@@ -70,12 +70,21 @@ import {
   FSRSScheduler,
 } from "@x/core/dist/academic/fsrs-scheduler.js";
 import { EssayGrader } from "@x/core/dist/academic/essay-grader.js";
-import type { FlashCard, FSRSCard } from "@x/shared/academic.js";
+import {
+  TaskManager,
+  type KanbanStatus,
+} from "@x/core/dist/academic/task-manager.js";
+import type {
+  FlashCard,
+  FSRSCard,
+  AcademicDashboardSummary,
+} from "@x/shared/dist/academic.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
 
 const flashcardStorage = new CardStorage(path.join(WorkDir, "academic"));
 const flashcardScheduler = new FSRSScheduler();
 const essayGrader = new EssayGrader();
+const taskManager = new TaskManager(path.join(WorkDir, "academic"));
 
 function createSeedFlashcards(courseId: string): FlashCard[] {
   const created = new Date().toISOString();
@@ -603,6 +612,33 @@ export function setupIpcHandlers() {
         sourceNames: args.sourceNames,
         wordGoal: args.wordGoal,
       });
+    },
+    "academic:assignments:list": async (_event, args) => {
+      const assignments = await taskManager.listAssignments(args.courseId);
+      return { assignments };
+    },
+    "academic:assignments:updateStatus": async (_event, args) => {
+      const next = await taskManager.updateKanbanStatus(
+        args.assignmentId,
+        args.status as KanbanStatus,
+      );
+      if (!next) {
+        return { success: false, error: "Assignment not found" };
+      }
+
+      return { success: true, assignment: next };
+    },
+    "academic:dashboard:summary": async (_event, args) => {
+      const courseId = args.courseId || "scholaros-demo";
+      let cards = await flashcardStorage.loadCards(courseId);
+      if (cards.length === 0) {
+        cards = createSeedFlashcards(courseId);
+        await flashcardStorage.saveCards(cards);
+      }
+
+      const summary: AcademicDashboardSummary =
+        await taskManager.dashboardSummary(cards, args.courseId);
+      return summary;
     },
     "mcp:listTools": async (_event, args) => {
       return mcpCore.listTools(args.serverName, args.cursor);

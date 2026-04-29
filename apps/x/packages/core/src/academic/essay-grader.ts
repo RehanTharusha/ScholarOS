@@ -1,8 +1,9 @@
 import type {
   CitationError,
+  CriterionFeedback,
   EssayFeedback,
   EssayDraft,
-} from "@x/shared/academic.js";
+} from "@x/shared/dist/academic.js";
 import {
   parseRubricMarkdown,
   rubricToAssignmentRubric,
@@ -32,10 +33,7 @@ export class EssayGrader {
       input.sourceNames ?? [],
     );
 
-    const criteriaScores = new Map<
-      string,
-      EssayFeedback["criteriaScores"] extends Map<string, infer T> ? T : never
-    >();
+    const criteriaScores = new Map<string, CriterionFeedback>();
     const revisionSuggestions: EssayFeedback["revisionSuggestions"] = [];
     const wordCount = input.essayText.split(/\s+/).filter(Boolean).length;
     const wordTarget = input.wordGoal ?? 1200;

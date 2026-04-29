@@ -8,7 +8,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { FSRSCard, FlashCard, ReviewHistory } from "@x/shared/academic.js";
+import { FSRSCard, FlashCard, ReviewHistory } from "@x/shared/dist/academic.js";
 
 /**
  * FSRS Parameters (defaults from fsrs-js library)
@@ -121,7 +121,7 @@ export class FSRSScheduler {
 
     return {
       ...card,
-      state: grade === 1 ? "learning" : grade === 2 ? "learning" : "review",
+      state: grade >= 3 ? "review" : "learning",
       difficulty: Math.max(0, hardPenalty + (grade - 3) * w[9]),
       stability: initialStability,
       scheduledDays:

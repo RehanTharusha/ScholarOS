@@ -2,7 +2,7 @@ import type {
   AssignmentRubric,
   RubricCriterion,
   GradingLevel,
-} from "@x/shared/academic.js";
+} from "@x/shared/dist/academic.js";
 
 export interface ParsedRubric {
   title: string;

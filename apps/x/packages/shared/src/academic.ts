@@ -44,9 +44,22 @@ export interface Assignment {
   description?: string;
   dueDate: string; // ISO 8601
   status: "not-started" | "in-progress" | "submitted" | "graded";
+  priority?: "high" | "medium" | "low";
   rubric?: AssignmentRubric;
   wikiLinks?: string[]; // Related concept pages
   notes?: string; // User's working notes
+}
+
+/**
+ * Aggregated dashboard metrics for the academic overview page
+ */
+export interface AcademicDashboardSummary {
+  coursesCount: number;
+  dueToday: number;
+  dueThisWeek: number;
+  completedAssignments: number;
+  totalAssignments: number;
+  dueFlashcards: number;
 }
 
 /**

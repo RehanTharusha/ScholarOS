@@ -605,8 +605,8 @@ async function processVoiceMemosForKnowledge(): Promise<boolean> {
     level: "info",
     message: `Found ${unprocessedFiles.length} new voice memo${unprocessedFiles.length === 1 ? "" : "s"}`,
     counts: { voiceMemos: unprocessedFiles.length },
-    items: limitedVoiceMemos.items,
-    truncated: limitedVoiceMemos.truncated,
+    items: limitedVoiceMemos,
+    truncated: relativeVoiceMemos.length > limitedVoiceMemos.length,
   });
 
   // Read the files
@@ -826,8 +826,8 @@ export async function processAllSources(): Promise<void> {
       level: "info",
       message: `Found ${allFiles.length} changed file${allFiles.length === 1 ? "" : "s"}${folderMessage}`,
       counts: countsByFolder,
-      items: limitedFiles.items,
-      truncated: limitedFiles.truncated,
+      items: limitedFiles,
+      truncated: relativeFiles.length > limitedFiles.length,
     });
 
     const notesCreated = new Set<string>();

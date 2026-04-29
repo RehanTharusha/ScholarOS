@@ -1,23 +1,41 @@
-import { z } from 'zod';
-import { RelPath, Encoding, Stat, DirEntry, ReaddirOptions, ReadFileResult, WorkspaceChangeEvent, WriteFileOptions, WriteFileResult, RemoveOptions } from './workspace.js';
-import { ListToolsResponse } from './mcp.js';
-import { AskHumanResponsePayload, CreateRunOptions, Run, ListRunsResponse, ToolPermissionAuthorizePayload } from './runs.js';
-import { LlmModelConfig } from './models.js';
-import { AgentScheduleConfig, AgentScheduleEntry } from './agent-schedule.js';
-import { AgentScheduleState } from './agent-schedule-state.js';
-import { ServiceEvent } from './service-events.js';
-import { TrackEvent } from './track-block.js';
-import { UserMessageContent } from './message.js';
-import { RowboatApiConfig } from './rowboat-account.js';
-import { ZListToolkitsResponse } from './composio.js';
-import { BrowserStateSchema } from './browser-control.js';
+import { z } from "zod";
+import {
+  RelPath,
+  Encoding,
+  Stat,
+  DirEntry,
+  ReaddirOptions,
+  ReadFileResult,
+  WorkspaceChangeEvent,
+  WriteFileOptions,
+  WriteFileResult,
+  RemoveOptions,
+} from "./workspace.js";
+import { ListToolsResponse } from "./mcp.js";
+import {
+  AskHumanResponsePayload,
+  CreateRunOptions,
+  Run,
+  ListRunsResponse,
+  ToolPermissionAuthorizePayload,
+} from "./runs.js";
+import { LlmModelConfig } from "./models.js";
+import { AgentScheduleConfig, AgentScheduleEntry } from "./agent-schedule.js";
+import { AgentScheduleState } from "./agent-schedule-state.js";
+import { ServiceEvent } from "./service-events.js";
+import { TrackEvent } from "./track-block.js";
+import { UserMessageContent } from "./message.js";
+import { RowboatApiConfig } from "./rowboat-account.js";
+import { ZListToolkitsResponse } from "./composio.js";
+import { BrowserStateSchema } from "./browser-control.js";
+import { Assignment } from "./academic.js";
 
 // ============================================================================
 // Runtime Validation Schemas (Single Source of Truth)
 // ============================================================================
 
 const ipcSchemas = {
-  'app:getVersions': {
+  "app:getVersions": {
     req: z.null(),
     res: z.object({
       chrome: z.string(),
@@ -25,13 +43,13 @@ const ipcSchemas = {
       electron: z.string(),
     }),
   },
-  'workspace:getRoot': {
+  "workspace:getRoot": {
     req: z.null(),
     res: z.object({
       root: z.string(),
     }),
   },
-  'workspace:exists': {
+  "workspace:exists": {
     req: z.object({
       path: RelPath,
     }),
@@ -39,27 +57,27 @@ const ipcSchemas = {
       exists: z.boolean(),
     }),
   },
-  'workspace:stat': {
+  "workspace:stat": {
     req: z.object({
       path: RelPath,
     }),
     res: Stat,
   },
-  'workspace:readdir': {
+  "workspace:readdir": {
     req: z.object({
       path: z.string(), // Empty string allowed for root directory
       opts: ReaddirOptions.optional(),
     }),
     res: z.array(DirEntry),
   },
-  'workspace:readFile': {
+  "workspace:readFile": {
     req: z.object({
       path: RelPath,
       encoding: Encoding.optional(),
     }),
     res: ReadFileResult,
   },
-  'workspace:writeFile': {
+  "workspace:writeFile": {
     req: z.object({
       path: RelPath,
       data: z.string(),
@@ -67,7 +85,7 @@ const ipcSchemas = {
     }),
     res: WriteFileResult,
   },
-  'workspace:mkdir': {
+  "workspace:mkdir": {
     req: z.object({
       path: RelPath,
       recursive: z.boolean().optional(),
@@ -76,7 +94,7 @@ const ipcSchemas = {
       ok: z.literal(true),
     }),
   },
-  'workspace:rename': {
+  "workspace:rename": {
     req: z.object({
       from: RelPath,
       to: RelPath,
@@ -86,7 +104,7 @@ const ipcSchemas = {
       ok: z.literal(true),
     }),
   },
-  'workspace:copy': {
+  "workspace:copy": {
     req: z.object({
       from: RelPath,
       to: RelPath,
@@ -96,7 +114,7 @@ const ipcSchemas = {
       ok: z.literal(true),
     }),
   },
-  'workspace:remove': {
+  "workspace:remove": {
     req: z.object({
       path: RelPath,
       opts: RemoveOptions.optional(),
@@ -105,18 +123,18 @@ const ipcSchemas = {
       ok: z.literal(true),
     }),
   },
-  'workspace:didChange': {
+  "workspace:didChange": {
     req: WorkspaceChangeEvent,
     res: z.null(),
   },
-  'mcp:listTools': {
+  "mcp:listTools": {
     req: z.object({
       serverName: z.string(),
       cursor: z.string().optional(),
     }),
     res: ListToolsResponse,
   },
-  'mcp:executeTool': {
+  "mcp:executeTool": {
     req: z.object({
       serverName: z.string(),
       toolName: z.string(),
@@ -126,35 +144,37 @@ const ipcSchemas = {
       result: z.unknown(),
     }),
   },
-  'runs:create': {
+  "runs:create": {
     req: CreateRunOptions,
     res: Run,
   },
-  'runs:createMessage': {
+  "runs:createMessage": {
     req: z.object({
       runId: z.string(),
       message: UserMessageContent,
       voiceInput: z.boolean().optional(),
-      voiceOutput: z.enum(['summary', 'full']).optional(),
+      voiceOutput: z.enum(["summary", "full"]).optional(),
       searchEnabled: z.boolean().optional(),
-      middlePaneContext: z.discriminatedUnion('kind', [
-        z.object({
-          kind: z.literal('note'),
-          path: z.string(),
-          content: z.string(),
-        }),
-        z.object({
-          kind: z.literal('browser'),
-          url: z.string(),
-          title: z.string(),
-        }),
-      ]).optional(),
+      middlePaneContext: z
+        .discriminatedUnion("kind", [
+          z.object({
+            kind: z.literal("note"),
+            path: z.string(),
+            content: z.string(),
+          }),
+          z.object({
+            kind: z.literal("browser"),
+            url: z.string(),
+            title: z.string(),
+          }),
+        ])
+        .optional(),
     }),
     res: z.object({
       messageId: z.string(),
     }),
   },
-  'runs:authorizePermission': {
+  "runs:authorizePermission": {
     req: z.object({
       runId: z.string(),
       authorization: ToolPermissionAuthorizePayload,
@@ -163,7 +183,7 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
-  'runs:provideHumanInput': {
+  "runs:provideHumanInput": {
     req: z.object({
       runId: z.string(),
       reply: AskHumanResponsePayload,
@@ -172,7 +192,7 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
-  'runs:stop': {
+  "runs:stop": {
     req: z.object({
       runId: z.string(),
       force: z.boolean().optional().default(false),
@@ -181,65 +201,69 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
-  'runs:fetch': {
+  "runs:fetch": {
     req: z.object({
       runId: z.string(),
     }),
     res: Run,
   },
-  'runs:list': {
+  "runs:list": {
     req: z.object({
       cursor: z.string().optional(),
     }),
     res: ListRunsResponse,
   },
-  'runs:delete': {
+  "runs:delete": {
     req: z.object({
       runId: z.string(),
     }),
     res: z.object({ success: z.boolean() }),
   },
-  'runs:events': {
+  "runs:events": {
     req: z.null(),
     res: z.null(),
   },
-  'services:events': {
+  "services:events": {
     req: ServiceEvent,
     res: z.null(),
   },
-  'tracks:events': {
+  "tracks:events": {
     req: TrackEvent,
     res: z.null(),
   },
-  'models:list': {
+  "models:list": {
     req: z.null(),
     res: z.object({
-      providers: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        models: z.array(z.object({
+      providers: z.array(
+        z.object({
           id: z.string(),
-          name: z.string().optional(),
-          release_date: z.string().optional(),
-        })),
-      })),
+          name: z.string(),
+          models: z.array(
+            z.object({
+              id: z.string(),
+              name: z.string().optional(),
+              release_date: z.string().optional(),
+            }),
+          ),
+        }),
+      ),
       lastUpdated: z.string().optional(),
     }),
   },
-  'models:test': {
+  "models:test": {
     req: LlmModelConfig,
     res: z.object({
       success: z.boolean(),
       error: z.string().optional(),
     }),
   },
-  'models:saveConfig': {
+  "models:saveConfig": {
     req: LlmModelConfig,
     res: z.object({
       success: z.literal(true),
     }),
   },
-  'oauth:connect': {
+  "oauth:connect": {
     req: z.object({
       provider: z.string(),
       clientId: z.string().optional(),
@@ -250,7 +274,7 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'oauth:disconnect': {
+  "oauth:disconnect": {
     req: z.object({
       provider: z.string(),
     }),
@@ -258,24 +282,27 @@ const ipcSchemas = {
       success: z.boolean(),
     }),
   },
-  'oauth:list-providers': {
+  "oauth:list-providers": {
     req: z.null(),
     res: z.object({
       providers: z.array(z.string()),
     }),
   },
-  'oauth:getState': {
+  "oauth:getState": {
     req: z.null(),
     res: z.object({
-      config: z.record(z.string(), z.object({
-        connected: z.boolean(),
-        error: z.string().nullable().optional(),
-        userId: z.string().optional(),
-        clientId: z.string().nullable().optional(),
-      })),
+      config: z.record(
+        z.string(),
+        z.object({
+          connected: z.boolean(),
+          error: z.string().nullable().optional(),
+          userId: z.string().optional(),
+          clientId: z.string().nullable().optional(),
+        }),
+      ),
     }),
   },
-  'account:getRowboat': {
+  "account:getRowboat": {
     req: z.null(),
     res: z.object({
       signedIn: z.boolean(),
@@ -283,7 +310,7 @@ const ipcSchemas = {
       config: RowboatApiConfig.nullable(),
     }),
   },
-  'oauth:didConnect': {
+  "oauth:didConnect": {
     req: z.object({
       provider: z.string(),
       success: z.boolean(),
@@ -292,13 +319,13 @@ const ipcSchemas = {
     }),
     res: z.null(),
   },
-  'granola:getConfig': {
+  "granola:getConfig": {
     req: z.null(),
     res: z.object({
       enabled: z.boolean(),
     }),
   },
-  'granola:setConfig': {
+  "granola:setConfig": {
     req: z.object({
       enabled: z.boolean(),
     }),
@@ -306,14 +333,14 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
-  'slack:getConfig': {
+  "slack:getConfig": {
     req: z.null(),
     res: z.object({
       enabled: z.boolean(),
       workspaces: z.array(z.object({ url: z.string(), name: z.string() })),
     }),
   },
-  'slack:setConfig': {
+  "slack:setConfig": {
     req: z.object({
       enabled: z.boolean(),
       workspaces: z.array(z.object({ url: z.string(), name: z.string() })),
@@ -322,33 +349,101 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
-  'slack:listWorkspaces': {
+  "slack:listWorkspaces": {
     req: z.null(),
     res: z.object({
       workspaces: z.array(z.object({ url: z.string(), name: z.string() })),
       error: z.string().optional(),
     }),
   },
-  'onboarding:getStatus': {
+  "academic:flashcards:list": {
+    req: z.object({
+      courseId: z.string().optional(),
+    }),
+    res: z.object({
+      cards: z.array(z.unknown()),
+      dueCount: z.number(),
+      totalCount: z.number(),
+    }),
+  },
+  "academic:flashcards:grade": {
+    req: z.object({
+      courseId: z.string().optional(),
+      cardId: z.string(),
+      grade: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+      durationMs: z.number().optional(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      card: z.unknown().optional(),
+      cards: z.array(z.unknown()).optional(),
+      dueCount: z.number().optional(),
+      totalCount: z.number().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "academic:essay:grade": {
+    req: z.object({
+      title: z.string(),
+      essayText: z.string(),
+      rubricMarkdown: z.string(),
+      sourceNames: z.array(z.string()).optional(),
+      wordGoal: z.number().optional(),
+    }),
+    res: z.unknown(),
+  },
+  "academic:assignments:list": {
+    req: z.object({
+      courseId: z.string().optional(),
+    }),
+    res: z.object({
+      assignments: z.array(z.custom<Assignment>()),
+    }),
+  },
+  "academic:assignments:updateStatus": {
+    req: z.object({
+      assignmentId: z.string(),
+      status: z.enum(["not-started", "in-progress", "done"]),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      assignment: z.custom<Assignment>().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "academic:dashboard:summary": {
+    req: z.object({
+      courseId: z.string().optional(),
+    }),
+    res: z.object({
+      coursesCount: z.number(),
+      dueToday: z.number(),
+      dueThisWeek: z.number(),
+      completedAssignments: z.number(),
+      totalAssignments: z.number(),
+      dueFlashcards: z.number(),
+    }),
+  },
+  "onboarding:getStatus": {
     req: z.null(),
     res: z.object({
       showOnboarding: z.boolean(),
     }),
   },
-  'onboarding:markComplete': {
+  "onboarding:markComplete": {
     req: z.null(),
     res: z.object({
       success: z.literal(true),
     }),
   },
   // Composio integration channels
-  'composio:is-configured': {
+  "composio:is-configured": {
     req: z.null(),
     res: z.object({
       configured: z.boolean(),
     }),
   },
-  'composio:set-api-key': {
+  "composio:set-api-key": {
     req: z.object({
       apiKey: z.string(),
     }),
@@ -357,7 +452,7 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'composio:initiate-connection': {
+  "composio:initiate-connection": {
     req: z.object({
       toolkitSlug: z.string(),
     }),
@@ -368,7 +463,7 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'composio:get-connection-status': {
+  "composio:get-connection-status": {
     req: z.object({
       toolkitSlug: z.string(),
     }),
@@ -377,7 +472,7 @@ const ipcSchemas = {
       status: z.string().optional(),
     }),
   },
-  'composio:sync-connection': {
+  "composio:sync-connection": {
     req: z.object({
       toolkitSlug: z.string(),
       connectedAccountId: z.string(),
@@ -386,7 +481,7 @@ const ipcSchemas = {
       status: z.string(),
     }),
   },
-  'composio:disconnect': {
+  "composio:disconnect": {
     req: z.object({
       toolkitSlug: z.string(),
     }),
@@ -394,25 +489,25 @@ const ipcSchemas = {
       success: z.boolean(),
     }),
   },
-  'composio:list-connected': {
+  "composio:list-connected": {
     req: z.null(),
     res: z.object({
       toolkits: z.array(z.string()),
     }),
   },
-  'composio:use-composio-for-google': {
+  "composio:use-composio-for-google": {
     req: z.null(),
     res: z.object({
       enabled: z.boolean(),
     }),
   },
-  'composio:use-composio-for-google-calendar': {
+  "composio:use-composio-for-google-calendar": {
     req: z.null(),
     res: z.object({
       enabled: z.boolean(),
     }),
   },
-  'composio:didConnect': {
+  "composio:didConnect": {
     req: z.object({
       toolkitSlug: z.string(),
       success: z.boolean(),
@@ -421,20 +516,20 @@ const ipcSchemas = {
     res: z.null(),
   },
   // Composio Tools Library channels
-  'composio:list-toolkits': {
+  "composio:list-toolkits": {
     req: z.object({}),
     res: ZListToolkitsResponse,
   },
   // Agent schedule channels
-  'agent-schedule:getConfig': {
+  "agent-schedule:getConfig": {
     req: z.null(),
     res: AgentScheduleConfig,
   },
-  'agent-schedule:getState': {
+  "agent-schedule:getState": {
     req: z.null(),
     res: AgentScheduleState,
   },
-  'agent-schedule:updateAgent': {
+  "agent-schedule:updateAgent": {
     req: z.object({
       agentName: z.string(),
       entry: AgentScheduleEntry,
@@ -443,7 +538,7 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
-  'agent-schedule:deleteAgent': {
+  "agent-schedule:deleteAgent": {
     req: z.object({
       agentName: z.string(),
     }),
@@ -452,63 +547,69 @@ const ipcSchemas = {
     }),
   },
   // Shell integration channels
-  'shell:openPath': {
+  "shell:openPath": {
     req: z.object({ path: z.string() }),
     res: z.object({ error: z.string().optional() }),
   },
-  'shell:readFileBase64': {
+  "shell:readFileBase64": {
     req: z.object({ path: z.string() }),
     res: z.object({ data: z.string(), mimeType: z.string(), size: z.number() }),
   },
   // Knowledge version history channels
-  'knowledge:history': {
+  "knowledge:history": {
     req: z.object({ path: RelPath }),
     res: z.object({
-      commits: z.array(z.object({
-        oid: z.string(),
-        message: z.string(),
-        timestamp: z.number(),
-        author: z.string(),
-      })),
+      commits: z.array(
+        z.object({
+          oid: z.string(),
+          message: z.string(),
+          timestamp: z.number(),
+          author: z.string(),
+        }),
+      ),
     }),
   },
-  'knowledge:fileAtCommit': {
+  "knowledge:fileAtCommit": {
     req: z.object({ path: RelPath, oid: z.string() }),
     res: z.object({ content: z.string() }),
   },
-  'knowledge:restore': {
+  "knowledge:restore": {
     req: z.object({ path: RelPath, oid: z.string() }),
     res: z.object({ ok: z.literal(true) }),
   },
-  'knowledge:didCommit': {
+  "knowledge:didCommit": {
     req: z.object({}),
     res: z.null(),
   },
   // Search channels
-  'search:query': {
+  "search:query": {
     req: z.object({
       query: z.string(),
       limit: z.number().optional(),
-      types: z.array(z.enum(['knowledge', 'chat'])).optional(),
+      types: z.array(z.enum(["knowledge", "chat"])).optional(),
     }),
     res: z.object({
-      results: z.array(z.object({
-        type: z.enum(['knowledge', 'chat']),
-        title: z.string(),
-        preview: z.string(),
-        path: z.string(),
-      })),
+      results: z.array(
+        z.object({
+          type: z.enum(["knowledge", "chat"]),
+          title: z.string(),
+          preview: z.string(),
+          path: z.string(),
+        }),
+      ),
     }),
   },
   // Voice mode channels
-  'voice:getConfig': {
+  "voice:getConfig": {
     req: z.null(),
     res: z.object({
       deepgram: z.object({ apiKey: z.string() }).nullable(),
-      elevenlabs: z.object({ apiKey: z.string(), voiceId: z.string().optional() }).nullable(),
+      elevenlabs: z
+        .object({ apiKey: z.string(), voiceId: z.string().optional() })
+        .nullable(),
     }),
   },
-  'voice:synthesize': {
+  "voice:synthesize": {
     req: z.object({
       text: z.string(),
     }),
@@ -517,17 +618,17 @@ const ipcSchemas = {
       mimeType: z.string(),
     }),
   },
-  'meeting:checkScreenPermission': {
+  "meeting:checkScreenPermission": {
     req: z.null(),
     res: z.object({
       granted: z.boolean(),
     }),
   },
-  'meeting:openScreenRecordingSettings': {
+  "meeting:openScreenRecordingSettings": {
     req: z.null(),
     res: z.object({ success: z.boolean() }),
   },
-  'meeting:summarize': {
+  "meeting:summarize": {
     req: z.object({
       transcript: z.string(),
       meetingStartTime: z.string().optional(),
@@ -538,10 +639,10 @@ const ipcSchemas = {
     }),
   },
   // Inline task schedule classification
-  'export:note': {
+  "export:note": {
     req: z.object({
       markdown: z.string(),
-      format: z.enum(['md', 'pdf', 'docx']),
+      format: z.enum(["md", "pdf", "docx"]),
       title: z.string(),
     }),
     res: z.object({
@@ -549,19 +650,39 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'inline-task:classifySchedule': {
+  "inline-task:classifySchedule": {
     req: z.object({
       instruction: z.string(),
     }),
     res: z.object({
-      schedule: z.union([
-        z.object({ type: z.literal('cron'), expression: z.string(), startDate: z.string(), endDate: z.string(), label: z.string() }),
-        z.object({ type: z.literal('window'), cron: z.string(), startTime: z.string(), endTime: z.string(), startDate: z.string(), endDate: z.string(), label: z.string() }),
-        z.object({ type: z.literal('once'), runAt: z.string(), label: z.string() }),
-      ]).nullable(),
+      schedule: z
+        .union([
+          z.object({
+            type: z.literal("cron"),
+            expression: z.string(),
+            startDate: z.string(),
+            endDate: z.string(),
+            label: z.string(),
+          }),
+          z.object({
+            type: z.literal("window"),
+            cron: z.string(),
+            startTime: z.string(),
+            endTime: z.string(),
+            startDate: z.string(),
+            endDate: z.string(),
+            label: z.string(),
+          }),
+          z.object({
+            type: z.literal("once"),
+            runAt: z.string(),
+            label: z.string(),
+          }),
+        ])
+        .nullable(),
     }),
   },
-  'inline-task:process': {
+  "inline-task:process": {
     req: z.object({
       instruction: z.string(),
       noteContent: z.string(),
@@ -569,17 +690,31 @@ const ipcSchemas = {
     }),
     res: z.object({
       instruction: z.string(),
-      schedule: z.union([
-        z.object({ type: z.literal('cron'), expression: z.string(), startDate: z.string(), endDate: z.string() }),
-        z.object({ type: z.literal('window'), cron: z.string(), startTime: z.string(), endTime: z.string(), startDate: z.string(), endDate: z.string() }),
-        z.object({ type: z.literal('once'), runAt: z.string() }),
-      ]).nullable(),
+      schedule: z
+        .union([
+          z.object({
+            type: z.literal("cron"),
+            expression: z.string(),
+            startDate: z.string(),
+            endDate: z.string(),
+          }),
+          z.object({
+            type: z.literal("window"),
+            cron: z.string(),
+            startTime: z.string(),
+            endTime: z.string(),
+            startDate: z.string(),
+            endDate: z.string(),
+          }),
+          z.object({ type: z.literal("once"), runAt: z.string() }),
+        ])
+        .nullable(),
       scheduleLabel: z.string().nullable(),
       response: z.string().nullable(),
     }),
   },
   // Track channels
-  'track:run': {
+  "track:run": {
     req: z.object({
       trackId: z.string(),
       filePath: z.string(),
@@ -590,7 +725,7 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'track:get': {
+  "track:get": {
     req: z.object({
       trackId: z.string(),
       filePath: z.string(),
@@ -603,7 +738,7 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'track:update': {
+  "track:update": {
     req: z.object({
       trackId: z.string(),
       filePath: z.string(),
@@ -617,7 +752,7 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'track:replaceYaml': {
+  "track:replaceYaml": {
     req: z.object({
       trackId: z.string(),
       filePath: z.string(),
@@ -629,7 +764,7 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'track:delete': {
+  "track:delete": {
     req: z.object({
       trackId: z.string(),
       filePath: z.string(),
@@ -640,7 +775,7 @@ const ipcSchemas = {
     }),
   },
   // Embedded browser (WebContentsView) channels
-  'browser:setBounds': {
+  "browser:setBounds": {
     req: z.object({
       x: z.number().int(),
       y: z.number().int(),
@@ -649,23 +784,27 @@ const ipcSchemas = {
     }),
     res: z.object({ ok: z.literal(true) }),
   },
-  'browser:setVisible': {
+  "browser:setVisible": {
     req: z.object({ visible: z.boolean() }),
     res: z.object({ ok: z.literal(true) }),
   },
-  'browser:newTab': {
+  "browser:newTab": {
     req: z.object({
-      url: z.string().min(1).refine(
-        (u) => {
-          const lower = u.trim().toLowerCase();
-          if (lower.startsWith('javascript:')) return false;
-          if (lower.startsWith('file://')) return false;
-          if (lower.startsWith('chrome://')) return false;
-          if (lower.startsWith('chrome-extension://')) return false;
-          return true;
-        },
-        { message: 'Unsafe URL scheme' },
-      ).optional(),
+      url: z
+        .string()
+        .min(1)
+        .refine(
+          (u) => {
+            const lower = u.trim().toLowerCase();
+            if (lower.startsWith("javascript:")) return false;
+            if (lower.startsWith("file://")) return false;
+            if (lower.startsWith("chrome://")) return false;
+            if (lower.startsWith("chrome-extension://")) return false;
+            return true;
+          },
+          { message: "Unsafe URL scheme" },
+        )
+        .optional(),
     }),
     res: z.object({
       ok: z.boolean(),
@@ -673,55 +812,58 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  'browser:switchTab': {
+  "browser:switchTab": {
     req: z.object({ tabId: z.string().min(1) }),
     res: z.object({ ok: z.boolean() }),
   },
-  'browser:closeTab': {
+  "browser:closeTab": {
     req: z.object({ tabId: z.string().min(1) }),
     res: z.object({ ok: z.boolean() }),
   },
-  'browser:navigate': {
+  "browser:navigate": {
     req: z.object({
-      url: z.string().min(1).refine(
-        (u) => {
-          const lower = u.trim().toLowerCase();
-          if (lower.startsWith('javascript:')) return false;
-          if (lower.startsWith('file://')) return false;
-          if (lower.startsWith('chrome://')) return false;
-          if (lower.startsWith('chrome-extension://')) return false;
-          return true;
-        },
-        { message: 'Unsafe URL scheme' },
-      ),
+      url: z
+        .string()
+        .min(1)
+        .refine(
+          (u) => {
+            const lower = u.trim().toLowerCase();
+            if (lower.startsWith("javascript:")) return false;
+            if (lower.startsWith("file://")) return false;
+            if (lower.startsWith("chrome://")) return false;
+            if (lower.startsWith("chrome-extension://")) return false;
+            return true;
+          },
+          { message: "Unsafe URL scheme" },
+        ),
     }),
     res: z.object({
       ok: z.boolean(),
       error: z.string().optional(),
     }),
   },
-  'browser:back': {
+  "browser:back": {
     req: z.null(),
     res: z.object({ ok: z.boolean() }),
   },
-  'browser:forward': {
+  "browser:forward": {
     req: z.null(),
     res: z.object({ ok: z.boolean() }),
   },
-  'browser:reload': {
+  "browser:reload": {
     req: z.null(),
     res: z.object({ ok: z.literal(true) }),
   },
-  'browser:getState': {
+  "browser:getState": {
     req: z.null(),
     res: BrowserStateSchema,
   },
-  'browser:didUpdateState': {
+  "browser:didUpdateState": {
     req: BrowserStateSchema,
     res: z.null(),
   },
   // Billing channels
-  'billing:getInfo': {
+  "billing:getInfo": {
     req: z.null(),
     res: z.object({
       userEmail: z.string().nullable(),
@@ -741,8 +883,8 @@ const ipcSchemas = {
 
 export type IPCChannels = {
   [K in keyof typeof ipcSchemas]: {
-    req: z.infer<typeof ipcSchemas[K]['req']>;
-    res: z.infer<typeof ipcSchemas[K]['res']>;
+    req: z.infer<(typeof ipcSchemas)[K]["req"]>;
+    res: z.infer<(typeof ipcSchemas)[K]["res"]>;
   };
 };
 
@@ -751,8 +893,7 @@ export type IPCChannels = {
  * These are channels with non-null responses
  */
 export type InvokeChannels = {
-  [K in keyof IPCChannels]:
-    IPCChannels[K]['res'] extends null ? never : K
+  [K in keyof IPCChannels]: IPCChannels[K]["res"] extends null ? never : K;
 }[keyof IPCChannels];
 
 /**
@@ -760,8 +901,7 @@ export type InvokeChannels = {
  * These are channels with null responses (no response expected)
  */
 export type SendChannels = {
-  [K in keyof IPCChannels]:
-    IPCChannels[K]['res'] extends null ? K : never
+  [K in keyof IPCChannels]: IPCChannels[K]["res"] extends null ? K : never;
 }[keyof IPCChannels];
 
 // ============================================================================
@@ -770,16 +910,16 @@ export type SendChannels = {
 
 export function validateRequest<K extends keyof IPCChannels>(
   channel: K,
-  data: unknown
-): IPCChannels[K]['req'] {
+  data: unknown,
+): IPCChannels[K]["req"] {
   const schema = ipcSchemas[channel].req;
-  return schema.parse(data) as IPCChannels[K]['req'];
+  return schema.parse(data) as IPCChannels[K]["req"];
 }
 
 export function validateResponse<K extends keyof IPCChannels>(
   channel: K,
-  data: unknown
-): IPCChannels[K]['res'] {
+  data: unknown,
+): IPCChannels[K]["res"] {
   const schema = ipcSchemas[channel].res;
-  return schema.parse(data) as IPCChannels[K]['res'];
+  return schema.parse(data) as IPCChannels[K]["res"];
 }

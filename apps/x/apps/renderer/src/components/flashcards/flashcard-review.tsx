@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FlashcardStats } from "./flashcard-stats";
-import type { FlashCard } from "@x/shared/academic.js";
+import type { FlashCard } from "@x/shared/dist/academic.js";
 
 const COURSE_ID = "scholaros-demo";
 

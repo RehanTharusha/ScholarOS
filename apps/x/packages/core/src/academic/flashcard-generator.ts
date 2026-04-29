@@ -3,7 +3,7 @@
  * Extracts Q&A pairs from wiki concepts using LLM
  */
 
-import { FlashCard } from "@x/shared/academic.js";
+import { FlashCard } from "@x/shared/dist/academic.js";
 
 export interface CardGenerationOptions {
   conceptPath: string;

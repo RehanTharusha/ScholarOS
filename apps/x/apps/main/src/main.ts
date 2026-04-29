@@ -233,13 +233,9 @@ app.whenReady().then(async () => {
   try {
     execSync("agent-slack --version", { stdio: "ignore", timeout: 5000 });
   } catch {
-    try {
-      console.log("agent-slack not found, installing...");
-      await execAsync("npm install -g agent-slack", { timeout: 60000 });
-      console.log("agent-slack installed successfully");
-    } catch (e) {
-      console.error("Failed to install agent-slack:", e);
-    }
+    console.warn(
+      "agent-slack not found; Slack connector features will stay disabled until it is installed.",
+    );
   }
 
   // Initialize all config files before UI can access them

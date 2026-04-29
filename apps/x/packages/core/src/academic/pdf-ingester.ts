@@ -151,14 +151,19 @@ Format as JSON.
  * PDF text extraction (integrates with existing pdf-parse)
  */
 class PDFExtractor {
-  async extract(
-    filepath: string,
-  ): Promise<{
+  async extract(filepath: string): Promise<{
     text: string;
     pageCount: number;
     metadata: Record<string, unknown>;
   }> {
-    const pdfParse = await import("pdf-parse");
+    const pdfParseModule = (await import("pdf-parse")) as {
+      default?: (buffer: Buffer) => Promise<PdfParseResult>;
+    };
+    const pdfParse =
+      pdfParseModule.default ??
+      (pdfParseModule as unknown as (
+        buffer: Buffer,
+      ) => Promise<PdfParseResult>);
     const fileBuffer = await fs.readFile(filepath);
 
     const data = (await pdfParse(fileBuffer as Buffer)) as PdfParseResult;
@@ -166,7 +171,7 @@ class PDFExtractor {
     return {
       text: data.text,
       pageCount: data.numpages,
-      metadata: data.info,
+      metadata: data.info ?? {},
     };
   }
 }

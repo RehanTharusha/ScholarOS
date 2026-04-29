@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { EssayFeedback, CitationError } from "@x/shared/academic.js";
+import type { EssayFeedback, CitationError } from "@x/shared/dist/academic.js";
 
 type EssayGradeResponse = {
   draft: {

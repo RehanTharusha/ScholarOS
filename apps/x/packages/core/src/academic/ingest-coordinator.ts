@@ -5,6 +5,8 @@
 
 import { PDFIngester, IngestResult } from "./pdf-ingester.js";
 import { FlashcardGenerator, GeneratedCard } from "./flashcard-generator.js";
+import { ContradictionDetector } from "./contradiction-detector.js";
+import type { Contradiction as AcademicContradiction } from "@x/shared/dist/academic.js";
 import path from "path";
 import { promises as fs } from "fs";
 
@@ -64,6 +66,7 @@ export interface CommitOptions {
 export class IngestCoordinator {
   private pdfIngester: PDFIngester;
   private cardGenerator: FlashcardGenerator;
+  private contradictionDetector: ContradictionDetector;
   private currentWorkflow?: IngestPreview;
 
   constructor(
@@ -73,6 +76,7 @@ export class IngestCoordinator {
   ) {
     this.pdfIngester = new PDFIngester(vaultPath, llmAgent);
     this.cardGenerator = new FlashcardGenerator(llmAgent);
+    this.contradictionDetector = new ContradictionDetector(llmAgent);
   }
 
   /**
@@ -159,7 +163,15 @@ Generate 5-8 high-quality study flashcards. Return JSON array with {front, back,
     // Check for contradictions if enabled
     let potentialContradictions: Contradiction[] | undefined;
     if (options.checkContradictions && extractResults.length > 1) {
-      potentialContradictions = await this.detectContradictions(extractResults);
+      const detected = await this.contradictionDetector.detect(
+        extractResults
+          .filter((result) => result.success)
+          .map((result) => ({
+            name: result.metadata.title || result.metadata.filename,
+            content: result.metadata.extractedText,
+          })),
+      );
+      potentialContradictions = detected.map(this.fromAcademicContradiction);
     }
 
     const preview: IngestPreview = {
@@ -269,47 +281,16 @@ Generate 5-8 high-quality study flashcards. Return JSON array with {front, back,
     return { created, errors };
   }
 
-  /**
-   * Detect contradictions across sources
-   */
-  private async detectContradictions(
-    results: IngestResult[],
-  ): Promise<Contradiction[]> {
-    if (results.length < 2) return [];
-
-    const prompt = `
-Analyze these academic sources for factual contradictions or disagreements:
-
-${results
-  .map(
-    (r) =>
-      `Source: ${r.metadata.title || r.metadata.filename}
-Content (first 300 chars):
-${r.metadata.extractedText.substring(0, 300)}`,
-  )
-  .join("\n\n")}
-
-Identify 2-3 key factual or methodological disagreements, if any. Return JSON array with:
-{
-  "claim1": "statement from source 1",
-  "source1": "source name",
-  "claim2": "statement from source 2", 
-  "source2": "source name",
-  "confidence": 0.8,
-  "type": "factual|methodological|interpretive"
-}
-
-If no contradictions, return empty array [].
-    `;
-
-    try {
-      const response = await this.llmAgent.generate(prompt);
-      const contradictions = JSON.parse(response.text);
-      return contradictions || [];
-    } catch (e) {
-      console.error("Failed to detect contradictions:", e);
-      return [];
-    }
+  private fromAcademicContradiction(
+    contradiction: AcademicContradiction,
+  ): Contradiction {
+    return {
+      claim1: contradiction.claim1,
+      source1: contradiction.source1,
+      claim2: contradiction.claim2,
+      source2: contradiction.source2,
+      confidence: contradiction.confidence,
+    };
   }
 
   /**
