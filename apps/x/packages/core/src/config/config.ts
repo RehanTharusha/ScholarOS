@@ -59,6 +59,37 @@ function ensureDefaultConfigs() {
 ensureDirs();
 ensureDefaultConfigs();
 
+/**
+ * Check if tools should be disabled for development/testing.
+ * Useful for testing LLMs that don't support tool_choice parameter.
+ *
+ * Configuration priority (highest to lowest):
+ * 1. SCHOLAROS_DISABLE_TOOLS environment variable
+ * 2. ~/.rowboat/config/dev.json { disableTools: true }
+ * 3. Default: false (tools enabled)
+ */
+export function shouldDisableTools(): boolean {
+  // Check environment variable first
+  if (process.env.SCHOLAROS_DISABLE_TOOLS === "true") {
+    return true;
+  }
+
+  // Check dev config file
+  try {
+    const devConfigPath = path.join(WorkDir, "config", "dev.json");
+    if (fs.existsSync(devConfigPath)) {
+      const config = JSON.parse(fs.readFileSync(devConfigPath, "utf-8"));
+      if (config.disableTools === true) {
+        return true;
+      }
+    }
+  } catch {
+    // Ignore config errors
+  }
+
+  return false;
+}
+
 // Ensure default knowledge files exist
 import("../knowledge/ensure_daily_note.js")
   .then((m) => m.ensureDailyNote())

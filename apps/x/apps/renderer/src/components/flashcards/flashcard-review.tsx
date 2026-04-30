@@ -1,16 +1,22 @@
 import * as React from "react";
 import {
   ArrowLeftRight,
-  FlipHorizontal2,
   RefreshCw,
   ThumbsDown,
   ThumbsUp,
   XCircle,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { FlashcardStats } from "./flashcard-stats";
 import type { FlashCard } from "@x/shared/dist/academic.js";
+import {
+  AcademicCard,
+  AcademicEmptyState,
+  AcademicPageHeader,
+  AcademicPageShell,
+  AcademicSectionTitle,
+} from "@/components/academic/academic-shell";
 
 const COURSE_ID = "scholaros-demo";
 
@@ -21,10 +27,6 @@ type FlashcardListResponse = {
   dueCount: number;
   totalCount: number;
 };
-
-function isFlippedCard(card: FlashCard): boolean {
-  return (card.reviewed?.length ?? 0) > 0;
-}
 
 export function FlashcardReview() {
   const [cards, setCards] = React.useState<FlashCard[]>([]);
@@ -110,36 +112,27 @@ export function FlashcardReview() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(120,119,198,0.12),_transparent_40%),linear-gradient(180deg,_rgba(15,23,42,0.96),_rgba(2,6,23,0.98))] text-slate-50">
-      <div className="border-b border-white/10 px-6 py-5 backdrop-blur-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/70">
-              ScholarOS Study Mode
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-              Flashcards
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-300">
-              Review high-yield concepts with spaced repetition and keep the
-              session focused on recall, not rereading.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+    <AcademicPageShell>
+      <AcademicPageHeader
+        eyebrow="ScholarOS Study Mode"
+        title="Flashcards"
+        description="Review high-yield concepts with spaced repetition and keep the session focused on recall, not rereading."
+        actions={
+          <>
+            <Badge variant="secondary" className="rounded-full px-3 py-1">
               Course: General Studies
-            </span>
-            <button
-              type="button"
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => void loadCards()}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-100 transition hover:bg-white/10"
             >
               <RefreshCw className="size-3.5" />
               Refresh
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
         <FlashcardStats
@@ -150,80 +143,63 @@ export function FlashcardReview() {
         />
 
         {error ? (
-          <div className="mb-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         ) : null}
 
         {loading ? (
-          <div className="flex min-h-[380px] items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 text-sm text-slate-300">
-            Loading flashcards...
-          </div>
+          <AcademicEmptyState
+            title="Loading flashcards..."
+            description="Fetching the current review queue."
+          />
         ) : cards.length === 0 ? (
-          <div className="flex min-h-[380px] flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/15 bg-white/5 px-6 text-center text-slate-300">
-            <p className="text-lg font-medium text-slate-100">No cards yet</p>
-            <p className="mt-2 max-w-md text-sm">
-              The backend seeds sample cards automatically. If you see this
-              state, reload the tab.
-            </p>
-            <Button className="mt-4" onClick={() => void loadCards()}>
-              Reload cards
-            </Button>
-          </div>
+          <AcademicEmptyState
+            title="No cards yet"
+            description="The backend seeds sample cards automatically. If you see this state, reload the tab."
+            action={
+              <Button variant="outline" onClick={() => void loadCards()}>
+                Reload cards
+              </Button>
+            }
+          />
         ) : (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="rounded-[2rem] border border-white/10 bg-slate-950/70 p-4 shadow-2xl shadow-cyan-950/20">
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-2 pb-3">
-                <div className="text-sm text-slate-300">
-                  Card <span className="text-slate-50">{activeIndex + 1}</span>{" "}
-                  of <span className="text-slate-50">{cards.length}</span>
+            <AcademicCard className="flex min-h-0 flex-col">
+              <AcademicSectionTitle
+                eyebrow="Review"
+                title={`Card ${activeIndex + 1} of ${cards.length}`}
+              />
+
+              <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-6 transition-colors duration-200">
+                <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
+                  {flipped ? "Answer" : "Prompt"}
                 </div>
                 <button
                   type="button"
                   onClick={() => setFlipped((value) => !value)}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 transition hover:bg-white/10"
+                  className="mt-4 block w-full text-left text-2xl font-medium leading-tight text-foreground"
                 >
-                  <FlipHorizontal2 className="size-3.5" />
-                  {flipped || isFlippedCard(activeCard)
-                    ? "Show front"
-                    : "Show answer"}
-                </button>
-              </div>
-
-              <div
-                className={cn(
-                  "mt-4 min-h-[280px] rounded-[1.5rem] border border-white/10 p-6 transition-all duration-300",
-                  flipped ? "bg-cyan-500/10" : "bg-white/[0.03]",
-                )}
-              >
-                <div className="text-xs uppercase tracking-[0.3em] text-cyan-200/70">
-                  {flipped ? "Answer" : "Prompt"}
-                </div>
-                <div className="mt-4 text-2xl font-medium leading-tight text-slate-50">
                   {flipped ? activeCard.back : activeCard.front}
-                </div>
-                <div className="mt-6 flex flex-wrap gap-2 text-xs text-slate-300">
-                  <span className="rounded-full border border-white/10 px-3 py-1">
+                </button>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="rounded-full px-3 py-1">
                     Difficulty: {activeCard.difficulty}
-                  </span>
-                  <span className="rounded-full border border-white/10 px-3 py-1">
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-3 py-1">
                     Concept: {activeCard.conceptId}
-                  </span>
+                  </Badge>
                   {activeCard.nextReview ? (
-                    <span className="rounded-full border border-white/10 px-3 py-1">
+                    <Badge variant="outline" className="rounded-full px-3 py-1">
                       Next review:{" "}
                       {new Date(activeCard.nextReview).toLocaleDateString()}
-                    </span>
+                    </Badge>
                   ) : null}
                 </div>
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <Button
-                  variant="ghost"
-                  className="text-slate-200 hover:bg-white/10 hover:text-white"
-                  onClick={previousCard}
-                >
+                <Button variant="ghost" onClick={previousCard}>
                   Previous
                 </Button>
                 <div className="flex flex-wrap gap-2">
@@ -238,7 +214,7 @@ export function FlashcardReview() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="gap-2 border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                    className="gap-2"
                     onClick={() => void gradeCard(2)}
                     disabled={busyGrade !== null}
                   >
@@ -246,7 +222,7 @@ export function FlashcardReview() {
                     Hard
                   </Button>
                   <Button
-                    className="gap-2 bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                    className="gap-2"
                     onClick={() => void gradeCard(3)}
                     disabled={busyGrade !== null}
                   >
@@ -254,7 +230,8 @@ export function FlashcardReview() {
                     Good
                   </Button>
                   <Button
-                    className="gap-2 bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                    variant="secondary"
+                    className="gap-2"
                     onClick={() => void gradeCard(4)}
                     disabled={busyGrade !== null}
                   >
@@ -262,39 +239,36 @@ export function FlashcardReview() {
                     Easy
                   </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  className="text-slate-200 hover:bg-white/10 hover:text-white"
-                  onClick={nextCard}
-                >
+                <Button variant="ghost" onClick={nextCard}>
                   Next
                 </Button>
               </div>
-            </div>
+            </AcademicCard>
 
-            <aside className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300 backdrop-blur-sm">
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">
-                Session notes
-              </p>
+            <aside className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+              <AcademicSectionTitle
+                eyebrow="Session notes"
+                title="Review rules"
+              />
               <ul className="mt-3 space-y-3">
-                <li className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <li className="rounded-xl border border-border bg-muted/30 p-3">
                   Grade from memory first, then check the answer.
                 </li>
-                <li className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <li className="rounded-xl border border-border bg-muted/30 p-3">
                   Use Hard only when you partially recalled the answer.
                 </li>
-                <li className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <li className="rounded-xl border border-border bg-muted/30 p-3">
                   Easy should mean instant recall with confidence.
                 </li>
               </ul>
-              <div className="mt-4 rounded-xl border border-cyan-400/20 bg-cyan-500/10 p-3 text-cyan-100">
-                Flashcards here are backed by JSON storage in the main process
-                and scheduled with FSRS.
+              <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3 text-sm text-foreground">
+                Flashcards are backed by JSON storage in the main process and
+                scheduled with FSRS.
               </div>
             </aside>
           </div>
         )}
       </div>
-    </div>
+    </AcademicPageShell>
   );
 }

@@ -1,6 +1,14 @@
 import * as React from "react";
 import { RefreshCw } from "lucide-react";
 import type { Assignment } from "@x/shared/dist/academic.js";
+import { Button } from "@/components/ui/button";
+import {
+  AcademicCard,
+  AcademicEmptyState,
+  AcademicPageHeader,
+  AcademicPageShell,
+  AcademicSectionTitle,
+} from "@/components/academic/academic-shell";
 import { useVirtualScroll } from "@/hooks/use-virtual-scroll";
 import { TaskCard, type KanbanStatus } from "./task-card";
 
@@ -96,55 +104,49 @@ export function KanbanAcademic() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_bottom_left,_rgba(20,184,166,0.14),_transparent_35%),linear-gradient(180deg,_rgba(2,6,23,0.96),_rgba(15,23,42,0.98))] text-slate-50">
-      <div className="border-b border-white/10 px-6 py-5 backdrop-blur-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-teal-200/70">
-              ScholarOS Study Mode
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-              Assignment Board
-            </h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-300">
-              Track coursework from first draft to completion, with course
-              context and wiki links.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void loadAssignments()}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 transition hover:bg-white/10"
-          >
-            <RefreshCw className="size-3.5" />
-            Refresh board
-          </button>
-          <select
-            value={courseFilter}
-            onChange={(event) => setCourseFilter(event.target.value)}
-            className="h-8 rounded-md border border-white/10 bg-white/5 px-2 text-xs text-slate-100 outline-none"
-          >
-            <option value="all">All courses</option>
-            {courses.map((courseId) => (
-              <option key={courseId} value={courseId}>
-                {courseId}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+    <AcademicPageShell>
+      <AcademicPageHeader
+        eyebrow="ScholarOS Study Mode"
+        title="Assignment Board"
+        description="Track coursework from first draft to completion, with course context and wiki links."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void loadAssignments()}
+            >
+              <RefreshCw className="size-3.5" />
+              Refresh board
+            </Button>
+            <select
+              value={courseFilter}
+              onChange={(event) => setCourseFilter(event.target.value)}
+              className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+            >
+              <option value="all">All courses</option>
+              {courses.map((courseId) => (
+                <option key={courseId} value={courseId}>
+                  {courseId}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+      />
 
       <div className="flex-1 min-h-0 overflow-hidden px-6 py-5">
         {error ? (
-          <div className="mb-3 rounded-2xl border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">
+          <div className="mb-3 rounded-2xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
             {error}
           </div>
         ) : null}
 
         {loading ? (
-          <div className="flex h-full items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 text-sm text-slate-300">
-            Loading assignments...
-          </div>
+          <AcademicEmptyState
+            title="Loading assignments..."
+            description="Fetching the current board state."
+          />
         ) : (
           <div className="grid h-full min-h-0 gap-4 xl:grid-cols-3">
             {columnOrder.map((status) => (
@@ -160,7 +162,7 @@ export function KanbanAcademic() {
           </div>
         )}
       </div>
-    </div>
+    </AcademicPageShell>
   );
 }
 
@@ -183,16 +185,15 @@ function KanbanColumn({
   const visibleItems = assignments.slice(startIndex, endIndex);
 
   return (
-    <section className="flex min-h-0 flex-col rounded-[1.75rem] border border-white/10 bg-slate-950/70 p-4 shadow-2xl shadow-slate-950/20">
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
-        <h3 className="text-lg font-semibold text-slate-50">{title}</h3>
-        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-100">
-          {assignments.length}
-        </span>
-      </div>
+    <AcademicCard className="flex min-h-0 flex-col">
+      <AcademicSectionTitle
+        eyebrow="Status"
+        title={title}
+        count={assignments.length}
+      />
 
       {assignments.length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-slate-400">
+        <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
           No tasks in this column.
         </div>
       ) : (
@@ -216,6 +217,6 @@ function KanbanColumn({
           </div>
         </div>
       )}
-    </section>
+    </AcademicCard>
   );
 }

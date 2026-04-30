@@ -53,6 +53,7 @@ import { getRaw as getLabelingAgentRaw } from "../knowledge/note_tagging_agent.j
 import { getRaw as getNoteTaggingAgentRaw } from "../knowledge/note_tagging_agent.js";
 import { getRaw as getInlineTaskAgentRaw } from "../knowledge/inline_task_agent.js";
 import { getRaw as getAgentNotesAgentRaw } from "../knowledge/agent_notes_agent.js";
+import { shouldDisableTools } from "../config/config.js";
 
 const AGENT_NOTES_DIR = path.join(WorkDir, "knowledge", "Agent Notes");
 
@@ -1344,11 +1345,18 @@ async function* streamLlm(
 ): AsyncGenerator<z.infer<typeof LlmStepStreamEvent>, void, unknown> {
   const converted = convertFromMessages(messages);
   console.log(`! SENDING payload to model: `, JSON.stringify(converted));
+
+  // Development mode: allow disabling tools for LLMs without tool support
+  const disableTools = shouldDisableTools();
+  if (disableTools) {
+    console.log(`[DEV] Tools disabled via config/env`);
+  }
+
   const { fullStream } = streamText({
     model,
     messages: converted,
     system: instructions,
-    tools,
+    tools: disableTools ? undefined : tools,
     stopWhen: stepCountIs(1),
     abortSignal: signal,
   });

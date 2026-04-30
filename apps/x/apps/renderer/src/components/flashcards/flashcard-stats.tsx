@@ -1,6 +1,7 @@
 import * as React from "react";
 import { BrainCircuit, Clock3, Layers3, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AcademicMetricCard } from "@/components/academic/academic-shell";
 
 export function FlashcardStats({
   totalCount,
@@ -47,35 +48,13 @@ export function FlashcardStats({
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <div
+          <AcademicMetricCard
             key={card.label}
-            className={cn(
-              "rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm",
-              "bg-gradient-to-br",
-              card.accent,
-            )}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  {card.label}
-                </p>
-                <div className="mt-1 flex items-end gap-1">
-                  <span className="text-2xl font-semibold text-foreground">
-                    {card.value}
-                  </span>
-                  {card.suffix ? (
-                    <span className="pb-1 text-sm text-muted-foreground">
-                      {card.suffix}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex size-10 items-center justify-center rounded-xl bg-background/80 text-foreground shadow-inner">
-                <Icon className="size-5" />
-              </div>
-            </div>
-          </div>
+            label={card.label}
+            value={card.value}
+            suffix={card.suffix}
+            icon={Icon}
+          />
         );
       })}
     </div>

@@ -70,11 +70,11 @@ main (depends on shared, core)
 
 ### Key Entry Points
 
-| Component | Entry | Output |
-|-----------|-------|--------|
-| main | `apps/main/src/main.ts` | `.package/dist/main.cjs` |
-| renderer | `apps/renderer/src/main.tsx` | `apps/renderer/dist/` |
-| preload | `apps/preload/src/preload.ts` | `apps/preload/dist/preload.js` |
+| Component | Entry                         | Output                         |
+| --------- | ----------------------------- | ------------------------------ |
+| main      | `apps/main/src/main.ts`       | `.package/dist/main.cjs`       |
+| renderer  | `apps/renderer/src/main.tsx`  | `apps/renderer/dist/`          |
+| preload   | `apps/preload/src/preload.ts` | `apps/preload/dist/preload.js` |
 
 ## Build System
 
@@ -90,69 +90,85 @@ pnpm uses symlinks for workspace packages. Electron Forge's dependency walker ca
 
 ## Key Files Reference
 
-| Purpose | File |
-|---------|------|
-| Electron main entry | `apps/x/apps/main/src/main.ts` |
-| React app entry | `apps/x/apps/renderer/src/main.tsx` |
-| Forge config (packaging) | `apps/x/apps/main/forge.config.cjs` |
-| Main process bundler | `apps/x/apps/main/bundle.mjs` |
-| Vite config | `apps/x/apps/renderer/vite.config.ts` |
-| Shared types | `apps/x/packages/shared/src/` |
-| Core business logic | `apps/x/packages/core/src/` |
-| Workspace config | `apps/x/pnpm-workspace.yaml` |
-| Root scripts | `apps/x/package.json` |
+| Purpose                  | File                                  |
+| ------------------------ | ------------------------------------- |
+| Electron main entry      | `apps/x/apps/main/src/main.ts`        |
+| React app entry          | `apps/x/apps/renderer/src/main.tsx`   |
+| Forge config (packaging) | `apps/x/apps/main/forge.config.cjs`   |
+| Main process bundler     | `apps/x/apps/main/bundle.mjs`         |
+| Vite config              | `apps/x/apps/renderer/vite.config.ts` |
+| Shared types             | `apps/x/packages/shared/src/`         |
+| Core business logic      | `apps/x/packages/core/src/`           |
+| Workspace config         | `apps/x/pnpm-workspace.yaml`          |
+| Root scripts             | `apps/x/package.json`                 |
 
 ## Feature Deep-Dives
 
 Long-form docs for specific features. Read the relevant file before making changes in that area — it has the full product flow, technical flows, and (where applicable) a catalog of the LLM prompts involved with exact file:line pointers.
 
-| Feature | Doc |
-|---------|-----|
+| Feature                                                                                                       | Doc                |
+| ------------------------------------------------------------------------------------------------------------- | ------------------ |
 | Track Blocks — auto-updating note content (scheduled / event-driven / manual), Copilot skill, prompts catalog | `apps/x/TRACKS.md` |
+
+## Design Contract
+
+Before designing or implementing any new feature UI in `apps/x/apps/renderer/src/`, read [design.md](design.md). Treat it as the source of truth for layout, spacing, component choice, colors, empty states, and interaction patterns.
+
+- Start from the shared shell and primitives described there instead of inventing a new visual language.
+- If a new feature needs a reusable visual pattern that is not already documented, add it to [design.md](design.md) before or alongside the implementation.
+- If a screen looks meaningfully different from the rest of the app, assume the design contract was missed and fix the shared pattern instead of patching the screen in isolation.
+- Prefer `AcademicPageShell`, `AcademicPageHeader`, `AcademicCard`, and the shared UI primitives when building study-mode surfaces.
 
 ## Common Tasks
 
 ### LLM configuration (single provider)
+
 - Config file: `~/.rowboat/config/models.json`
 - Schema: `{ provider: { flavor, apiKey?, baseURL?, headers? }, model: string }`
 - Models catalog cache: `~/.rowboat/config/models.dev.json` (OpenAI/Anthropic/Google only)
 
 ### Add a new shared type
+
 1. Edit `apps/x/packages/shared/src/`
 2. Run `cd apps/x && npm run deps` to rebuild
 
 ### Modify main process
+
 1. Edit `apps/x/apps/main/src/`
 2. Restart dev server (main doesn't hot-reload)
 
 ### Modify renderer (React UI)
+
 1. Edit `apps/x/apps/renderer/src/`
 2. Changes hot-reload automatically in dev mode
 
 ### Add a new dependency to main
+
 1. `cd apps/x/apps/main && pnpm add <package>`
 2. Import in source - esbuild will bundle it
 
 ### Verify compilation
+
 ```bash
 cd apps/x && npm run deps && npm run lint
 ```
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Desktop | Electron 39.x |
-| UI | React 19, Vite 7 |
-| Styling | TailwindCSS, Radix UI |
-| State | React hooks |
-| AI | Vercel AI SDK, OpenAI/Anthropic/Google/OpenRouter providers, Vercel AI Gateway, Ollama, models.dev catalog |
-| IPC | Electron contextBridge |
-| Build | TypeScript 5.9, esbuild, Electron Forge |
+| Layer   | Technology                                                                                                 |
+| ------- | ---------------------------------------------------------------------------------------------------------- |
+| Desktop | Electron 39.x                                                                                              |
+| UI      | React 19, Vite 7                                                                                           |
+| Styling | TailwindCSS, Radix UI                                                                                      |
+| State   | React hooks                                                                                                |
+| AI      | Vercel AI SDK, OpenAI/Anthropic/Google/OpenRouter providers, Vercel AI Gateway, Ollama, models.dev catalog |
+| IPC     | Electron contextBridge                                                                                     |
+| Build   | TypeScript 5.9, esbuild, Electron Forge                                                                    |
 
 ## Environment Variables (for packaging)
 
 For production builds with code signing:
+
 - `APPLE_ID` - Apple Developer ID
 - `APPLE_PASSWORD` - App-specific password
 - `APPLE_TEAM_ID` - Team ID
