@@ -4,6 +4,42 @@ import { homedir } from "os";
 import { fileURLToPath } from "url";
 
 function resolveWorkDir(): string {
+  // Check for saved vault path first
+  const vaultConfigPath = path.join(
+    homedir(),
+    ".rowboat",
+    "config",
+    "vault.json",
+  );
+  try {
+    if (fs.existsSync(vaultConfigPath)) {
+      const vaultConfig = JSON.parse(fs.readFileSync(vaultConfigPath, "utf-8"));
+      if (vaultConfig.path && typeof vaultConfig.path === "string") {
+        let expandedPath = vaultConfig.path;
+        // Expand ~ if present
+        if (
+          expandedPath === "~" ||
+          expandedPath.startsWith("~/") ||
+          expandedPath.startsWith("~\\")
+        ) {
+          expandedPath = path.join(homedir(), expandedPath.slice(2));
+        }
+        expandedPath = path.resolve(expandedPath);
+        // Verify the path exists
+        if (fs.existsSync(expandedPath)) {
+          return expandedPath;
+        } else {
+          console.warn(
+            `[Config] Saved vault path ${expandedPath} does not exist, falling back to default`,
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[Config] Failed to read vault config:", error);
+  }
+
+  // Fallback to environment variable or default
   const configured = process.env.ROWBOAT_WORKDIR;
   if (!configured) {
     return path.join(homedir(), ".rowboat");
@@ -23,6 +59,56 @@ function resolveWorkDir(): string {
 // Allow override via ROWBOAT_WORKDIR env var for standalone pipeline usage.
 // Normalize to an absolute path so workspace boundary checks behave consistently.
 export const WorkDir = resolveWorkDir();
+
+/**
+ * Save the selected vault path to config.
+ * This allows the app to remember which vault/folder was last opened.
+ */
+export function saveVaultPath(vaultPath: string): void {
+  const vaultConfigPath = path.join(
+    homedir(),
+    ".rowboat",
+    "config",
+    "vault.json",
+  );
+  const dir = path.dirname(vaultConfigPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const expandedPath =
+    vaultPath.startsWith("~/") || vaultPath.startsWith("~\\")
+      ? path.join(homedir(), vaultPath.slice(2))
+      : path.resolve(vaultPath);
+
+  fs.writeFileSync(
+    vaultConfigPath,
+    JSON.stringify({ path: expandedPath }, null, 2),
+  );
+}
+
+/**
+ * Get the saved vault path, if any.
+ * Returns null if no vault has been saved.
+ */
+export function getVaultPath(): string | null {
+  const vaultConfigPath = path.join(
+    homedir(),
+    ".rowboat",
+    "config",
+    "vault.json",
+  );
+  try {
+    if (fs.existsSync(vaultConfigPath)) {
+      const vaultConfig = JSON.parse(fs.readFileSync(vaultConfigPath, "utf-8"));
+      if (vaultConfig.path && typeof vaultConfig.path === "string") {
+        return vaultConfig.path;
+      }
+    }
+  } catch (error) {
+    console.error("[Config] Failed to read vault config:", error);
+  }
+  return null;
+}
 
 // Get the directory of this file (for locating bundled assets)
 const __filename = fileURLToPath(import.meta.url);

@@ -11,6 +11,7 @@ import {
   ExternalLink,
   FilePlus,
   Folder,
+  FolderOpen,
   FolderPlus,
   Globe,
   AlertTriangle,
@@ -457,6 +458,51 @@ export function SidebarContentPanel({
   const [loggingIn, setLoggingIn] = useState(false);
   const [appUrl, setAppUrl] = useState<string | null>(null);
   const { billing } = useBilling(isRowboatConnected);
+  const [vaultPath, setVaultPath] = useState<string | null>(null);
+  const [vaultLoading, setVaultLoading] = useState(false);
+
+  // Load saved vault path on mount
+  useEffect(() => {
+    window.ipc
+      .invoke("vault:getPath", null)
+      .then((result) => {
+        if (result.path) {
+          setVaultPath(result.path);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to get vault path:", err);
+      });
+  }, []);
+
+  // Handle vault selection
+  const handleVaultSelect = useCallback(async () => {
+    try {
+      setVaultLoading(true);
+      const result = await window.ipc.invoke("vault:select", null);
+      if (result.success && result.path) {
+        setVaultPath(result.path);
+        toast(
+          `Vault changed to: ${result.path.split(/[\\/]/).pop()}`,
+          "success",
+        );
+        // Reload the page to use the new vault
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+    } catch (err) {
+      console.error("Failed to select vault:", err);
+      toast("Failed to select vault", "error");
+    } finally {
+      setVaultLoading(false);
+    }
+  }, []);
+
+  // Get display name for vault (just the folder name)
+  const vaultDisplayName = vaultPath
+    ? vaultPath.split(/[\\/]/).pop() || vaultPath
+    : "Select Vault";
 
   const handleRowboatLogin = useCallback(async () => {
     try {
@@ -805,6 +851,23 @@ export function SidebarContentPanel({
               <span>Help</span>
             </button>
           </HelpPopover>
+          {/* Vault Selector Button */}
+          <button
+            onClick={handleVaultSelect}
+            disabled={vaultLoading}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            title={vaultPath || "Select a vault folder"}
+          >
+            {vaultLoading ? (
+              <LoaderIcon className="size-4 animate-spin" />
+            ) : (
+              <FolderOpen className="size-4" />
+            )}
+            <span className="truncate flex-1 text-left">
+              {vaultDisplayName}
+            </span>
+            <ChevronsUpDown className="size-3 opacity-50" />
+          </button>
         </div>
       </div>
       <SyncStatusBar />

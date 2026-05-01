@@ -892,6 +892,29 @@ const ipcSchemas = {
       availableCredits: z.number(),
     }),
   },
+  // Vault selection channels (similar to Obsidian's vault switcher)
+  "vault:select": {
+    req: z.null(),
+    res: z.object({
+      success: z.boolean(),
+      path: z.string().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "vault:getPath": {
+    req: z.null(),
+    res: z.object({
+      path: z.string().nullable(),
+    }),
+  },
+  "vault:setPath": {
+    req: z.object({
+      path: z.string(),
+    }),
+    res: z.object({
+      success: z.literal(true),
+    }),
+  },
 } as const;
 
 // ============================================================================

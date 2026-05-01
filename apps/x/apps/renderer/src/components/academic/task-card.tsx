@@ -1,4 +1,3 @@
-import * as React from "react";
 import { ArrowRightLeft, Link2 } from "lucide-react";
 import type { Assignment } from "@x/shared/dist/academic.js";
 import { Badge } from "@/components/ui/badge";

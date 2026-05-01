@@ -1,4 +1,3 @@
-import * as React from "react";
 import { BrainCircuit, Clock3, Layers3, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AcademicMetricCard } from "@/components/academic/academic-shell";

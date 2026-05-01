@@ -89,9 +89,10 @@ export function KanbanAcademic() {
           );
         }
 
+        const updatedAssignment = response.assignment;
         setAssignments((current) =>
           current.map((item) =>
-            item.id === response.assignment.id ? response.assignment : item,
+            item.id === updatedAssignment.id ? updatedAssignment : item,
           ),
         );
       } catch (err) {

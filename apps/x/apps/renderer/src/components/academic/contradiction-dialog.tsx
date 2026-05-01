@@ -1,4 +1,3 @@
-import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Contradiction } from "@x/shared/dist/academic.js";
 

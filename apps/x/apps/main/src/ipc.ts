@@ -98,7 +98,11 @@ import {
   replaceTrackBlockYaml,
   deleteTrackBlock,
 } from "@x/core/dist/knowledge/track/fileops.js";
-import { WorkDir } from "@x/core/dist/config/config.js";
+import {
+  WorkDir,
+  saveVaultPath,
+  getVaultPath,
+} from "@x/core/dist/config/config.js";
 import {
   CardStorage,
   FSRSScheduler,
@@ -1208,6 +1212,41 @@ export function setupIpcHandlers() {
     // Billing handler
     "billing:getInfo": async () => {
       return await getBillingInfo();
+    },
+    // Vault selection handlers (Obsidian-like vault switcher)
+    "vault:select": async () => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: "Select Vault Folder",
+          message: "Choose a folder to use as your ScholarOS vault",
+          properties: ["openDirectory", "createDirectory"],
+          buttonLabel: "Select Vault",
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+          return { success: false };
+        }
+
+        const selectedPath = result.filePaths[0];
+
+        // Save the vault path for future sessions
+        saveVaultPath(selectedPath);
+
+        return { success: true, path: selectedPath };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+    "vault:getPath": async () => {
+      const savedPath = getVaultPath();
+      return { path: savedPath };
+    },
+    "vault:setPath": async (_event, args) => {
+      saveVaultPath(args.path);
+      return { success: true as const };
     },
     // Embedded browser handlers (WebContentsView + navigation)
     ...browserIpcHandlers,
