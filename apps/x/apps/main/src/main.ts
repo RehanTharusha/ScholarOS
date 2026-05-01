@@ -80,6 +80,22 @@ function initializeExecutionEnvironment(): void {
 }
 initializeExecutionEnvironment();
 
+// Handle EPIPE errors gracefully — prevents uncaught exceptions when stdout/stderr streams are closed
+// This is common when running in certain environments or when the parent process closes pipes
+process.stdout?.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code !== 'EPIPE') {
+    console.error('Unexpected stdout error:', error);
+  }
+  // EPIPE is expected and can be safely ignored
+});
+
+process.stderr?.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code !== 'EPIPE') {
+    // This error can't use console.error since stderr itself is broken
+    process.stdout?.write(`Unexpected stderr error: ${error.message}\n`);
+  }
+});
+
 // Path resolution differs between development and production:
 const preloadPath = app.isPackaged
   ? path.join(__dirname, "../preload/dist/preload.js")

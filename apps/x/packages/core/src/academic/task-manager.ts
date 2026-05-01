@@ -43,8 +43,8 @@ function createSeedAssignments(): Assignment[] {
       status: "in-progress",
       priority: "high",
       wikiLinks: [
-        "knowledge/courses/Biology 101.md",
-        "knowledge/concepts/Photosynthesis.md",
+        "knowledge/courses/Biology 101/index.md",
+        "knowledge/courses/Biology 101/concepts/Photosynthesis.md",
       ],
     },
     {
@@ -74,7 +74,7 @@ function createSeedAssignments(): Assignment[] {
       dueDate: plusDays(-1),
       status: "graded",
       priority: "low",
-      wikiLinks: ["knowledge/concepts/Calvin Cycle.md"],
+      wikiLinks: ["knowledge/courses/Biology 101/concepts/Calvin Cycle.md"],
     },
   ];
 }

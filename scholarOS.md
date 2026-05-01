@@ -96,19 +96,29 @@ A high-performance kanban board — built with virtual scrolling so it handles h
 
 ```
 /ScholarOS
-├── /raw                  # Immutable source files — never modified by the agent
-│   ├── /pdfs
-│   ├── /slides
-│   ├── /articles
-│   └── /assets           # Locally stored images (avoid broken URLs)
+├── /raw                  # Source files — organized by course, modified by agent during ingest
+│   ├── /Biology 101      # Course-specific raw materials
+│   │   ├── lecture1.pdf
+│   │   └── syllabus.pdf
+│   ├── /CS 201           # Another course
+│   │   └── slides-week1.pdf
+│   └── /assets           # Shared images and media
 │
-├── /wiki                 # LLM-generated and maintained Markdown
-│   ├── /concepts         # Subject matter pages
-│   ├── /entities         # People, institutions, books, datasets
+├── /knowledge            # LLM-generated and maintained Markdown (the wiki)
+│   ├── /courses          # Per-course folders containing all course materials
+│   │   ├── /Biology 101
+│   │   │   ├── index.md          # Course overview page
+│   │   │   ├── /concepts        # Subject matter pages for this course
+│   │   │   │   ├── Photosynthesis.md
+│   │   │   │   └── Cell Respiration.md
+│   │   │   ├── /lectures        # Lecture notes and slides
+│   │   │   └── /assignments     # Assignments and grading
+│   │   └── /CS 201
+│   │       ├── index.md
+│   │       └── /concepts
+│   ├── /papers           # Academic papers, research articles (cross-course)
 │   ├── /syntheses        # Comparison tables, cross-source summaries
-│   ├── /courses          # Per-course index pages
-│   ├── index.md          # Master content catalog (updated on every ingest)
-│   └── log.md            # Append-only operation log
+│   └── /resources        # URLs, tools, reference materials (cross-course)
 │
 ├── /meta
 │   └── CLAUDE.md         # The schema — instructs the agent on conventions and workflows
@@ -116,7 +126,7 @@ A high-performance kanban board — built with virtual scrolling so it handles h
 └── /assets               # Diagrams and images referenced by wiki pages
 ```
 
-The `/raw` directory is your source of truth. The agent reads from it but never touches it. The `/wiki` directory is entirely AI-owned — you read it, the agent writes it. The `CLAUDE.md` schema is what makes the agent a disciplined wiki maintainer rather than a generic chatbot; you and the agent co-evolve it as you develop workflows that fit your discipline.
+The `/raw` directory is your dump for study materials. During ingest, the agent organizes files into course subfolders based on content analysis, then processes them into the `/knowledge` wiki. The `/knowledge` directory is entirely AI-owned — you read it, the agent writes it. The `CLAUDE.md` schema is what makes the agent a disciplined wiki maintainer rather than a generic chatbot; you and the agent co-evolve it as you develop workflows that fit your discipline.
 
 ---
 
@@ -125,16 +135,19 @@ The `/raw` directory is your source of truth. The agent reads from it but never 
 ### 1. The Ingest Loop
 
 ```
-You drop a source into /raw
+You drop materials into /raw (unorganized)
         │
         ▼
-Agent reads and discusses key takeaways with you
+Agent organizes files by course in /raw (e.g., /raw/Biology 101/)
         │
         ▼
-Agent writes a summary page in /wiki/entities or /wiki/concepts
+Agent reads each file and discusses key takeaways with you
         │
         ▼
-Agent updates index.md and appends to log.md
+Agent writes concept pages in /knowledge/courses/<course>/concepts/
+        │
+        ▼
+Agent updates course index.md and appends to log.md
         │
         ▼
 Agent surgically updates existing concept pages
@@ -245,10 +258,15 @@ npm install
 
 ### First Ingest
 
-1. Drop a PDF or article into `/raw`
+1. Drop your study materials (PDFs, slides, articles) into `/raw` — don't worry about organizing them by course yet
 2. Open your agent and point it at the vault
-3. Say: _"Ingest the new file in /raw. Check the index and log first, then process it according to CLAUDE.md."_
-4. Watch the wiki update in Obsidian in real time
+3. Say: _"Ingest all materials in /raw. Organize them by course first, then process each one according to CLAUDE.md."_
+4. The agent will:
+   - Analyze files to determine which course/module they belong to
+   - Move them into course subfolders (e.g., `/raw/Biology 101/`, `/raw/CS 201/`)
+   - Extract metadata and create concept pages under `/knowledge/courses/<course-name>/concepts/`
+   - Update the course index page with links to all materials
+5. Watch the wiki update in Obsidian in real time
 
 ---
 

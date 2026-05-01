@@ -263,14 +263,33 @@
 **Structure:**
 
 ```
-/ScholarOS/wiki/
-├── /concepts       # Subject matter (e.g., "Kinematics.md", "Photosynthesis.md")
-├── /entities       # Authors, papers, institutions, researchers
-├── /syntheses      # Cross-source comparisons (AI-generated)
-├── /courses        # Per-course index pages linking to concepts
-├── index.md        # Master catalog (updated on every ingest)
-├── log.md          # Append-only operation log
-└── assignments.md  # Tracks assignment status (or store separately)
+/ScholarOS/knowledge/
+├── /courses/              # Per-course folders containing all course materials
+│   ├── /Biology 101/
+│   │   ├── index.md       # Course overview page
+│   │   ├── /concepts/    # Subject matter for this course
+│   │   │   ├── Photosynthesis.md
+│   │   │   └── Cell Respiration.md
+│   │   ├── /lectures/    # Lecture notes and slides
+│   │   └── /assignments/ # Assignments and grading
+│   └── /CS 201/
+│       ├── index.md
+│       └── /concepts/
+├── /papers/               # Academic papers, research articles (cross-course)
+├── /syntheses/            # Cross-source comparisons (AI-generated)
+└── /resources/            # URLs, tools, reference materials (cross-course)
+```
+
+**Raw folder structure (organized by agent during ingest):**
+
+```
+/ScholarOS/raw/
+├── /Biology 101/          # Course-specific raw materials
+│   ├── textbook-ch1.pdf
+│   └── lecture-slides.pdf
+├── /CS 201/
+│   └── week1-notes.pdf
+└── /assets/               # Shared images and media
 ```
 
 **YAML Frontmatter Schema (new fields):**

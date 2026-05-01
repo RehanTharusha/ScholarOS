@@ -10,6 +10,17 @@ import type { Contradiction as AcademicContradiction } from "@x/shared/dist/acad
 import path from "path";
 import { promises as fs } from "fs";
 
+/**
+ * Sanitize a string for use as a filesystem folder or file name.
+ * Removes or replaces characters that are not safe for filenames.
+ */
+function sanitize(name: string): string {
+  return name
+    .replace(/[/\\?%*:|"<>]/g, "-") // Replace unsafe characters with hyphens
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim();
+}
+
 interface LlmAgent {
   generate(prompt: string): Promise<{ text: string }>;
 }
@@ -232,8 +243,10 @@ Generate 5-8 high-quality study flashcards. Return JSON array with {front, back,
 
           const conceptPath = path.join(
             this.vaultPath,
+            "courses",
+            sanitize(courseName),
             "concepts",
-            `${concept.title}.md`,
+            `${sanitize(concept.title)}.md`,
           );
           await fs.mkdir(path.dirname(conceptPath), { recursive: true });
           await fs.writeFile(conceptPath, wikiPage);

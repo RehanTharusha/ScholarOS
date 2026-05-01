@@ -15,6 +15,38 @@ const SYNC_INTERVAL_MS = 15 * 1000; // 15 seconds
 const INLINE_TASK_AGENT = 'inline_task_agent';
 const KNOWLEDGE_DIR = path.join(WorkDir, 'knowledge');
 
+// Safe logging utility that gracefully handles EPIPE errors when stdout is closed
+function safeLog(message: string): void {
+    try {
+        console.log(message);
+    } catch (error) {
+        // Silently ignore EPIPE and other stream errors
+        if (error instanceof Error && error.message?.includes('EPIPE')) {
+            return;
+        }
+    }
+}
+
+function safeWarn(message: string): void {
+    try {
+        console.warn(message);
+    } catch (error) {
+        if (error instanceof Error && error.message?.includes('EPIPE')) {
+            return;
+        }
+    }
+}
+
+function safeError(message: string, error?: unknown): void {
+    try {
+        console.error(message, error);
+    } catch (err) {
+        if (err instanceof Error && err.message?.includes('EPIPE')) {
+            return;
+        }
+    }
+}
+
 
 // ---------------------------------------------------------------------------
 // Minimal frontmatter helpers (duplicated from renderer to avoid cross-package
@@ -411,10 +443,10 @@ function updateBlockData(body: string, startLine: number, endLine: number, lastR
 // ---------------------------------------------------------------------------
 
 async function processInlineTasks(): Promise<void> {
-    console.log('[InlineTasks] Checking live notes...');
+    safeLog('[InlineTasks] Checking live notes...');
 
     if (!fs.existsSync(KNOWLEDGE_DIR)) {
-        console.log('[InlineTasks] Knowledge directory not found');
+        safeLog('[InlineTasks] Knowledge directory not found');
         return;
     }
 
@@ -449,14 +481,14 @@ async function processInlineTasks(): Promise<void> {
                 try {
                     fs.writeFileSync(filePath, newContent, 'utf-8');
                     const rel = path.relative(WorkDir, filePath);
-                    console.log(`[InlineTasks] Marked ${rel} as no longer live`);
+                    safeLog(`[InlineTasks] Marked ${rel} as no longer live`);
                 } catch { /* ignore */ }
             }
             continue;
         }
 
         const relativePath = path.relative(WorkDir, filePath);
-        console.log(`[InlineTasks] Found ${tasks.length} pending task(s) in ${relativePath}`);
+        safeLog(`[InlineTasks] Found ${tasks.length} pending task(s) in ${relativePath}`);
 
         // Process tasks one at a time, bottom-up so line indices stay valid
         // (inserting content shifts lines below, so process from bottom to top)
@@ -465,7 +497,7 @@ async function processInlineTasks(): Promise<void> {
         let currentBody = body;
 
         for (const task of sortedTasks) {
-            console.log(`[InlineTasks] Running task: "${task.instruction.slice(0, 80)}..."`);
+            safeLog(`[InlineTasks] Running task: "${task.instruction.slice(0, 80)}..."`);
 
             try {
                 const run = await createRun({ agentId: INLINE_TASK_AGENT, model: await getKgModel() });
@@ -497,12 +529,12 @@ async function processInlineTasks(): Promise<void> {
                     const timestamp = new Date().toISOString();
                     currentBody = updateBlockData(currentBody, task.startLine, task.endLine, timestamp);
                     totalProcessed++;
-                    console.log(`[InlineTasks] Task completed`);
+                    safeLog(`[InlineTasks] Task completed`);
                 } else {
-                    console.warn(`[InlineTasks] No response from agent for task`);
+                    safeWarn(`[InlineTasks] No response from agent for task`);
                 }
             } catch (error) {
-                console.error(`[InlineTasks] Error processing task:`, error);
+                safeError(`[InlineTasks] Error processing task:`, error);
             }
         }
 
@@ -515,16 +547,16 @@ async function processInlineTasks(): Promise<void> {
 
         try {
             fs.writeFileSync(filePath, newContent, 'utf-8');
-            console.log(`[InlineTasks] Updated ${relativePath}`);
+            safeLog(`[InlineTasks] Updated ${relativePath}`);
         } catch (error) {
-            console.error(`[InlineTasks] Error writing ${relativePath}:`, error);
+            safeError(`[InlineTasks] Error writing ${relativePath}:`, error);
         }
     }
 
     if (totalProcessed > 0) {
-        console.log(`[InlineTasks] Done. Processed ${totalProcessed} task(s).`);
+        safeLog(`[InlineTasks] Done. Processed ${totalProcessed} task(s).`);
     } else {
-        console.log('[InlineTasks] No pending tasks found');
+        safeLog('[InlineTasks] No pending tasks found');
     }
 }
 
@@ -660,7 +692,7 @@ Respond with ONLY valid JSON: either a schedule object or null. No other text.`;
         });
 
         let text = result.text.trim();
-        console.log('[classifySchedule] LLM response:', text);
+        safeLog(`[classifySchedule] LLM response: ${text}`);
         // Strip markdown code fences if the LLM wraps the JSON
         text = text.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
         if (text === 'null' || text === '') {
@@ -674,7 +706,7 @@ Respond with ONLY valid JSON: either a schedule object or null. No other text.`;
 
         return parsed as InlineTaskSchedule;
     } catch (error) {
-        console.error('[classifySchedule] Error:', error);
+        safeError('[classifySchedule] Error:', error);
         return null;
     }
 }
@@ -683,8 +715,8 @@ Respond with ONLY valid JSON: either a schedule object or null. No other text.`;
  * Main entry point — runs as independent polling service
  */
 export async function init() {
-    console.log('[InlineTasks] Starting Inline Task Service...');
-    console.log(`[InlineTasks] Will check for task blocks every ${SYNC_INTERVAL_MS / 1000} seconds`);
+    safeLog('[InlineTasks] Starting Inline Task Service...');
+    safeLog(`[InlineTasks] Will check for task blocks every ${SYNC_INTERVAL_MS / 1000} seconds`);
 
     // Initial run
     await processInlineTasks();
@@ -696,7 +728,7 @@ export async function init() {
         try {
             await processInlineTasks();
         } catch (error) {
-            console.error('[InlineTasks] Error in main loop:', error);
+            safeError('[InlineTasks] Error in main loop:', error);
         }
     }
 }

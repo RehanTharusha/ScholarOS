@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import * as React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bot,
   ChevronRight,
@@ -28,13 +28,13 @@ import {
   Settings,
   Square,
   Trash2,
-} from "lucide-react"
+} from "lucide-react";
 
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +42,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,8 +53,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -69,85 +69,88 @@ import {
   SidebarMenuSub,
   SidebarRail,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu"
-import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
-import { type ActiveSection, useSidebarSection } from "@/contexts/sidebar-context"
-import { ConnectorsPopover } from "@/components/connectors-popover"
-import { HelpPopover } from "@/components/help-popover"
-import { SettingsDialog } from "@/components/settings-dialog"
-import { toast } from "@/lib/toast"
-import { useBilling } from "@/hooks/useBilling"
-import { ServiceEvent } from "@x/shared/src/service-events.js"
-import type { MeetingTranscriptionState } from "@/hooks/useMeetingTranscription"
-import z from "zod"
+} from "@/components/ui/context-menu";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import {
+  type ActiveSection,
+  useSidebarSection,
+} from "@/contexts/sidebar-context";
+import { ConnectorsPopover } from "@/components/connectors-popover";
+import { HelpPopover } from "@/components/help-popover";
+import { SettingsDialog } from "@/components/settings-dialog";
+import { toast } from "@/lib/toast";
+import { useBilling } from "@/hooks/useBilling";
+import { ServiceEvent } from "@x/shared/src/service-events.js";
+import type { MeetingTranscriptionState } from "@/hooks/useMeetingTranscription";
+import z from "zod";
 
 interface TreeNode {
-  path: string
-  name: string
-  kind: "file" | "dir"
-  children?: TreeNode[]
-  loaded?: boolean
+  path: string;
+  name: string;
+  kind: "file" | "dir";
+  children?: TreeNode[];
+  loaded?: boolean;
 }
 
 type KnowledgeActions = {
-  createNote: (parentPath?: string) => void
-  createFolder: (parentPath?: string) => void
-  openGraph: () => void
-  openBases: () => void
-  expandAll: () => void
-  collapseAll: () => void
-  rename: (path: string, newName: string, isDir: boolean) => Promise<void>
-  remove: (path: string) => Promise<void>
-  copyPath: (path: string) => void
-  onOpenInNewTab?: (path: string) => void
-}
+  createNote: (parentPath?: string) => void;
+  createFolder: (parentPath?: string) => void;
+  openGraph: () => void;
+  openBases: () => void;
+  expandAll: () => void;
+  collapseAll: () => void;
+  rename: (path: string, newName: string, isDir: boolean) => Promise<void>;
+  remove: (path: string) => Promise<void>;
+  copyPath: (path: string) => void;
+  onOpenInNewTab?: (path: string) => void;
+};
 
 type RunListItem = {
-  id: string
-  title?: string
-  createdAt: string
-  agentId: string
-}
+  id: string;
+  title?: string;
+  createdAt: string;
+  agentId: string;
+};
 
 type BackgroundTaskItem = {
-  name: string
-  description?: string
+  name: string;
+  description?: string;
   schedule: {
-    type: "cron" | "window" | "once"
-    expression?: string
-    cron?: string
-    startTime?: string
-    endTime?: string
-    runAt?: string
-  }
-  enabled: boolean
-  status?: "scheduled" | "running" | "finished" | "failed" | "triggered"
-  nextRunAt?: string | null
-  lastRunAt?: string | null
-}
+    type: "cron" | "window" | "once";
+    expression?: string;
+    cron?: string;
+    startTime?: string;
+    endTime?: string;
+    runAt?: string;
+  };
+  enabled: boolean;
+  status?: "scheduled" | "running" | "finished" | "failed" | "triggered";
+  nextRunAt?: string | null;
+  lastRunAt?: string | null;
+};
 
-type ServiceEventType = z.infer<typeof ServiceEvent>
+type ServiceEventType = z.infer<typeof ServiceEvent>;
 
-const MAX_SYNC_EVENTS = 1000
-const RUN_STALE_MS = 2 * 60 * 60 * 1000
+const MAX_SYNC_EVENTS = 1000;
+const RUN_STALE_MS = 2 * 60 * 60 * 1000;
 
 const SERVICE_LABELS: Record<string, string> = {
   gmail: "Syncing Gmail",
@@ -156,166 +159,172 @@ const SERVICE_LABELS: Record<string, string> = {
   granola: "Syncing Granola",
   graph: "Updating knowledge",
   voice_memo: "Processing voice memo",
-}
+};
 
 type TasksActions = {
-  onNewChat: () => void
-  onSelectRun: (runId: string) => void
-  onDeleteRun: (runId: string) => void
-  onOpenInNewTab?: (runId: string) => void
-  onSelectBackgroundTask?: (taskName: string) => void
-}
+  onNewChat: () => void;
+  onSelectRun: (runId: string) => void;
+  onDeleteRun: (runId: string) => void;
+  onOpenInNewTab?: (runId: string) => void;
+  onSelectBackgroundTask?: (taskName: string) => void;
+};
 
 type SidebarContentPanelProps = {
-  tree: TreeNode[]
-  selectedPath: string | null
-  expandedPaths: Set<string>
-  onSelectFile: (path: string, kind: "file" | "dir") => void
-  onToggleFolder?: (path: string) => void
-  knowledgeActions: KnowledgeActions
-  onVoiceNoteCreated?: (path: string) => void
-  runs?: RunListItem[]
-  currentRunId?: string | null
-  processingRunIds?: Set<string>
-  tasksActions?: TasksActions
-  backgroundTasks?: BackgroundTaskItem[]
-  selectedBackgroundTask?: string | null
-  onNewChat?: () => void
-  onOpenSearch?: () => void
-  meetingState?: MeetingTranscriptionState
-  meetingSummarizing?: boolean
-  meetingAvailable?: boolean
-  onToggleMeeting?: () => void
-  isBrowserOpen?: boolean
-  onToggleBrowser?: () => void
-  isSuggestedTopicsOpen?: boolean
-  onOpenSuggestedTopics?: () => void
-} & React.ComponentProps<typeof Sidebar>
+  tree: TreeNode[];
+  selectedPath: string | null;
+  expandedPaths: Set<string>;
+  onSelectFile: (path: string, kind: "file" | "dir") => void;
+  onToggleFolder?: (path: string) => void;
+  knowledgeActions: KnowledgeActions;
+  onVoiceNoteCreated?: (path: string) => void;
+  runs?: RunListItem[];
+  currentRunId?: string | null;
+  processingRunIds?: Set<string>;
+  tasksActions?: TasksActions;
+  backgroundTasks?: BackgroundTaskItem[];
+  selectedBackgroundTask?: string | null;
+  onNewChat?: () => void;
+  onOpenSearch?: () => void;
+  meetingState?: MeetingTranscriptionState;
+  meetingSummarizing?: boolean;
+  meetingAvailable?: boolean;
+  onToggleMeeting?: () => void;
+  isBrowserOpen?: boolean;
+  onToggleBrowser?: () => void;
+  isSuggestedTopicsOpen?: boolean;
+  onOpenSuggestedTopics?: () => void;
+} & React.ComponentProps<typeof Sidebar>;
 
 const sectionTabs: { id: ActiveSection; label: string }[] = [
   { id: "tasks", label: "Chat" },
   { id: "knowledge", label: "Knowledge" },
-]
+];
 
 function formatEventTime(ts: string): string {
-  const date = new Date(ts)
-  if (Number.isNaN(date.getTime())) return ""
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 function formatRunTime(ts: string): string {
-  const date = new Date(ts)
-  if (Number.isNaN(date.getTime())) return ""
-  const now = Date.now()
-  const diffMs = Math.max(0, now - date.getTime())
-  const diffMinutes = Math.floor(diffMs / (1000 * 60))
-  const diffHours = Math.floor(diffMinutes / 60)
-  const diffDays = Math.floor(diffHours / 24)
-  const diffWeeks = Math.floor(diffDays / 7)
-  const diffMonths = Math.floor(diffDays / 30)
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = Date.now();
+  const diffMs = Math.max(0, now - date.getTime());
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
 
-  if (diffMinutes < 1) return "just now"
-  if (diffMinutes < 60) return `${diffMinutes} m`
-  if (diffHours < 24) return `${diffHours} h`
-  if (diffDays < 7) return `${diffDays} d`
-  if (diffWeeks < 4) return `${diffWeeks} w`
-  return `${Math.max(1, diffMonths)} m`
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes} m`;
+  if (diffHours < 24) return `${diffHours} h`;
+  if (diffDays < 7) return `${diffDays} d`;
+  if (diffWeeks < 4) return `${diffWeeks} w`;
+  return `${Math.max(1, diffMonths)} m`;
 }
 
 function SyncStatusBar() {
-  const { state } = useSidebar()
-  const [activeServices, setActiveServices] = useState<Map<string, string>>(new Map())
-  const [popoverOpen, setPopoverOpen] = useState(false)
-  const [logEvents, setLogEvents] = useState<ServiceEventType[]>([])
-  const [logLoading, setLogLoading] = useState(false)
-  const runTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const { state } = useSidebar();
+  const [activeServices, setActiveServices] = useState<Map<string, string>>(
+    new Map(),
+  );
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [logEvents, setLogEvents] = useState<ServiceEventType[]>([]);
+  const [logLoading, setLogLoading] = useState(false);
+  const runTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   // Track active runs from real-time events
   useEffect(() => {
-    const cleanup = window.ipc.on('services:events', (event) => {
-      const nextEvent = event as ServiceEventType
-      if (nextEvent.type === 'run_start') {
+    const cleanup = window.ipc.on("services:events", (event) => {
+      const nextEvent = event as ServiceEventType;
+      if (nextEvent.type === "run_start") {
         setActiveServices((prev) => {
-          const next = new Map(prev)
-          next.set(nextEvent.runId, nextEvent.service)
-          return next
-        })
-        const existingTimeout = runTimeoutsRef.current.get(nextEvent.runId)
-        if (existingTimeout) clearTimeout(existingTimeout)
+          const next = new Map(prev);
+          next.set(nextEvent.runId, nextEvent.service);
+          return next;
+        });
+        const existingTimeout = runTimeoutsRef.current.get(nextEvent.runId);
+        if (existingTimeout) clearTimeout(existingTimeout);
         const timeout = setTimeout(() => {
           setActiveServices((prev) => {
-            if (!prev.has(nextEvent.runId)) return prev
-            const next = new Map(prev)
-            next.delete(nextEvent.runId)
-            return next
-          })
-          runTimeoutsRef.current.delete(nextEvent.runId)
-        }, RUN_STALE_MS)
-        runTimeoutsRef.current.set(nextEvent.runId, timeout)
-      } else if (nextEvent.type === 'run_complete') {
+            if (!prev.has(nextEvent.runId)) return prev;
+            const next = new Map(prev);
+            next.delete(nextEvent.runId);
+            return next;
+          });
+          runTimeoutsRef.current.delete(nextEvent.runId);
+        }, RUN_STALE_MS);
+        runTimeoutsRef.current.set(nextEvent.runId, timeout);
+      } else if (nextEvent.type === "run_complete") {
         setActiveServices((prev) => {
-          const next = new Map(prev)
-          next.delete(nextEvent.runId)
-          return next
-        })
-        const existingTimeout = runTimeoutsRef.current.get(nextEvent.runId)
+          const next = new Map(prev);
+          next.delete(nextEvent.runId);
+          return next;
+        });
+        const existingTimeout = runTimeoutsRef.current.get(nextEvent.runId);
         if (existingTimeout) {
-          clearTimeout(existingTimeout)
-          runTimeoutsRef.current.delete(nextEvent.runId)
+          clearTimeout(existingTimeout);
+          runTimeoutsRef.current.delete(nextEvent.runId);
         }
       }
-    })
-    return cleanup
-  }, [])
+    });
+    return cleanup;
+  }, []);
 
   useEffect(() => {
     return () => {
-      runTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout))
-      runTimeoutsRef.current.clear()
-    }
-  }, [])
+      runTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+      runTimeoutsRef.current.clear();
+    };
+  }, []);
 
   // Load logs from JSONL file when popover opens
   useEffect(() => {
-    if (!popoverOpen) return
-    let cancelled = false
+    if (!popoverOpen) return;
+    let cancelled = false;
     async function loadLogs() {
-      setLogLoading(true)
+      setLogLoading(true);
       try {
-        const result = await window.ipc.invoke('workspace:readFile', {
-          path: 'logs/services.jsonl',
-          encoding: 'utf8',
-        })
-        if (cancelled) return
-        const lines = result.data.trim().split('\n').filter(Boolean)
-        const parsed: ServiceEventType[] = []
+        const result = await window.ipc.invoke("workspace:readFile", {
+          path: "logs/services.jsonl",
+          encoding: "utf8",
+        });
+        if (cancelled) return;
+        const lines = result.data.trim().split("\n").filter(Boolean);
+        const parsed: ServiceEventType[] = [];
         for (const line of lines) {
           try {
-            parsed.push(JSON.parse(line))
+            parsed.push(JSON.parse(line));
           } catch {
             // skip malformed lines
           }
         }
         // Newest first, limit to 1000
-        setLogEvents(parsed.reverse().slice(0, MAX_SYNC_EVENTS))
+        setLogEvents(parsed.reverse().slice(0, MAX_SYNC_EVENTS));
       } catch {
-        if (!cancelled) setLogEvents([])
+        if (!cancelled) setLogEvents([]);
       } finally {
-        if (!cancelled) setLogLoading(false)
+        if (!cancelled) setLogLoading(false);
       }
     }
-    loadLogs()
-    return () => { cancelled = true }
-  }, [popoverOpen])
+    loadLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [popoverOpen]);
 
-  const isSyncing = activeServices.size > 0
-  const isCollapsed = state === "collapsed"
+  const isSyncing = activeServices.size > 0;
+  const isCollapsed = state === "collapsed";
 
   // Build status label from active services
-  const activeServiceNames = [...new Set(activeServices.values())]
+  const activeServiceNames = [...new Set(activeServices.values())];
   const statusLabel = isSyncing
     ? activeServiceNames.map((s) => SERVICE_LABELS[s] || s).join(", ")
-    : "All caught up"
+    : "All caught up";
 
   return (
     <>
@@ -378,16 +387,24 @@ function SyncStatusBar() {
                         {formatEventTime(event.ts)}
                       </span>
                       <span className="shrink-0">
-                        <span className={cn(
-                          "inline-block rounded px-1 py-0.5 text-[10px] font-medium leading-none",
-                          event.level === 'error' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                          event.level === 'warn' ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                          "bg-muted text-muted-foreground"
-                        )}>
-                          {SERVICE_LABELS[event.service]?.split(" ").slice(-1)[0] || event.service}
+                        <span
+                          className={cn(
+                            "inline-block rounded px-1 py-0.5 text-[10px] font-medium leading-none",
+                            event.level === "error"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                              : event.level === "warn"
+                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {SERVICE_LABELS[event.service]
+                            ?.split(" ")
+                            .slice(-1)[0] || event.service}
                         </span>
                       </span>
-                      <span className="leading-4 text-foreground/80">{event.message}</span>
+                      <span className="leading-4 text-foreground/80">
+                        {event.message}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -397,7 +414,7 @@ function SyncStatusBar() {
         </Popover>
       </SidebarFooter>
     </>
-  )
+  );
 }
 
 export function SidebarContentPanel({
@@ -416,7 +433,7 @@ export function SidebarContentPanel({
   selectedBackgroundTask,
   onNewChat,
   onOpenSearch,
-  meetingState = 'idle',
+  meetingState = "idle",
   meetingSummarizing = false,
   meetingAvailable = false,
   onToggleMeeting,
@@ -426,72 +443,79 @@ export function SidebarContentPanel({
   onOpenSuggestedTopics,
   ...props
 }: SidebarContentPanelProps) {
-  const { activeSection, setActiveSection } = useSidebarSection()
-  const [hasOauthError, setHasOauthError] = useState(false)
-  const [showOauthAlert, setShowOauthAlert] = useState(true)
-  const [connectorsOpen, setConnectorsOpen] = useState(false)
-  const [openConnectorsAfterClose, setOpenConnectorsAfterClose] = useState(false)
-  const connectorsButtonRef = useRef<HTMLButtonElement | null>(null)
-  const [isRowboatConnected, setIsRowboatConnected] = useState(false)
-  const [loggingIn, setLoggingIn] = useState(false)
-  const [appUrl, setAppUrl] = useState<string | null>(null)
-  const { billing } = useBilling(isRowboatConnected)
+  const { activeSection, setActiveSection } = useSidebarSection();
+  const [hasOauthError, setHasOauthError] = useState(false);
+  const [showOauthAlert, setShowOauthAlert] = useState(true);
+  const [connectorsOpen, setConnectorsOpen] = useState(false);
+  const [openConnectorsAfterClose, setOpenConnectorsAfterClose] =
+    useState(false);
+  const connectorsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [isRowboatConnected, setIsRowboatConnected] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [appUrl, setAppUrl] = useState<string | null>(null);
+  const { billing } = useBilling(isRowboatConnected);
 
   const handleRowboatLogin = useCallback(async () => {
     try {
-      setLoggingIn(true)
-      const result = await window.ipc.invoke('oauth:connect', { provider: 'rowboat' })
+      setLoggingIn(true);
+      const result = await window.ipc.invoke("oauth:connect", {
+        provider: "rowboat",
+      });
       if (!result.success) {
-        setLoggingIn(false)
+        setLoggingIn(false);
       }
     } catch {
-      setLoggingIn(false)
+      setLoggingIn(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    let mounted = true
+    let mounted = true;
 
     const refreshOauthError = async () => {
       try {
-        const result = await window.ipc.invoke('oauth:getState', null)
-        const config = result.config || {}
-        const hasError = Object.values(config).some((entry) => Boolean(entry?.error))
-        const connected = config['rowboat']?.connected ?? false
+        const result = await window.ipc.invoke("oauth:getState", null);
+        const config = result.config || {};
+        const hasError = Object.values(config).some((entry) =>
+          Boolean(entry?.error),
+        );
+        const connected = config["rowboat"]?.connected ?? false;
         if (mounted) {
-          setHasOauthError(hasError)
-          setIsRowboatConnected(connected)
+          setHasOauthError(hasError);
+          setIsRowboatConnected(connected);
           if (!hasError) {
-            setShowOauthAlert(true)
+            setShowOauthAlert(true);
           }
         }
         if (connected && mounted) {
           try {
-            const account = await window.ipc.invoke('account:getRowboat', null)
-            if (mounted) setAppUrl(account.config?.appUrl ?? null)
-          } catch { /* ignore */ }
+            const account = await window.ipc.invoke("account:getRowboat", null);
+            if (mounted) setAppUrl(account.config?.appUrl ?? null);
+          } catch {
+            /* ignore */
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch OAuth state:', error)
+        console.error("Failed to fetch OAuth state:", error);
         if (mounted) {
-          setHasOauthError(false)
-          setIsRowboatConnected(false)
-          setShowOauthAlert(true)
+          setHasOauthError(false);
+          setIsRowboatConnected(false);
+          setShowOauthAlert(true);
         }
       }
-    }
+    };
 
-    refreshOauthError()
-    const cleanup = window.ipc.on('oauth:didConnect', () => {
-      refreshOauthError()
-      setLoggingIn(false)
-    })
+    refreshOauthError();
+    const cleanup = window.ipc.on("oauth:didConnect", () => {
+      refreshOauthError();
+      setLoggingIn(false);
+    });
 
     return () => {
-      mounted = false
-      cleanup()
-    }
-  }, [])
+      mounted = false;
+      cleanup();
+    };
+  }, []);
 
   return (
     <Sidebar className="border-r-0" {...props}>
@@ -509,7 +533,7 @@ export function SidebarContentPanel({
                   "flex-1 rounded-md px-3 py-1 text-sm font-medium transition-colors",
                   activeSection === tab.id
                     ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground",
                 )}
               >
                 {tab.label}
@@ -543,29 +567,33 @@ export function SidebarContentPanel({
             <button
               type="button"
               onClick={onToggleMeeting}
-              disabled={meetingState === 'connecting' || meetingState === 'stopping' || meetingSummarizing}
+              disabled={
+                meetingState === "connecting" ||
+                meetingState === "stopping" ||
+                meetingSummarizing
+              }
               className={cn(
                 "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors disabled:pointer-events-none",
-                meetingState === 'recording'
+                meetingState === "recording"
                   ? "text-red-500 hover:bg-sidebar-accent"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >
-              {meetingSummarizing || meetingState === 'connecting' ? (
+              {meetingSummarizing || meetingState === "connecting" ? (
                 <LoaderIcon className="size-4 animate-spin" />
-              ) : meetingState === 'recording' ? (
+              ) : meetingState === "recording" ? (
                 <Square className="size-4 animate-pulse" />
               ) : (
                 <Radio className="size-4" />
               )}
               <span>
                 {meetingSummarizing
-                  ? 'Generating notes…'
-                  : meetingState === 'connecting'
-                    ? 'Starting…'
-                    : meetingState === 'recording'
-                      ? 'Stop recording'
-                      : 'Take meeting notes'}
+                  ? "Generating notes…"
+                  : meetingState === "connecting"
+                    ? "Starting…"
+                    : meetingState === "recording"
+                      ? "Stop recording"
+                      : "Take meeting notes"}
               </span>
             </button>
           )}
@@ -577,7 +605,7 @@ export function SidebarContentPanel({
                 "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
                 isBrowserOpen
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >
               <Globe className="size-4" />
@@ -592,7 +620,7 @@ export function SidebarContentPanel({
                 "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
                 isSuggestedTopicsOpen
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >
               <Lightbulb className="size-4" />
@@ -630,22 +658,41 @@ export function SidebarContentPanel({
           <div className="flex items-center justify-between rounded-lg border border-sidebar-border bg-sidebar-accent/20 px-3 py-2">
             <div className="min-w-0">
               <span className="text-xs font-medium capitalize text-sidebar-foreground">
-                {billing.subscriptionPlan ? `${billing.subscriptionPlan} plan` : 'No plan'}
+                {billing.subscriptionPlan
+                  ? `${billing.subscriptionPlan} plan`
+                  : "No plan"}
               </span>
-              {billing.subscriptionStatus === 'trialing' && billing.trialExpiresAt && (() => {
-                const days = Math.max(0, Math.ceil((new Date(billing.trialExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-                return (
-                  <p className="text-[10px] text-sidebar-foreground/60">
-                    {days === 0 ? 'Trial expires today' : days === 1 ? '1 day left' : `${days} days left`}
-                  </p>
-                )
-              })()}
+              {billing.subscriptionStatus === "trialing" &&
+                billing.trialExpiresAt &&
+                (() => {
+                  const days = Math.max(
+                    0,
+                    Math.ceil(
+                      (new Date(billing.trialExpiresAt).getTime() -
+                        Date.now()) /
+                        (1000 * 60 * 60 * 24),
+                    ),
+                  );
+                  return (
+                    <p className="text-[10px] text-sidebar-foreground/60">
+                      {days === 0
+                        ? "Trial expires today"
+                        : days === 1
+                          ? "1 day left"
+                          : `${days} days left`}
+                    </p>
+                  );
+                })()}
             </div>
             <button
               onClick={() => appUrl && window.open(`${appUrl}?intent=upgrade`)}
               className="shrink-0 rounded-md bg-sidebar-foreground/10 px-2.5 py-1 text-[11px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-foreground/20"
             >
-              {!billing.subscriptionPlan ? 'Subscribe' : billing.subscriptionPlan === 'starter' ? 'Upgrade' : 'Manage'}
+              {!billing.subscriptionPlan
+                ? "Subscribe"
+                : billing.subscriptionPlan === "starter"
+                  ? "Upgrade"
+                  : "Manage"}
             </button>
           </div>
         </div>
@@ -658,7 +705,7 @@ export function SidebarContentPanel({
             disabled={loggingIn}
             className="flex w-full items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent/20 px-3 py-2.5 text-xs font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/40 disabled:opacity-50"
           >
-            {loggingIn ? 'Signing in…' : 'Sign in to Rowboat'}
+            {loggingIn ? "Signing in…" : "Sign in to Rowboat"}
           </button>
         </div>
       )}
@@ -666,7 +713,11 @@ export function SidebarContentPanel({
       <div className="border-t border-sidebar-border px-2 py-2">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <ConnectorsPopover open={connectorsOpen} onOpenChange={setConnectorsOpen} mode="unconnected">
+            <ConnectorsPopover
+              open={connectorsOpen}
+              onOpenChange={setConnectorsOpen}
+              mode="unconnected"
+            >
               <button
                 ref={connectorsButtonRef}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
@@ -691,34 +742,35 @@ export function SidebarContentPanel({
                 </AlertDialogTrigger>
                 <AlertDialogContent
                   onCloseAutoFocus={(event) => {
-                    event.preventDefault()
+                    event.preventDefault();
                     if (openConnectorsAfterClose) {
-                      setOpenConnectorsAfterClose(false)
-                      setConnectorsOpen(true)
+                      setOpenConnectorsAfterClose(false);
+                      setConnectorsOpen(true);
                     }
-                    connectorsButtonRef.current?.focus()
+                    connectorsButtonRef.current?.focus();
                   }}
                 >
                   <AlertDialogHeader>
                     <AlertDialogTitle>Reconnect your accounts</AlertDialogTitle>
                     <AlertDialogDescription>
-                      One or more connected accounts need attention. Open Connected accounts
-                      to review the status and reconnect if needed.
+                      One or more connected accounts need attention. Open
+                      Connected accounts to review the status and reconnect if
+                      needed.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel
                       onClick={() => {
-                        setOpenConnectorsAfterClose(false)
-                        setShowOauthAlert(false)
+                        setOpenConnectorsAfterClose(false);
+                        setShowOauthAlert(false);
                       }}
                     >
                       Dismiss
                     </AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => {
-                        setOpenConnectorsAfterClose(true)
-                        setShowOauthAlert(false)
+                        setOpenConnectorsAfterClose(true);
+                        setShowOauthAlert(false);
                       }}
                     >
                       View connected accounts
@@ -745,84 +797,93 @@ export function SidebarContentPanel({
       <SyncStatusBar />
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }
 
 async function transcribeWithDeepgram(audioBlob: Blob): Promise<string | null> {
   try {
-    const configResult = await window.ipc.invoke('workspace:readFile', {
-      path: 'config/deepgram.json',
-      encoding: 'utf8',
-    })
-    const { apiKey } = JSON.parse(configResult.data) as { apiKey: string }
-    if (!apiKey) throw new Error('No apiKey in deepgram.json')
+    const configResult = await window.ipc.invoke("workspace:readFile", {
+      path: "config/deepgram.json",
+      encoding: "utf8",
+    });
+    const { apiKey } = JSON.parse(configResult.data) as { apiKey: string };
+    if (!apiKey) throw new Error("No apiKey in deepgram.json");
 
     const response = await fetch(
-      'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true',
+      "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true",
       {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Token ${apiKey}`,
-          'Content-Type': audioBlob.type,
+          "Content-Type": audioBlob.type,
         },
         body: audioBlob,
       },
-    )
+    );
 
-    if (!response.ok) throw new Error(`Deepgram API error: ${response.status}`)
-    const result = await response.json()
-    return result.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? null
+    if (!response.ok) throw new Error(`Deepgram API error: ${response.status}`);
+    const result = await response.json();
+    return result.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? null;
   } catch (err) {
-    console.error('Deepgram transcription failed:', err)
-    return null
+    console.error("Deepgram transcription failed:", err);
+    return null;
   }
 }
 
 // Voice Note Recording Button
-function VoiceNoteButton({ onNoteCreated }: { onNoteCreated?: (path: string) => void }) {
-  const [isRecording, setIsRecording] = React.useState(false)
-  const [hasDeepgramKey, setHasDeepgramKey] = React.useState(false)
-  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null)
-  const chunksRef = React.useRef<Blob[]>([])
-  const notePathRef = React.useRef<string | null>(null)
-  const timestampRef = React.useRef<string | null>(null)
-  const relativePathRef = React.useRef<string | null>(null)
+function VoiceNoteButton({
+  onNoteCreated,
+}: {
+  onNoteCreated?: (path: string) => void;
+}) {
+  const [isRecording, setIsRecording] = React.useState(false);
+  const [hasDeepgramKey, setHasDeepgramKey] = React.useState(false);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const chunksRef = React.useRef<Blob[]>([]);
+  const notePathRef = React.useRef<string | null>(null);
+  const timestampRef = React.useRef<string | null>(null);
+  const relativePathRef = React.useRef<string | null>(null);
   // Keep a ref to always call the latest onNoteCreated (avoids stale closure in recorder.onstop)
-  const onNoteCreatedRef = React.useRef(onNoteCreated)
-  React.useEffect(() => { onNoteCreatedRef.current = onNoteCreated }, [onNoteCreated])
+  const onNoteCreatedRef = React.useRef(onNoteCreated);
+  React.useEffect(() => {
+    onNoteCreatedRef.current = onNoteCreated;
+  }, [onNoteCreated]);
 
   React.useEffect(() => {
-    window.ipc.invoke('workspace:readFile', {
-      path: 'config/deepgram.json',
-      encoding: 'utf8',
-    }).then((result: { data: string }) => {
-      const { apiKey } = JSON.parse(result.data) as { apiKey: string }
-      setHasDeepgramKey(!!apiKey)
-    }).catch(() => {
-      setHasDeepgramKey(false)
-    })
-  }, [])
+    window.ipc
+      .invoke("workspace:readFile", {
+        path: "config/deepgram.json",
+        encoding: "utf8",
+      })
+      .then((result: { data: string }) => {
+        const { apiKey } = JSON.parse(result.data) as { apiKey: string };
+        setHasDeepgramKey(!!apiKey);
+      })
+      .catch(() => {
+        setHasDeepgramKey(false);
+      });
+  }, []);
 
   const startRecording = async () => {
     try {
       // Generate timestamp and paths immediately
-      const now = new Date()
-      const timestamp = now.toISOString().replace(/[:.]/g, '-')
-      const dateStr = now.toISOString().split('T')[0] // YYYY-MM-DD
-      const noteName = `voice-memo-${timestamp}`
-      const notePath = `knowledge/Voice Memos/${dateStr}/${noteName}.md`
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, "-");
+      const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+      const noteName = `voice-memo-${timestamp}`;
+      const notePath = `knowledge/Voice Memos/${dateStr}/${noteName}.md`;
 
-      timestampRef.current = timestamp
-      notePathRef.current = notePath
+      timestampRef.current = timestamp;
+      notePathRef.current = notePath;
       // Relative path for linking (from knowledge/ root, without .md extension)
-      const relativePath = `Voice Memos/${dateStr}/${noteName}`
-      relativePathRef.current = relativePath
+      const relativePath = `Voice Memos/${dateStr}/${noteName}`;
+      relativePathRef.current = relativePath;
 
       // Create the note immediately with a "Recording..." placeholder
-      await window.ipc.invoke('workspace:mkdir', {
+      await window.ipc.invoke("workspace:mkdir", {
         path: `knowledge/Voice Memos/${dateStr}`,
         recursive: true,
-      })
+      });
 
       const initialContent = `---
 type: voice memo
@@ -834,61 +895,61 @@ path: ${relativePath}
 ## Transcript
 
 *Recording in progress...*
-`
-      await window.ipc.invoke('workspace:writeFile', {
+`;
+      await window.ipc.invoke("workspace:writeFile", {
         path: notePath,
         data: initialContent,
-        opts: { encoding: 'utf8' },
-      })
+        opts: { encoding: "utf8" },
+      });
 
       // Select the note so the user can see it
-      onNoteCreatedRef.current?.(notePath)
+      onNoteCreatedRef.current?.(notePath);
 
       // Start actual recording
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = MediaRecorder.isTypeSupported('audio/mp4')
-        ? 'audio/mp4'
-        : 'audio/webm'
-      const recorder = new MediaRecorder(stream, { mimeType })
-      chunksRef.current = []
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
 
       recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        const blob = new Blob(chunksRef.current, { type: mimeType })
-        const ext = mimeType === 'audio/mp4' ? 'm4a' : 'webm'
-        const audioFilename = `voice-memo-${timestampRef.current}.${ext}`
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const ext = mimeType === "audio/mp4" ? "m4a" : "webm";
+        const audioFilename = `voice-memo-${timestampRef.current}.${ext}`;
 
         // Save audio file to voice_memos folder (for backup/reference)
         try {
-          await window.ipc.invoke('workspace:mkdir', {
-            path: 'voice_memos',
+          await window.ipc.invoke("workspace:mkdir", {
+            path: "voice_memos",
             recursive: true,
-          })
+          });
 
-          const arrayBuffer = await blob.arrayBuffer()
+          const arrayBuffer = await blob.arrayBuffer();
           const base64 = btoa(
             new Uint8Array(arrayBuffer).reduce(
               (data, byte) => data + String.fromCharCode(byte),
-              '',
+              "",
             ),
-          )
+          );
 
-          await window.ipc.invoke('workspace:writeFile', {
+          await window.ipc.invoke("workspace:writeFile", {
             path: `voice_memos/${audioFilename}`,
             data: base64,
-            opts: { encoding: 'base64' },
-          })
+            opts: { encoding: "base64" },
+          });
         } catch {
-          console.error('Failed to save audio file')
+          console.error("Failed to save audio file");
         }
 
         // Update note to show transcribing status
-        const currentNotePath = notePathRef.current
-        const currentRelativePath = relativePathRef.current
+        const currentNotePath = notePathRef.current;
+        const currentRelativePath = relativePathRef.current;
         if (currentNotePath && currentRelativePath) {
           const transcribingContent = `---
 type: voice memo
@@ -900,16 +961,16 @@ path: ${currentRelativePath}
 ## Transcript
 
 *Transcribing...*
-`
-          await window.ipc.invoke('workspace:writeFile', {
+`;
+          await window.ipc.invoke("workspace:writeFile", {
             path: currentNotePath,
             data: transcribingContent,
-            opts: { encoding: 'utf8' },
-          })
+            opts: { encoding: "utf8" },
+          });
         }
 
         // Transcribe and update the note with the transcript
-        const transcript = await transcribeWithDeepgram(blob)
+        const transcript = await transcribeWithDeepgram(blob);
         if (currentNotePath && currentRelativePath) {
           const finalContent = transcript
             ? `---
@@ -933,42 +994,45 @@ path: ${currentRelativePath}
 ## Transcript
 
 *Transcription failed. Please try again.*
-`
-          await window.ipc.invoke('workspace:writeFile', {
+`;
+          await window.ipc.invoke("workspace:writeFile", {
             path: currentNotePath,
             data: finalContent,
-            opts: { encoding: 'utf8' },
-          })
+            opts: { encoding: "utf8" },
+          });
 
           // Re-select to trigger refresh
-          onNoteCreatedRef.current?.(currentNotePath)
+          onNoteCreatedRef.current?.(currentNotePath);
 
           if (transcript) {
-            toast('Voice note transcribed', 'success')
+            toast("Voice note transcribed", "success");
           } else {
-            toast('Transcription failed', 'error')
+            toast("Transcription failed", "error");
           }
         }
-      }
+      };
 
-      recorder.start()
-      mediaRecorderRef.current = recorder
-      setIsRecording(true)
-      toast('Recording started', 'success')
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      toast("Recording started", "success");
     } catch {
-      toast('Could not access microphone', 'error')
+      toast("Could not access microphone", "error");
     }
-  }
+  };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      mediaRecorderRef.current.stop();
     }
-    mediaRecorderRef.current = null
-    setIsRecording(false)
-  }
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+  };
 
-  if (!hasDeepgramKey) return null
+  if (!hasDeepgramKey) return null;
 
   return (
     <Tooltip>
@@ -985,10 +1049,10 @@ path: ${currentRelativePath}
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {isRecording ? 'Stop Recording' : 'New Voice Note'}
+        {isRecording ? "Stop Recording" : "New Voice Note"}
       </TooltipContent>
     </Tooltip>
-  )
+  );
 }
 
 // Knowledge Section
@@ -1001,52 +1065,58 @@ function KnowledgeSection({
   actions,
   onVoiceNoteCreated,
 }: {
-  tree: TreeNode[]
-  selectedPath: string | null
-  expandedPaths: Set<string>
-  onSelectFile: (path: string, kind: "file" | "dir") => void
-  onToggleFolder?: (path: string) => void
-  actions: KnowledgeActions
-  onVoiceNoteCreated?: (path: string) => void
+  tree: TreeNode[];
+  selectedPath: string | null;
+  expandedPaths: Set<string>;
+  onSelectFile: (path: string, kind: "file" | "dir") => void;
+  onToggleFolder?: (path: string) => void;
+  actions: KnowledgeActions;
+  onVoiceNoteCreated?: (path: string) => void;
 }) {
-  const isExpanded = expandedPaths.size > 0
-  const treeContainerRef = React.useRef<HTMLDivElement | null>(null)
+  const isExpanded = expandedPaths.size > 0;
+  const treeContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!selectedPath) return
+    if (!selectedPath) return;
 
-    let cancelled = false
-    let rafId: number | null = null
-    let attempts = 0
-    const maxAttempts = 20
+    let cancelled = false;
+    let rafId: number | null = null;
+    let attempts = 0;
+    const maxAttempts = 20;
 
     const revealActiveFile = () => {
-      if (cancelled) return
-      const container = treeContainerRef.current
-      if (!container) return
-      const activeRow = container.querySelector<HTMLElement>('[data-knowledge-active="true"]')
+      if (cancelled) return;
+      const container = treeContainerRef.current;
+      if (!container) return;
+      const activeRow = container.querySelector<HTMLElement>(
+        '[data-knowledge-active="true"]',
+      );
       if (activeRow) {
-        activeRow.scrollIntoView({ block: "nearest", inline: "nearest" })
-        return
+        activeRow.scrollIntoView({ block: "nearest", inline: "nearest" });
+        return;
       }
-      if (attempts >= maxAttempts) return
-      attempts += 1
-      rafId = requestAnimationFrame(revealActiveFile)
-    }
+      if (attempts >= maxAttempts) return;
+      attempts += 1;
+      rafId = requestAnimationFrame(revealActiveFile);
+    };
 
-    rafId = requestAnimationFrame(revealActiveFile)
+    rafId = requestAnimationFrame(revealActiveFile);
     return () => {
-      cancelled = true
-      if (rafId !== null) cancelAnimationFrame(rafId)
-    }
-  }, [selectedPath, expandedPaths, tree])
+      cancelled = true;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [selectedPath, expandedPaths, tree]);
 
   const quickActions = [
     { icon: FilePlus, label: "New Note", action: () => actions.createNote() },
-    { icon: FolderPlus, label: "New Folder", action: () => actions.createFolder() },
+    {
+      icon: FolderPlus,
+      label: "New Folder",
+      action: () => actions.createFolder(),
+    },
     { icon: Network, label: "Graph View", action: () => actions.openGraph() },
     { icon: Table2, label: "Bases", action: () => actions.openBases() },
-  ]
+  ];
 
   return (
     <ContextMenu>
@@ -1115,16 +1185,19 @@ function KnowledgeSection({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  )
+  );
 }
 
 function countFiles(node: TreeNode): number {
-  if (node.kind === 'file') return 1
-  return (node.children ?? []).reduce((sum, child) => sum + countFiles(child), 0)
+  if (node.kind === "file") return 1;
+  return (node.children ?? []).reduce(
+    (sum, child) => sum + countFiles(child),
+    0,
+  );
 }
 
 /** Display name overrides for top-level knowledge folders */
-const FOLDER_DISPLAY_NAMES: Record<string, string> = {}
+const FOLDER_DISPLAY_NAMES: Record<string, string> = {};
 
 // Tree component for file browser
 function Tree({
@@ -1135,74 +1208,73 @@ function Tree({
   onToggleFolder,
   actions,
 }: {
-  item: TreeNode
-  selectedPath: string | null
-  expandedPaths: Set<string>
-  onSelect: (path: string, kind: "file" | "dir") => void
-  onToggleFolder?: (path: string) => void
-  actions: KnowledgeActions
+  item: TreeNode;
+  selectedPath: string | null;
+  expandedPaths: Set<string>;
+  onSelect: (path: string, kind: "file" | "dir") => void;
+  onToggleFolder?: (path: string) => void;
+  actions: KnowledgeActions;
 }) {
-  const isDir = item.kind === 'dir'
-  const isExpanded = expandedPaths.has(item.path)
-  const isSelected = selectedPath === item.path
-  const [isRenaming, setIsRenaming] = useState(false)
-  const isSubmittingRef = React.useRef(false)
-  const displayName = (isDir && FOLDER_DISPLAY_NAMES[item.name]) || item.name
+  const isDir = item.kind === "dir";
+  const isExpanded = expandedPaths.has(item.path);
+  const isSelected = selectedPath === item.path;
+  const [isRenaming, setIsRenaming] = useState(false);
+  const isSubmittingRef = React.useRef(false);
+  const displayName = (isDir && FOLDER_DISPLAY_NAMES[item.name]) || item.name;
 
   // For files, strip .md extension for editing
-  const baseName = !isDir && item.name.endsWith('.md')
-    ? item.name.slice(0, -3)
-    : item.name
-  const [newName, setNewName] = useState(baseName)
+  const baseName =
+    !isDir && item.name.endsWith(".md") ? item.name.slice(0, -3) : item.name;
+  const [newName, setNewName] = useState(baseName);
 
   // Sync newName when baseName changes (e.g., after external rename)
   React.useEffect(() => {
-    setNewName(baseName)
-  }, [baseName])
+    setNewName(baseName);
+  }, [baseName]);
 
   const handleRename = async () => {
     // Prevent double submission
-    if (isSubmittingRef.current) return
-    isSubmittingRef.current = true
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
-    const trimmedName = newName.trim()
+    const trimmedName = newName.trim();
     if (trimmedName && trimmedName !== baseName) {
       try {
-        await actions.rename(item.path, trimmedName, isDir)
-        toast('Renamed successfully', 'success')
+        await actions.rename(item.path, trimmedName, isDir);
+        toast("Renamed successfully", "success");
       } catch {
-        toast('Failed to rename', 'error')
+        toast("Failed to rename", "error");
       }
     }
-    setIsRenaming(false)
+    setIsRenaming(false);
     // Reset after a small delay to prevent blur from re-triggering
     setTimeout(() => {
-      isSubmittingRef.current = false
-    }, 100)
-  }
+      isSubmittingRef.current = false;
+    }, 100);
+  };
 
   const handleDelete = async () => {
     try {
-      await actions.remove(item.path)
-      toast('Moved to trash', 'success')
+      await actions.remove(item.path);
+      toast("Moved to trash", "success");
     } catch {
-      toast('Failed to delete', 'error')
+      toast("Failed to delete", "error");
     }
-  }
+  };
 
   const handleCopyPath = () => {
-    actions.copyPath(item.path)
-    toast('Path copied', 'success')
-  }
+    actions.copyPath(item.path);
+    toast("Path copied", "success");
+  };
 
   const cancelRename = () => {
-    isSubmittingRef.current = true // Prevent blur from triggering rename
-    setIsRenaming(false)
-    setNewName(baseName) // Reset to original name
+    isSubmittingRef.current = true; // Prevent blur from triggering rename
+    setIsRenaming(false);
+    setNewName(baseName); // Reset to original name
     setTimeout(() => {
-      isSubmittingRef.current = false
-    }, 100)
-  }
+      isSubmittingRef.current = false;
+    }, 100);
+  };
 
   const contextMenuContent = (
     <ContextMenuContent className="w-48">
@@ -1233,7 +1305,13 @@ function Tree({
         Copy Path
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem onClick={() => { setNewName(baseName); isSubmittingRef.current = false; setIsRenaming(true) }}>
+      <ContextMenuItem
+        onClick={() => {
+          setNewName(baseName);
+          isSubmittingRef.current = false;
+          setIsRenaming(true);
+        }}
+      >
         <Pencil className="mr-2 size-4" />
         Rename
       </ContextMenuItem>
@@ -1242,7 +1320,7 @@ function Tree({
         Delete
       </ContextMenuItem>
     </ContextMenuContent>
-  )
+  );
 
   // Inline rename input
   if (isRenaming) {
@@ -1253,19 +1331,19 @@ function Tree({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={async (e) => {
-              e.stopPropagation()
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                await handleRename()
-              } else if (e.key === 'Escape') {
-                e.preventDefault()
-                cancelRename()
+              e.stopPropagation();
+              if (e.key === "Enter") {
+                e.preventDefault();
+                await handleRename();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancelRename();
               }
             }}
             onBlur={() => {
               // Only trigger rename if not already submitting
               if (!isSubmittingRef.current) {
-                handleRename()
+                handleRename();
               }
             }}
             className="h-6 text-sm flex-1"
@@ -1273,12 +1351,12 @@ function Tree({
           />
         </div>
       </SidebarMenuItem>
-    )
+    );
   }
 
   // Top-level knowledge folders open bases view — render as flat items
-  const parts = item.path.split('/')
-  const isBasesFolder = isDir && parts.length === 2 && parts[0] === 'knowledge'
+  const parts = item.path.split("/");
+  const isBasesFolder = isDir && parts.length === 2 && parts[0] === "knowledge";
 
   if (isBasesFolder) {
     return (
@@ -1289,7 +1367,9 @@ function Tree({
               <Folder className="size-4 shrink-0" />
               <div className="flex w-full items-center gap-1 min-w-0">
                 <span className="min-w-0 flex-1 truncate">{displayName}</span>
-                <span className="text-xs text-sidebar-foreground/50 tabular-nums shrink-0">{countFiles(item)}</span>
+                <span className="text-xs text-sidebar-foreground/50 tabular-nums shrink-0">
+                  {countFiles(item)}
+                </span>
               </div>
             </SidebarMenuButton>
             {onToggleFolder && (item.children?.length ?? 0) > 0 && (
@@ -1297,8 +1377,8 @@ function Tree({
                 showOnHover
                 aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
                 onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleFolder(item.path)
+                  e.stopPropagation();
+                  onToggleFolder(item.path);
                 }}
               >
                 <ChevronRight
@@ -1328,7 +1408,7 @@ function Tree({
         </ContextMenuTrigger>
         {contextMenuContent}
       </ContextMenu>
-    )
+    );
   }
 
   if (!isDir) {
@@ -1344,9 +1424,9 @@ function Tree({
               isActive={isSelected}
               onClick={(e) => {
                 if (e.metaKey && actions.onOpenInNewTab) {
-                  actions.onOpenInNewTab(item.path)
+                  actions.onOpenInNewTab(item.path);
                 } else {
-                  onSelect(item.path, item.kind)
+                  onSelect(item.path, item.kind);
                 }
               }}
             >
@@ -1358,7 +1438,7 @@ function Tree({
         </ContextMenuTrigger>
         {contextMenuContent}
       </ContextMenu>
-    )
+    );
   }
 
   return (
@@ -1375,7 +1455,9 @@ function Tree({
                 <ChevronRight className="transition-transform size-4" />
                 <div className="flex w-full items-center gap-1 min-w-0">
                   <span className="min-w-0 flex-1 truncate">{displayName}</span>
-                  <span className="text-xs text-sidebar-foreground/50 tabular-nums shrink-0">{countFiles(item)}</span>
+                  <span className="text-xs text-sidebar-foreground/50 tabular-nums shrink-0">
+                    {countFiles(item)}
+                  </span>
                 </div>
               </SidebarMenuButton>
             </CollapsibleTrigger>
@@ -1399,27 +1481,27 @@ function Tree({
       </ContextMenuTrigger>
       {contextMenuContent}
     </ContextMenu>
-  )
+  );
 }
 
 // Get status indicator color
 function getStatusColor(status?: string, enabled?: boolean): string {
   // Disabled agents always show gray
   if (enabled === false) {
-    return "bg-gray-400"
+    return "bg-gray-400";
   }
   switch (status) {
     case "running":
-      return "bg-blue-500"
+      return "bg-blue-500";
     case "finished":
-      return "bg-green-500"
+      return "bg-green-500";
     case "failed":
-      return "bg-red-500"
+      return "bg-red-500";
     case "triggered":
-      return "bg-gray-400"
+      return "bg-gray-400";
     case "scheduled":
     default:
-      return "bg-yellow-500"
+      return "bg-yellow-500";
   }
 }
 
@@ -1432,14 +1514,16 @@ function TasksSection({
   backgroundTasks = [],
   selectedBackgroundTask,
 }: {
-  runs: RunListItem[]
-  currentRunId?: string | null
-  processingRunIds?: Set<string>
-  actions?: TasksActions
-  backgroundTasks?: BackgroundTaskItem[]
-  selectedBackgroundTask?: string | null
+  runs: RunListItem[];
+  currentRunId?: string | null;
+  processingRunIds?: Set<string>;
+  actions?: TasksActions;
+  backgroundTasks?: BackgroundTaskItem[];
+  selectedBackgroundTask?: string | null;
 }) {
-  const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(null)
+  const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(
+    null,
+  );
 
   return (
     <SidebarGroup className="flex-1 flex flex-col overflow-hidden">
@@ -1464,7 +1548,9 @@ function TasksSection({
                         className={`absolute -bottom-0.5 -right-0.5 size-2 rounded-full ${getStatusColor(task.status, task.enabled)} ${task.status === "running" && task.enabled ? "animate-pulse" : ""}`}
                       />
                     </div>
-                    <span className={`truncate text-sm ${!task.enabled ? "text-muted-foreground" : ""}`}>
+                    <span
+                      className={`truncate text-sm ${!task.enabled ? "text-muted-foreground" : ""}`}
+                    >
                       {task.name}
                     </span>
                   </SidebarMenuButton>
@@ -1487,14 +1573,16 @@ function TasksSection({
                         isActive={currentRunId === run.id}
                         onClick={(e) => {
                           if (e.metaKey && actions?.onOpenInNewTab) {
-                            actions.onOpenInNewTab(run.id)
+                            actions.onOpenInNewTab(run.id);
                           } else {
-                            actions?.onSelectRun(run.id)
+                            actions?.onSelectRun(run.id);
                           }
                         }}
                       >
                         <div className="flex w-full items-center gap-2 min-w-0">
-                          <span className="min-w-0 flex-1 truncate text-sm">{run.title || '(Untitled chat)'}</span>
+                          <span className="min-w-0 flex-1 truncate text-sm">
+                            {run.title || "(Untitled chat)"}
+                          </span>
                           {run.createdAt ? (
                             <span className="shrink-0 text-[10px] text-muted-foreground">
                               {formatRunTime(run.createdAt)}
@@ -1506,7 +1594,9 @@ function TasksSection({
                   </ContextMenuTrigger>
                   <ContextMenuContent className="w-48">
                     {actions?.onOpenInNewTab && (
-                      <ContextMenuItem onClick={() => actions.onOpenInNewTab!(run.id)}>
+                      <ContextMenuItem
+                        onClick={() => actions.onOpenInNewTab!(run.id)}
+                      >
                         <ExternalLink className="mr-2 size-4" />
                         Open in new tab
                       </ContextMenuItem>
@@ -1532,7 +1622,12 @@ function TasksSection({
       </SidebarGroupContent>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={!!pendingDeleteRunId} onOpenChange={(open) => { if (!open) setPendingDeleteRunId(null) }}>
+      <Dialog
+        open={!!pendingDeleteRunId}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteRunId(null);
+        }}
+      >
         <DialogContent showCloseButton={false} className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete chat</DialogTitle>
@@ -1541,7 +1636,11 @@ function TasksSection({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setPendingDeleteRunId(null)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingDeleteRunId(null)}
+            >
               Cancel
             </Button>
             <Button
@@ -1549,9 +1648,9 @@ function TasksSection({
               size="sm"
               onClick={() => {
                 if (pendingDeleteRunId) {
-                  actions?.onDeleteRun(pendingDeleteRunId)
+                  actions?.onDeleteRun(pendingDeleteRunId);
                 }
-                setPendingDeleteRunId(null)
+                setPendingDeleteRunId(null);
               }}
             >
               Delete
@@ -1560,5 +1659,5 @@ function TasksSection({
         </DialogContent>
       </Dialog>
     </SidebarGroup>
-  )
+  );
 }

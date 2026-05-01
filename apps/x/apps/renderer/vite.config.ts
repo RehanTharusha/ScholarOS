@@ -15,6 +15,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    port: 5173,
+    strictPort: true, // Fail if port is already in use instead of auto-incrementing
+  },
   build: {
     outDir: 'dist',
   },

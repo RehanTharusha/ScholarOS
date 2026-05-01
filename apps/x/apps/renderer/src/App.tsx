@@ -5216,6 +5216,11 @@ function App() {
               onOpenSuggestedTopics={() =>
                 void navigateToView({ type: "suggested-topics" })
               }
+              onOpenIngestWindow={() => {
+                window.ipc.invoke("ingest:openWindow", null).catch((err) => {
+                  console.error("Failed to open ingestion window:", err);
+                });
+              }}
             />
             <SidebarInset
               className={cn(
