@@ -120,10 +120,6 @@ const flashcardStorage = new CardStorage(path.join(WorkDir, "academic"));
 const flashcardScheduler = new FSRSScheduler();
 const essayGrader = new EssayGrader();
 const taskManager = new TaskManager(path.join(WorkDir, "academic"));
-let ingestWindow: BrowserWindow | null = null;
-const ingestPreloadPath = app.isPackaged
-  ? path.join(__dirname, "../preload/dist/preload.js")
-  : path.join(__dirname, "../../../preload/dist/preload.js");
 
 async function ensureUniqueWorkspaceDestination(
   destinationPath: string,
@@ -148,59 +144,6 @@ async function ensureUniqueWorkspaceDestination(
       return candidate;
     }
   }
-}
-
-async function openIngestWindow(): Promise<void> {
-  if (ingestWindow && !ingestWindow.isDestroyed()) {
-    if (ingestWindow.isMinimized()) {
-      ingestWindow.restore();
-    }
-    ingestWindow.focus();
-    return;
-  }
-
-  ingestWindow = new BrowserWindow({
-    width: 1120,
-    height: 820,
-    minWidth: 840,
-    minHeight: 640,
-    show: false,
-    backgroundColor: "#252525",
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 12, y: 12 },
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-      preload: ingestPreloadPath,
-    },
-  });
-
-  configureSessionPermissions(session.defaultSession as Session);
-
-  ingestWindow.once("ready-to-show", () => {
-    ingestWindow?.show();
-  });
-
-  ingestWindow.on("closed", () => {
-    ingestWindow = null;
-  });
-
-  ingestWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
-
-  ingestWindow.webContents.on("will-navigate", (event, url) => {
-    const isInternal =
-      url.startsWith("app://") || url.startsWith("http://localhost:5173");
-    if (!isInternal) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-
-  await ingestWindow.loadURL(getRendererUrl("?mode=ingest"));
 }
 
 function createSeedFlashcards(courseId: string): FlashCard[] {
@@ -653,14 +596,10 @@ export function setupIpcHandlers() {
     "workspace:remove": async (_event, args) => {
       return workspace.remove(args.path, args.opts);
     },
-    "ingest:openWindow": async () => {
-      await openIngestWindow();
-      return { ok: true as const };
-    },
     "ingest:addFiles": async (_event, args) => {
       const { root: workspaceRoot } = await workspace.getRoot();
-      const inboxDirectory = path.join(workspaceRoot, "raw", "inbox");
-      await fs.mkdir(inboxDirectory, { recursive: true });
+      const rawDirectory = path.join(workspaceRoot, "raw");
+      await fs.mkdir(rawDirectory, { recursive: true });
 
       const stagedFiles: Array<{
         sourcePath: string;
@@ -679,7 +618,7 @@ export function setupIpcHandlers() {
 
           const originalName = path.basename(sourcePath);
           const destinationPath = await ensureUniqueWorkspaceDestination(
-            path.join(inboxDirectory, originalName),
+            path.join(rawDirectory, originalName),
           );
 
           if (path.resolve(sourcePath) !== path.resolve(destinationPath)) {

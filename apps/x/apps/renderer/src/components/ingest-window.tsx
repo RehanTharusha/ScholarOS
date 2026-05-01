@@ -8,6 +8,7 @@ import {
   Inbox,
   Loader2,
   Upload,
+  Play,
 } from "lucide-react";
 import {
   AcademicCard,
@@ -26,7 +27,15 @@ type StagedFile = {
   name: string;
 };
 
-export function IngestWindow() {
+interface IngestWindowProps {
+  onProcessIngest?: () => void;
+  isProcessing?: boolean;
+}
+
+export function IngestWindow({
+  onProcessIngest,
+  isProcessing,
+}: IngestWindowProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -35,9 +44,9 @@ export function IngestWindow() {
   const [errors, setErrors] = useState<string[]>([]);
   const [lastDropCount, setLastDropCount] = useState(0);
 
-  const inboxPath = useMemo(() => {
+  const rawPath = useMemo(() => {
     if (!workspaceRoot) return null;
-    return `${workspaceRoot.replace(/\/+$/, "")}/raw/inbox`;
+    return `${workspaceRoot.replace(/\/+$/, "")}/raw`;
   }, [workspaceRoot]);
 
   useEffect(() => {
@@ -74,7 +83,7 @@ export function IngestWindow() {
         toast.warning("Some files could not be staged.");
       } else {
         toast.success(
-          `Staged ${result.stagedFiles.length} file(s) for ingestion.`,
+          `Staged ${result.stagedFiles.length} file(s) into raw/ folder.`,
         );
       }
     } catch (error) {
@@ -121,14 +130,16 @@ export function IngestWindow() {
     };
   }, [stageFiles]);
 
-  const openInbox = useCallback(() => {
-    if (!inboxPath) return;
-    void window.ipc.invoke("shell:openPath", { path: inboxPath });
-  }, [inboxPath]);
+  const openRawFolder = useCallback(() => {
+    if (!rawPath) return;
+    void window.ipc.invoke("shell:openPath", { path: rawPath });
+  }, [rawPath]);
 
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  const hasStagedFiles = stagedFiles.length > 0;
 
   return (
     <AcademicPageShell>
@@ -136,17 +147,17 @@ export function IngestWindow() {
       <AcademicPageHeader
         eyebrow="Ingestion"
         title="Drop materials for import"
-        description="Drag PDFs, slides, images, and notes into this window. They are copied into raw/inbox so the existing ingestion flow can pick them up."
+        description="Drag PDFs, slides, images, and notes here. Files are copied into the raw/ folder and processed by the AI agent."
         actions={
           <>
             <Button
               variant="outline"
               size="sm"
-              onClick={openInbox}
-              disabled={!inboxPath}
+              onClick={openRawFolder}
+              disabled={!rawPath}
             >
               <FolderOpen className="mr-2 size-4" />
-              Open inbox
+              Open raw folder
             </Button>
             <Button size="sm" onClick={openFilePicker}>
               <Upload className="mr-2 size-4" />
@@ -191,22 +202,22 @@ export function IngestWindow() {
             </h3>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
               {isStaging
-                ? "Copying files into the workspace inbox."
-                : "The window accepts PDFs, slides, notes, images, and other materials from Finder or another app."}
+                ? "Copying files into the raw/ folder..."
+                : "Accepts PDFs, slides, notes, images, and other course materials."}
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <Badge variant="outline">Staged folder: raw/inbox</Badge>
+              <Badge variant="outline">Staged folder: raw/</Badge>
               <Badge variant="outline">Drag and drop</Badge>
               <Badge variant="outline">Any file type</Badge>
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               <Button
                 variant="outline"
-                onClick={openInbox}
-                disabled={!inboxPath}
+                onClick={openRawFolder}
+                disabled={!rawPath}
               >
                 <FolderOpen className="mr-2 size-4" />
-                Open inbox folder
+                Open raw folder
               </Button>
               <Button variant="secondary" onClick={openFilePicker}>
                 <ArrowUpFromLine className="mr-2 size-4" />
@@ -214,10 +225,49 @@ export function IngestWindow() {
               </Button>
             </div>
             <p className="mt-5 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Drop anywhere in this window
+              Drop files anywhere in this area
             </p>
           </div>
         </AcademicCard>
+
+        {/* Process Button - triggers agent with "ingest" command */}
+        {hasStagedFiles && (
+          <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div>
+              <h4 className="text-sm font-medium text-foreground">
+                Ready to process {stagedFiles.length} file(s)
+              </h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This will open a new chat and tell the agent to ingest these
+                files.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setStagedFiles([]);
+                  toast.info("Cleared staged files.");
+                }}
+                variant="outline"
+                size="sm"
+              >
+                Clear
+              </Button>
+              <Button
+                onClick={onProcessIngest}
+                disabled={isProcessing || !onProcessIngest}
+                className="gap-2"
+              >
+                {isProcessing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Play className="size-4" />
+                )}
+                Process with Agent
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -244,12 +294,12 @@ export function IngestWindow() {
           </div>
           <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Inbox
+              Raw folder
             </p>
             <div className="mt-2 flex items-center gap-2 text-sm text-foreground">
               <FileText className="size-4 text-muted-foreground" />
               <span className="truncate">
-                {inboxPath ?? "Loading workspace…"}
+                {rawPath ?? "Loading workspace…"}
               </span>
             </div>
           </div>

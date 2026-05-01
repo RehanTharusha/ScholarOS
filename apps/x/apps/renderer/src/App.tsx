@@ -117,6 +117,7 @@ import { FlashcardReview } from "@/components/flashcards/flashcard-review";
 import { EssayFeedbackPanel } from "@/components/academic/essay-feedback";
 import { CourseDashboard } from "@/components/academic/course-dashboard";
 import { KanbanAcademic } from "@/components/academic/kanban-academic";
+import { IngestWindow } from "@/components/ingest-window";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
@@ -213,6 +214,7 @@ const FLASHCARDS_TAB_PATH = "__scholar_flashcards__";
 const ESSAY_REVIEW_TAB_PATH = "__scholar_essay_review__";
 const DASHBOARD_TAB_PATH = "__scholar_dashboard__";
 const KANBAN_TAB_PATH = "__scholar_assignment_board__";
+const INGEST_TAB_PATH = "__scholar_ingest__";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -807,6 +809,7 @@ function App() {
   const [isGraphOpen, setIsGraphOpen] = useState(false);
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [isSuggestedTopicsOpen, setIsSuggestedTopicsOpen] = useState(false);
+  const [isIngestProcessing, setIsIngestProcessing] = useState(false);
   const [expandedFrom, setExpandedFrom] = useState<{
     path: string | null;
     graph: boolean;
@@ -3451,6 +3454,24 @@ function App() {
     setIsBrowserOpen(false);
   }, []);
 
+  const handleIngestProcess = useCallback(async () => {
+    setIsIngestProcessing(true);
+    try {
+      // Use submitFromPalette which handles creating a new tab, run, and submitting
+      // This will create a new chat tab and send the "ingest" command to the agent
+      submitFromPalette("ingest", null);
+
+      toast.success(
+        "Agent started ingesting files. Check the new chat tab for progress.",
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(`Failed to start ingestion: ${message}`);
+    } finally {
+      setIsIngestProcessing(false);
+    }
+  }, [submitFromPalette]);
+
   const toggleRightPaneMaximize = useCallback(() => {
     setIsChatSidebarOpen(true);
     setIsRightPaneMaximized((prev) => !prev);
@@ -5217,9 +5238,7 @@ function App() {
                 void navigateToView({ type: "suggested-topics" })
               }
               onOpenIngestWindow={() => {
-                window.ipc.invoke("ingest:openWindow", null).catch((err) => {
-                  console.error("Failed to open ingestion window:", err);
-                });
+                void navigateToView({ type: "file", path: INGEST_TAB_PATH });
               }}
             />
             <SidebarInset
@@ -5406,6 +5425,11 @@ function App() {
                 <CourseDashboard />
               ) : selectedPath === KANBAN_TAB_PATH ? (
                 <KanbanAcademic />
+              ) : selectedPath === INGEST_TAB_PATH ? (
+                <IngestWindow
+                  onProcessIngest={handleIngestProcess}
+                  isProcessing={isIngestProcessing}
+                />
               ) : isSuggestedTopicsOpen ? (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <SuggestedTopicsView

@@ -556,10 +556,6 @@ const ipcSchemas = {
     res: z.object({ data: z.string(), mimeType: z.string(), size: z.number() }),
   },
   // Ingestion channels
-  "ingest:openWindow": {
-    req: z.null(),
-    res: z.object({ ok: z.literal(true) }),
-  },
   "ingest:addFiles": {
     req: z.object({
       files: z.array(z.string().min(1)).min(1),
