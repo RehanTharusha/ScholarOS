@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   ArrowLeftRight,
+  BookOpen,
   RefreshCw,
   ThumbsDown,
   ThumbsUp,
@@ -8,6 +9,13 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FlashcardStats } from "./flashcard-stats";
 import type { FlashCard } from "@x/shared/dist/academic.js";
 import {
@@ -18,8 +26,6 @@ import {
   AcademicSectionTitle,
 } from "@/components/academic/academic-shell";
 
-const COURSE_ID = "scholaros-demo";
-
 type Grade = 1 | 2 | 3 | 4;
 
 type FlashcardListResponse = {
@@ -28,20 +34,48 @@ type FlashcardListResponse = {
   totalCount: number;
 };
 
+type CourseOption = {
+  id: string;
+  name: string;
+};
+
 export function FlashcardReview() {
   const [cards, setCards] = React.useState<FlashCard[]>([]);
+  const [courses, setCourses] = React.useState<CourseOption[]>([]);
+  const [selectedCourse, setSelectedCourse] =
+    React.useState<string>("scholaros-demo");
   const [loading, setLoading] = React.useState(true);
+  const [coursesLoading, setCoursesLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [flipped, setFlipped] = React.useState(false);
   const [busyGrade, setBusyGrade] = React.useState<Grade | null>(null);
+
+  const loadCourses = React.useCallback(async () => {
+    setCoursesLoading(true);
+    try {
+      const result = (await window.ipc.invoke(
+        "academic:flashcards:courses",
+        {},
+      )) as { courses: string[] };
+      const courseList = (result.courses || []).map((c) => ({
+        id: c,
+        name: c,
+      }));
+      setCourses(courseList);
+    } catch (err) {
+      console.error("Failed to load courses:", err);
+    } finally {
+      setCoursesLoading(false);
+    }
+  }, []);
 
   const loadCards = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const result = (await window.ipc.invoke("academic:flashcards:list", {
-        courseId: COURSE_ID,
+        courseId: selectedCourse,
       })) as FlashcardListResponse;
       setCards(result.cards ?? []);
       setActiveIndex((current) =>
@@ -55,11 +89,17 @@ export function FlashcardReview() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedCourse]);
 
   React.useEffect(() => {
-    void loadCards();
-  }, [loadCards]);
+    void loadCourses();
+  }, [loadCourses]);
+
+  React.useEffect(() => {
+    if (selectedCourse) {
+      void loadCards();
+    }
+  }, [selectedCourse, loadCards]);
 
   const activeCard = cards[activeIndex];
   const masteredCount = cards.filter(
@@ -78,7 +118,7 @@ export function FlashcardReview() {
     setBusyGrade(grade);
     try {
       const result = (await window.ipc.invoke("academic:flashcards:grade", {
-        courseId: COURSE_ID,
+        courseId: selectedCourse,
         cardId: activeCard.id,
         grade,
       })) as { success: boolean; cards?: FlashCard[]; error?: string };
@@ -119,9 +159,23 @@ export function FlashcardReview() {
         description="Review high-yield concepts with spaced repetition and keep the session focused on recall, not rereading."
         actions={
           <>
-            <Badge variant="secondary" className="rounded-full px-3 py-1">
-              Course: General Studies
-            </Badge>
+            <Select
+              value={selectedCourse}
+              onValueChange={(value) => setSelectedCourse(value)}
+              disabled={coursesLoading}
+            >
+              <SelectTrigger className="w-[200px] rounded-full">
+                <BookOpen className="mr-2 size-4" />
+                <SelectValue placeholder="Select a course" />
+              </SelectTrigger>
+              <SelectContent>
+                {courses.map((course) => (
+                  <SelectItem key={course.id} value={course.id}>
+                    {course.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
@@ -148,15 +202,28 @@ export function FlashcardReview() {
           </div>
         ) : null}
 
-        {loading ? (
+        {coursesLoading ? (
+          <AcademicEmptyState
+            title="Loading courses..."
+            description="Fetching available courses with flashcards."
+          />
+        ) : loading ? (
           <AcademicEmptyState
             title="Loading flashcards..."
             description="Fetching the current review queue."
           />
         ) : cards.length === 0 ? (
           <AcademicEmptyState
-            title="No cards yet"
-            description="The backend seeds sample cards automatically. If you see this state, reload the tab."
+            title={
+              selectedCourse === "scholaros-demo"
+                ? "No cards yet"
+                : "No flashcards for this course"
+            }
+            description={
+              selectedCourse === "scholaros-demo"
+                ? "The backend seeds sample cards automatically. If you see this state, reload the tab."
+                : "Ingest course materials to automatically generate flashcards for review."
+            }
             action={
               <Button variant="outline" onClick={() => void loadCards()}>
                 Reload cards
@@ -187,8 +254,19 @@ export function FlashcardReview() {
                     Difficulty: {activeCard.difficulty}
                   </Badge>
                   <Badge variant="outline" className="rounded-full px-3 py-1">
-                    Concept: {activeCard.conceptId}
+                    Concept: {activeCard.conceptTitle || activeCard.conceptId}
                   </Badge>
+                  {activeCard.tags && activeCard.tags.length > 0
+                    ? activeCard.tags.map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="rounded-full px-3 py-1"
+                        >
+                          {tag}
+                        </Badge>
+                      ))
+                    : null}
                   {activeCard.nextReview ? (
                     <Badge variant="outline" className="rounded-full px-3 py-1">
                       Next review:{" "}
@@ -197,6 +275,33 @@ export function FlashcardReview() {
                   ) : null}
                 </div>
               </div>
+
+              {activeCard.sourceReferences &&
+              activeCard.sourceReferences.length > 0 ? (
+                <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
+                    Sources
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {activeCard.sourceReferences.map((src, idx) => (
+                      <li key={idx} className="text-sm text-muted-foreground">
+                        📄 {src}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {activeCard.notes ? (
+                <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
+                    Notes
+                  </div>
+                  <p className="mt-2 text-sm text-foreground">
+                    {activeCard.notes}
+                  </p>
+                </div>
+              ) : null}
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <Button variant="ghost" onClick={previousCard}>

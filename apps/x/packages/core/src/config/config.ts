@@ -146,6 +146,54 @@ ensureDirs();
 ensureDefaultConfigs();
 
 /**
+ * App-level configuration (stored globally, persists across vault changes)
+ * Located at ~/.rowboat/config/app.json
+ */
+const APP_CONFIG_DIR = path.join(homedir(), ".rowboat", "config");
+const APP_CONFIG_FILE = path.join(APP_CONFIG_DIR, "app.json");
+
+interface AppConfig {
+  onboardingComplete?: boolean;
+  // Add other app-level settings here in the future
+}
+
+function readAppConfig(): AppConfig {
+  try {
+    if (!fs.existsSync(APP_CONFIG_FILE)) {
+      return {};
+    }
+    const raw = fs.readFileSync(APP_CONFIG_FILE, "utf-8");
+    return JSON.parse(raw) as AppConfig;
+  } catch {
+    return {};
+  }
+}
+
+function writeAppConfig(config: AppConfig): void {
+  if (!fs.existsSync(APP_CONFIG_DIR)) {
+    fs.mkdirSync(APP_CONFIG_DIR, { recursive: true });
+  }
+  fs.writeFileSync(APP_CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+/**
+ * Check if onboarding has been completed (app-level, persists across vaults).
+ */
+export function isOnboardingComplete(): boolean {
+  const config = readAppConfig();
+  return config.onboardingComplete === true;
+}
+
+/**
+ * Mark onboarding as complete (app-level, persists across vaults).
+ */
+export function markOnboardingComplete(): void {
+  const config = readAppConfig();
+  config.onboardingComplete = true;
+  writeAppConfig(config);
+}
+
+/**
  * Check if tools should be disabled for development/testing.
  * Useful for testing LLMs that don't support tool_choice parameter.
  *

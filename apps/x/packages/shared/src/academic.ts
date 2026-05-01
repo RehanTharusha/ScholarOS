@@ -88,18 +88,26 @@ export interface GradingLevel {
 
 /**
  * Flashcard for spaced repetition
+ * Follows LLM Wiki philosophy: flashcards are interconnected with concepts and sources
  */
 export interface FlashCard {
   id: string;
   front: string; // Question/prompt
   back: string; // Answer
-  conceptId: string; // Link to wiki concept
+  conceptId: string; // Link to wiki concept (e.g., "Photosynthesis")
+  conceptTitle?: string; // Human-readable concept name for display
   courseId: string;
+  courseName?: string; // Human-readable course name
   created: string; // ISO 8601
+  lastModified?: string; // ISO 8601 - track updates
   reviewed: ReviewHistory[];
   difficulty: "easy" | "normal" | "hard"; // Current difficulty
   nextReview?: string; // ISO 8601 (FSRS scheduled)
   fsrs?: FSRSCard;
+  // LLM Wiki enhancements
+  sourceReferences?: string[]; // Paths to source materials (e.g., ["knowledge/courses/Biology 101/lectures/Week1.pdf"])
+  tags?: string[]; // For organization (e.g., ["definition", "key-fact", "application"])
+  notes?: string; // Private notes for the student
 }
 
 /**

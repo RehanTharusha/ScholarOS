@@ -76,7 +76,7 @@ import { ISlackConfigRepo } from "@x/core/dist/slack/repo.js";
 import {
   isOnboardingComplete,
   markOnboardingComplete,
-} from "@x/core/dist/config/note_creation_config.js";
+} from "@x/core/dist/config/config.js";
 import * as composioHandler from "./composio-handler.js";
 import { IAgentScheduleRepo } from "@x/core/dist/agent-schedule/repo.js";
 import { IAgentScheduleStateRepo } from "@x/core/dist/agent-schedule/state-repo.js";
@@ -120,7 +120,9 @@ import type {
 import { browserIpcHandlers } from "./browser/ipc.js";
 import { getRendererUrl } from "./app-url.js";
 
-const flashcardStorage = new CardStorage(path.join(WorkDir, "academic"));
+// Store flashcards in knowledge base following LLM Wiki philosophy
+// Cards live in knowledge/courses/<course>/flashcards.json
+const flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
 const flashcardScheduler = new FSRSScheduler();
 const essayGrader = new EssayGrader();
 const taskManager = new TaskManager(path.join(WorkDir, "academic"));
@@ -641,10 +643,16 @@ export function setupIpcHandlers() {
 
       return { ok: true as const, stagedFiles, errors };
     },
+    "academic:flashcards:courses": async () => {
+      const courses = await flashcardStorage.getCoursesWithFlashcards();
+      return { courses };
+    },
     "academic:flashcards:list": async (_event, args) => {
       const courseId = args.courseId || "scholaros-demo";
       let cards = await flashcardStorage.loadCards(courseId);
-      if (cards.length === 0) {
+
+      // Only seed demo cards for the default demo course
+      if (cards.length === 0 && courseId === "scholaros-demo") {
         cards = createSeedFlashcards(courseId);
         await flashcardStorage.saveCards(cards);
       }
@@ -658,6 +666,18 @@ export function setupIpcHandlers() {
         dueCount: dueCards.length,
         totalCount: cards.length,
       };
+    },
+    "academic:flashcards:addFromIngest": async (_event, args) => {
+      // Called during ingest to add newly generated flashcards
+      const { cards } = args;
+      if (!Array.isArray(cards) || cards.length === 0) {
+        return { success: false, error: "No cards provided" };
+      }
+
+      // Type assertion - cards come from validated IPC request
+      const flashCards = cards as unknown as FlashCard[];
+      await flashcardStorage.addCards(flashCards);
+      return { success: true, count: cards.length };
     },
     "academic:flashcards:grade": async (_event, args) => {
       const courseId = args.courseId || "scholaros-demo";

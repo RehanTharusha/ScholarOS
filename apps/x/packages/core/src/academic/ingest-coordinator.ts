@@ -6,7 +6,9 @@
 import { PDFIngester, IngestResult } from "./pdf-ingester.js";
 import { FlashcardGenerator, GeneratedCard } from "./flashcard-generator.js";
 import { ContradictionDetector } from "./contradiction-detector.js";
+import { CardStorage } from "./fsrs-scheduler.js";
 import type { Contradiction as AcademicContradiction } from "@x/shared/dist/academic.js";
+import type { FlashCard } from "@x/shared/dist/academic.js";
 import path from "path";
 import { promises as fs } from "fs";
 
@@ -78,16 +80,19 @@ export class IngestCoordinator {
   private pdfIngester: PDFIngester;
   private cardGenerator: FlashcardGenerator;
   private contradictionDetector: ContradictionDetector;
+  private flashcardStorage: CardStorage;
   private currentWorkflow?: IngestPreview;
 
   constructor(
     private vaultPath: string,
     private llmAgent: LlmAgent,
     private knowledgeGraph: unknown, // Reference to knowledge graph for wiki integration
+    cardStorage?: CardStorage,
   ) {
     this.pdfIngester = new PDFIngester(vaultPath, llmAgent);
     this.cardGenerator = new FlashcardGenerator(llmAgent);
     this.contradictionDetector = new ContradictionDetector(llmAgent);
+    this.flashcardStorage = cardStorage ?? new CardStorage(vaultPath);
   }
 
   /**
@@ -259,14 +264,26 @@ Generate 5-8 high-quality study flashcards. Return JSON array with {front, back,
       }
     }
 
-    // Store flashcards (to database)
+    // Store flashcards in per-course storage (follows LLM Wiki philosophy)
     if (options.generateFlashcards && this.currentWorkflow.generatedCards) {
       try {
-        // TODO: integrate with flashcard storage
-        // For now, just log
-        console.log(
-          `Generated ${this.currentWorkflow.generatedCards.length} flashcards`,
+        const now = new Date().toISOString();
+        const flashcards: FlashCard[] = this.currentWorkflow.generatedCards.map(
+          (card: GeneratedCard, idx: number) => ({
+            id: `${courseId}-${Date.now()}-${idx}`,
+            front: card.front,
+            back: card.back,
+            conceptId:
+              this.currentWorkflow!.suggestedConcepts[0]?.title || "general",
+            courseId,
+            created: now,
+            reviewed: [],
+            difficulty: card.difficulty || "normal",
+          }),
         );
+
+        await this.flashcardStorage.addCards(flashcards);
+        created += flashcards.length;
       } catch (e) {
         errors.push(`Failed to store flashcards: ${e}`);
       }

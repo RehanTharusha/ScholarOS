@@ -87,17 +87,22 @@ IMPORTANT: Return ONLY valid JSON, no other text.
         }
       }
 
-      // Convert to FlashCard objects
+      // Convert to FlashCard objects with LLM Wiki metadata
       const now = new Date().toISOString();
       const flashcards: FlashCard[] = generatedCards.map((card, idx) => ({
         id: `${conceptId}-card-${idx}-${Date.now()}`,
         front: card.front,
         back: card.back,
         conceptId,
+        conceptTitle: conceptTitle,
         courseId,
         created: now,
+        lastModified: now,
         reviewed: [],
         difficulty: card.difficulty as "easy" | "normal" | "hard",
+        sourceReferences: [], // Will be populated from concept's source list
+        tags: this.inferTags(card.front, card.back),
+        notes: card.reasoning || "", // Store LLM's reasoning as initial notes
       }));
 
       return flashcards;
@@ -163,5 +168,61 @@ IMPORTANT: Return ONLY valid JSON, no other text.
       valid: issues.length === 0,
       issues,
     };
+  }
+
+  /**
+   * Infer tags from flashcard content (LLM Wiki enhancement)
+   */
+  private inferTags(front: string, back: string): string[] {
+    const tags: Set<string> = new Set();
+
+    const combined = `${front} ${back}`.toLowerCase();
+
+    // Definition patterns
+    if (
+      front.match(/what is|define|meaning of|definition/i) ||
+      back.match(/is defined as|refers to|is the process/i)
+    ) {
+      tags.add("definition");
+    }
+
+    // Application/example patterns
+    if (
+      front.match(/example|scenario|apply|calculate|solve/i) ||
+      back.match(/for example|in this case|therefore/i)
+    ) {
+      tags.add("application");
+    }
+
+    // Comparison patterns
+    if (
+      front.match(/difference|compare|versus|vs\.|similarities/i) ||
+      combined.match(/both|whereas|on the other hand/i)
+    ) {
+      tags.add("comparison");
+    }
+
+    // Key fact patterns
+    if (
+      front.match(/who|when|where|how many|how much/i) ||
+      back.match(/^\d+|^in \d{4}|^on /i)
+    ) {
+      tags.add("key-fact");
+    }
+
+    // Process/steps patterns
+    if (
+      front.match(/steps|process|sequence|order|stages/i) ||
+      back.match(/first|second|then|finally|step \d/i)
+    ) {
+      tags.add("process");
+    }
+
+    // Default tag if nothing matched
+    if (tags.size === 0) {
+      tags.add("general");
+    }
+
+    return Array.from(tags);
   }
 }

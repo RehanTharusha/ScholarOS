@@ -356,14 +356,30 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
+  "academic:flashcards:courses": {
+    req: z.object({}),
+    res: z.object({
+      courses: z.array(z.string()),
+    }),
+  },
   "academic:flashcards:list": {
     req: z.object({
       courseId: z.string().optional(),
     }),
     res: z.object({
-      cards: z.array(z.unknown()),
+      cards: z.array(z.any()),
       dueCount: z.number(),
       totalCount: z.number(),
+    }),
+  },
+  "academic:flashcards:addFromIngest": {
+    req: z.object({
+      cards: z.array(z.any()),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      count: z.number().optional(),
+      error: z.string().optional(),
     }),
   },
   "academic:flashcards:grade": {

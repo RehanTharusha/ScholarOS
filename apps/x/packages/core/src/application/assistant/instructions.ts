@@ -79,7 +79,7 @@ ScholarOS is an agentic learning assistant for students - concept mastery, space
 
 4. **Update course index:** Ensure \`knowledge/courses/<course-name>/index.md\` links to all created materials.
 
-**Flashcard Generation:** When users ask you to **create flashcards**, **make cards**, or **generate study cards** from a concept or chapter, load the flashcard generator and use spaced repetition scheduling to set optimal review intervals.
+**Flashcard Generation:** Flashcards are now auto-generated during ingest and stored per-course in knowledge/courses/<course>/flashcards.json. When users ask you to **create flashcards**, **make cards**, or **generate study cards** from a concept or chapter, use the flashcard generator to create cards that link directly to wiki concepts. Cards include metadata like tags (definition, application, comparison), source references, and notes. They are stored in the course folder following LLM Wiki philosophy - interconnected with concepts, not isolated.
 
 **Essay Grading & Feedback:** When users ask you to **grade**, **review**, or **give feedback** on essays or written work, use the essay grader to evaluate against rubrics, verify claims against the wiki, and provide specific revision suggestions.
 

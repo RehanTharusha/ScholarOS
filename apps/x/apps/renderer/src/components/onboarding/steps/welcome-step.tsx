@@ -1,14 +1,18 @@
-import { Loader2, CheckCircle2 } from "lucide-react"
-import { motion } from "motion/react"
-import { Button } from "@/components/ui/button"
-import type { OnboardingState } from "../use-onboarding-state"
+import { Loader2, CheckCircle2, FolderOpen } from "lucide-react";
+import { motion } from "motion/react";
+import { Button } from "@/components/ui/button";
+import type { OnboardingState } from "../use-onboarding-state";
 
 interface WelcomeStepProps {
-  state: OnboardingState
+  state: OnboardingState;
 }
 
 export function WelcomeStep({ state }: WelcomeStepProps) {
-  const rowboatState = state.providerStates['rowboat'] || { isConnected: false, isLoading: false, isConnecting: false }
+  const rowboatState = state.providerStates["rowboat"] || {
+    isConnected: false,
+    isLoading: false,
+    isConnecting: false,
+  };
 
   return (
     <div className="flex flex-col items-center justify-center text-center flex-1">
@@ -49,7 +53,8 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
         transition={{ delay: 0.3 }}
         className="text-base text-muted-foreground leading-relaxed max-w-sm mb-10"
       >
-        Rowboat connects to your work, builds a knowledge graph, and uses that context to help you get things done. Private and on your machine.
+        Rowboat connects to your work, builds a knowledge graph, and uses that
+        context to help you get things done. Private and on your machine.
       </motion.p>
 
       {/* Sign in / connected state */}
@@ -67,8 +72,8 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
             </div>
             <Button
               onClick={() => {
-                state.setOnboardingPath('rowboat')
-                state.setCurrentStep(2)
+                state.setOnboardingPath("rowboat");
+                state.setCurrentStep(2);
               }}
               size="lg"
               className="w-full h-12 text-base font-medium"
@@ -80,15 +85,18 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
           <div className="flex flex-col items-center gap-4">
             <Button
               onClick={() => {
-                state.setOnboardingPath('rowboat')
-                state.startConnect('rowboat')
+                state.setOnboardingPath("rowboat");
+                state.startConnect("rowboat");
               }}
               size="lg"
               className="w-full h-12 text-base font-medium"
               disabled={rowboatState.isConnecting}
             >
               {rowboatState.isConnecting ? (
-                <><Loader2 className="size-5 animate-spin mr-2" />Waiting for sign in...</>
+                <>
+                  <Loader2 className="size-5 animate-spin mr-2" />
+                  Waiting for sign in...
+                </>
               ) : (
                 "Sign in with Rowboat"
               )}
@@ -111,14 +119,42 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
       >
         <button
           onClick={() => {
-            state.setOnboardingPath('byok')
-            state.setCurrentStep(1)
+            state.setOnboardingPath("byok");
+            state.setCurrentStep(1);
           }}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground/50"
         >
           I want to bring my own API key
         </button>
       </motion.div>
+
+      {/* Vault selection for fresh vault */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="mt-4"
+      >
+        <Button
+          onClick={state.handleVaultSelect}
+          disabled={state.vaultLoading}
+          variant="outline"
+          size="sm"
+          className="text-sm"
+        >
+          {state.vaultLoading ? (
+            <>
+              <Loader2 className="size-4 animate-spin mr-2" />
+              Selecting...
+            </>
+          ) : (
+            <>
+              <FolderOpen className="size-4 mr-2" />
+              Open an existing folder as vault
+            </>
+          )}
+        </Button>
+      </motion.div>
     </div>
-  )
+  );
 }
