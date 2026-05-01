@@ -28,6 +28,7 @@ import {
   Settings,
   Square,
   Trash2,
+  Inbox,
 } from "lucide-react";
 
 import {
@@ -185,6 +186,7 @@ type SidebarContentPanelProps = {
   selectedBackgroundTask?: string | null;
   onNewChat?: () => void;
   onOpenSearch?: () => void;
+  onOpenIngestWindow?: () => void;
   meetingState?: MeetingTranscriptionState;
   meetingSummarizing?: boolean;
   meetingAvailable?: boolean;
@@ -433,6 +435,7 @@ export function SidebarContentPanel({
   selectedBackgroundTask,
   onNewChat,
   onOpenSearch,
+  onOpenIngestWindow,
   meetingState = "idle",
   meetingSummarizing = false,
   meetingAvailable = false,
@@ -625,6 +628,16 @@ export function SidebarContentPanel({
             >
               <Lightbulb className="size-4" />
               <span>Suggested Topics</span>
+            </button>
+          )}
+          {onOpenIngestWindow && (
+            <button
+              type="button"
+              onClick={onOpenIngestWindow}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <Inbox className="size-4" />
+              <span>Ingest materials</span>
             </button>
           )}
         </div>

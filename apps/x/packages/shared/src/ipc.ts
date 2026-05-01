@@ -555,6 +555,27 @@ const ipcSchemas = {
     req: z.object({ path: z.string() }),
     res: z.object({ data: z.string(), mimeType: z.string(), size: z.number() }),
   },
+  // Ingestion channels
+  "ingest:openWindow": {
+    req: z.null(),
+    res: z.object({ ok: z.literal(true) }),
+  },
+  "ingest:addFiles": {
+    req: z.object({
+      files: z.array(z.string().min(1)).min(1),
+    }),
+    res: z.object({
+      ok: z.literal(true),
+      stagedFiles: z.array(
+        z.object({
+          sourcePath: z.string(),
+          targetPath: z.string(),
+          name: z.string(),
+        }),
+      ),
+      errors: z.array(z.string()),
+    }),
+  },
   // Knowledge version history channels
   "knowledge:history": {
     req: z.object({ path: RelPath }),

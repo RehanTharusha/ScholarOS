@@ -37,15 +37,14 @@ import {
 
 import { initConfigs } from "@x/core/dist/config/initConfigs.js";
 import started from "electron-squirrel-startup";
-import { execSync, exec, execFileSync } from "node:child_process";
-import { promisify } from "node:util";
+import { execSync, execFileSync } from "node:child_process";
 import { init as initChromeSync } from "@x/core/dist/knowledge/chrome-extension/server/server.js";
 import { registerBrowserControlService } from "@x/core/dist/di/container.js";
 import { browserViewManager, BROWSER_PARTITION } from "./browser/view.js";
 import { setupBrowserEventForwarding } from "./browser/ipc.js";
 import { ElectronBrowserControlService } from "./browser/control-service.js";
-
-const execAsync = promisify(exec);
+import { getRendererUrl } from "./app-url.js";
+import { configureSessionPermissions } from "./session-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -80,22 +79,6 @@ function initializeExecutionEnvironment(): void {
 }
 initializeExecutionEnvironment();
 
-// Handle EPIPE errors gracefully — prevents uncaught exceptions when stdout/stderr streams are closed
-// This is common when running in certain environments or when the parent process closes pipes
-process.stdout?.on('error', (error: NodeJS.ErrnoException) => {
-  if (error.code !== 'EPIPE') {
-    console.error('Unexpected stdout error:', error);
-  }
-  // EPIPE is expected and can be safely ignored
-});
-
-process.stderr?.on('error', (error: NodeJS.ErrnoException) => {
-  if (error.code !== 'EPIPE') {
-    // This error can't use console.error since stderr itself is broken
-    process.stdout?.write(`Unexpected stderr error: ${error.message}\n`);
-  }
-});
-
 // Path resolution differs between development and production:
 const preloadPath = app.isPackaged
   ? path.join(__dirname, "../preload/dist/preload.js")
@@ -103,9 +86,8 @@ const preloadPath = app.isPackaged
 console.log("preloadPath", preloadPath);
 
 const rendererPath = app.isPackaged
-  ? path.join(__dirname, "../renderer/dist") // Production
-  : path.join(__dirname, "../../../renderer/dist"); // Development
-console.log("rendererPath", rendererPath);
+  ? path.join(__dirname, "../renderer/dist")
+  : path.join(__dirname, "../../../renderer/dist");
 
 // Register custom protocol for serving built renderer files in production.
 // This keeps SPA routes working when users deep link into the packaged app.
@@ -140,37 +122,6 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ]);
-
-const ALLOWED_SESSION_PERMISSIONS = new Set([
-  "media",
-  "display-capture",
-  "clipboard-read",
-  "clipboard-sanitized-write",
-]);
-
-function configureSessionPermissions(targetSession: Session): void {
-  targetSession.setPermissionCheckHandler((_webContents, permission) => {
-    return ALLOWED_SESSION_PERMISSIONS.has(permission);
-  });
-
-  targetSession.setPermissionRequestHandler(
-    (_webContents, permission, callback) => {
-      callback(ALLOWED_SESSION_PERMISSIONS.has(permission));
-    },
-  );
-
-  // Auto-approve display media requests and route system audio as loopback.
-  // Electron requires a video source in the callback even if we only want audio.
-  // We pass the first available screen source; the renderer discards the video track.
-  targetSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    const sources = await desktopCapturer.getSources({ types: ["screen"] });
-    if (sources.length === 0) {
-      callback({});
-      return;
-    }
-    callback({ video: sources[0], audio: "loopback" });
-  });
-}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -222,9 +173,9 @@ function createWindow() {
   browserViewManager.attach(win);
 
   if (app.isPackaged) {
-    win.loadURL("app://-/index.html");
+    win.loadURL(getRendererUrl());
   } else {
-    win.loadURL("http://localhost:5173");
+    win.loadURL(getRendererUrl());
   }
 }
 

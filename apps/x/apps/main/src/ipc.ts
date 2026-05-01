@@ -2,10 +2,44 @@ import {
   ipcMain,
   BrowserWindow,
   shell,
+  app,
   dialog,
   systemPreferences,
   desktopCapturer,
+  session,
+  type Session,
 } from "electron";
+
+const ALLOWED_SESSION_PERMISSIONS = new Set([
+  "media",
+  "display-capture",
+  "clipboard-read",
+  "clipboard-sanitized-write",
+]);
+
+function configureSessionPermissions(targetSession: Session): void {
+  targetSession.setPermissionCheckHandler((_webContents, permission) => {
+    return ALLOWED_SESSION_PERMISSIONS.has(permission as string);
+  });
+
+  targetSession.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      callback(ALLOWED_SESSION_PERMISSIONS.has(permission as string));
+    },
+  );
+
+  // Auto-approve display media requests and route system audio as loopback.
+  // Electron requires a video source in the callback even if we only want audio.
+  // We pass the first available screen source; the renderer discards the video track.
+  targetSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+    const sources = await desktopCapturer.getSources({ types: ["screen"] });
+    if (sources.length === 0) {
+      callback({});
+      return;
+    }
+    callback({ video: sources[0], audio: "loopback" });
+  });
+}
 import { ipc } from "@x/shared";
 import path from "node:path";
 import os from "node:os";
@@ -80,11 +114,94 @@ import type {
   AcademicDashboardSummary,
 } from "@x/shared/dist/academic.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
+import { getRendererUrl } from "./app-url.js";
 
 const flashcardStorage = new CardStorage(path.join(WorkDir, "academic"));
 const flashcardScheduler = new FSRSScheduler();
 const essayGrader = new EssayGrader();
 const taskManager = new TaskManager(path.join(WorkDir, "academic"));
+let ingestWindow: BrowserWindow | null = null;
+const ingestPreloadPath = app.isPackaged
+  ? path.join(__dirname, "../preload/dist/preload.js")
+  : path.join(__dirname, "../../../preload/dist/preload.js");
+
+async function ensureUniqueWorkspaceDestination(
+  destinationPath: string,
+): Promise<string> {
+  try {
+    await fs.access(destinationPath);
+  } catch {
+    return destinationPath;
+  }
+
+  const parsed = path.parse(destinationPath);
+  let counter = 1;
+  while (true) {
+    const candidate = path.join(
+      parsed.dir,
+      `${parsed.name}-${counter}${parsed.ext}`,
+    );
+    try {
+      await fs.access(candidate);
+      counter += 1;
+    } catch {
+      return candidate;
+    }
+  }
+}
+
+async function openIngestWindow(): Promise<void> {
+  if (ingestWindow && !ingestWindow.isDestroyed()) {
+    if (ingestWindow.isMinimized()) {
+      ingestWindow.restore();
+    }
+    ingestWindow.focus();
+    return;
+  }
+
+  ingestWindow = new BrowserWindow({
+    width: 1120,
+    height: 820,
+    minWidth: 840,
+    minHeight: 640,
+    show: false,
+    backgroundColor: "#252525",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 12, y: 12 },
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      preload: ingestPreloadPath,
+    },
+  });
+
+  configureSessionPermissions(session.defaultSession as Session);
+
+  ingestWindow.once("ready-to-show", () => {
+    ingestWindow?.show();
+  });
+
+  ingestWindow.on("closed", () => {
+    ingestWindow = null;
+  });
+
+  ingestWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  ingestWindow.webContents.on("will-navigate", (event, url) => {
+    const isInternal =
+      url.startsWith("app://") || url.startsWith("http://localhost:5173");
+    if (!isInternal) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  await ingestWindow.loadURL(getRendererUrl("?mode=ingest"));
+}
 
 function createSeedFlashcards(courseId: string): FlashCard[] {
   const created = new Date().toISOString();
@@ -535,6 +652,51 @@ export function setupIpcHandlers() {
     },
     "workspace:remove": async (_event, args) => {
       return workspace.remove(args.path, args.opts);
+    },
+    "ingest:openWindow": async () => {
+      await openIngestWindow();
+      return { ok: true as const };
+    },
+    "ingest:addFiles": async (_event, args) => {
+      const { root: workspaceRoot } = await workspace.getRoot();
+      const inboxDirectory = path.join(workspaceRoot, "raw", "inbox");
+      await fs.mkdir(inboxDirectory, { recursive: true });
+
+      const stagedFiles: Array<{
+        sourcePath: string;
+        targetPath: string;
+        name: string;
+      }> = [];
+      const errors: string[] = [];
+
+      for (const sourcePath of args.files) {
+        try {
+          const sourceStat = await fs.stat(sourcePath);
+          if (!sourceStat.isFile()) {
+            errors.push(`${sourcePath} is not a file`);
+            continue;
+          }
+
+          const originalName = path.basename(sourcePath);
+          const destinationPath = await ensureUniqueWorkspaceDestination(
+            path.join(inboxDirectory, originalName),
+          );
+
+          if (path.resolve(sourcePath) !== path.resolve(destinationPath)) {
+            await fs.copyFile(sourcePath, destinationPath);
+          }
+
+          stagedFiles.push({
+            sourcePath,
+            targetPath: destinationPath,
+            name: path.basename(destinationPath),
+          });
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : String(error));
+        }
+      }
+
+      return { ok: true as const, stagedFiles, errors };
     },
     "academic:flashcards:list": async (_event, args) => {
       const courseId = args.courseId || "scholaros-demo";
