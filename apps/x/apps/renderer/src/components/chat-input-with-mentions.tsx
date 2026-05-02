@@ -22,6 +22,7 @@ import {
   Settings,
   Square,
   X,
+  Info,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -612,6 +613,20 @@ function ChatInputInner({
                 </div>
               </PopoverContent>
             </Popover>
+            {cavemanEnabled && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-xs text-muted-foreground cursor-default">
+                    <Info className="h-3 w-3" />
+                    <span>Caveman mode</span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Make your agent talk like caveman, cutting ~75% of output
+                  tokens while maintaining accuracy
+                </TooltipContent>
+              </Tooltip>
+            )}
             {searchAvailable &&
               (searchEnabled ? (
                 <button
