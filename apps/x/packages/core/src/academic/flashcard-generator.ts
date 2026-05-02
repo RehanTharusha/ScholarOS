@@ -87,7 +87,7 @@ IMPORTANT: Return ONLY valid JSON, no other text.
         }
       }
 
-      // Convert to FlashCard objects with LLM Wiki metadata
+      // Convert to FlashCard objects
       const now = new Date().toISOString();
       const flashcards: FlashCard[] = generatedCards.map((card, idx) => ({
         id: `${conceptId}-card-${idx}-${Date.now()}`,
@@ -96,13 +96,7 @@ IMPORTANT: Return ONLY valid JSON, no other text.
         conceptId,
         conceptTitle: conceptTitle,
         courseId,
-        created: now,
-        lastModified: now,
-        reviewed: [],
         difficulty: card.difficulty as "easy" | "normal" | "hard",
-        sourceReferences: [], // Will be populated from concept's source list
-        tags: this.inferTags(card.front, card.back),
-        notes: card.reasoning || "", // Store LLM's reasoning as initial notes
       }));
 
       return flashcards;

@@ -59,7 +59,6 @@ export interface AcademicDashboardSummary {
   dueThisWeek: number;
   completedAssignments: number;
   totalAssignments: number;
-  dueFlashcards: number;
 }
 
 /**
@@ -87,8 +86,8 @@ export interface GradingLevel {
 }
 
 /**
- * Flashcard for spaced repetition
- * Follows LLM Wiki philosophy: flashcards are interconnected with concepts and sources
+ * Flashcard for study mode
+ * Simple Q&A cards linked to course concepts
  */
 export interface FlashCard {
   id: string;
@@ -98,27 +97,7 @@ export interface FlashCard {
   conceptTitle?: string; // Human-readable concept name for display
   courseId: string;
   courseName?: string; // Human-readable course name
-  created: string; // ISO 8601
-  lastModified?: string; // ISO 8601 - track updates
-  reviewed: ReviewHistory[];
-  difficulty: "easy" | "normal" | "hard"; // Current difficulty
-  nextReview?: string; // ISO 8601 (FSRS scheduled)
-  fsrs?: FSRSCard;
-  // LLM Wiki enhancements
-  sourceReferences?: string[]; // Paths to source materials (e.g., ["knowledge/courses/Biology 101/lectures/Week1.pdf"])
-  tags?: string[]; // For organization (e.g., ["definition", "key-fact", "application"])
-  notes?: string; // Private notes for the student
-}
-
-/**
- * Review record for a flashcard
- */
-export interface ReviewHistory {
-  timestamp: string; // ISO 8601
-  grade: 1 | 2 | 3 | 4; // FSRS grades (1=again, 2=hard, 3=good, 4=easy)
-  duration?: number; // Review duration in ms
-  interval?: number; // FSRS interval in days
-  easeFactor?: number; // FSRS ease factor
+  difficulty?: "easy" | "normal" | "hard"; // Optional difficulty indicator
 }
 
 /**
@@ -186,22 +165,6 @@ export interface PDFAnnotation {
   notes?: string;
   linkedConcepts?: string[]; // Wiki concepts this quote relates to
   created: string; // ISO 8601
-}
-
-/**
- * Spaced repetition schedule state (FSRS v6)
- */
-export interface FSRSCard {
-  id: string;
-  state: "new" | "learning" | "review" | "relearning";
-  due: number; // Days from now
-  stability: number; // FSRS stability (days)
-  difficulty: number; // FSRS difficulty (0-1)
-  elapsedDays: number;
-  scheduledDays: number;
-  reps: number;
-  lapses: number;
-  lastReview: string; // ISO 8601
 }
 
 /**

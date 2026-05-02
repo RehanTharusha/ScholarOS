@@ -1,36 +1,29 @@
 import * as React from "react";
-import {
-  ArrowLeftRight,
-  BookOpen,
-  RefreshCw,
-  ThumbsDown,
-  ThumbsUp,
-  XCircle,
-} from "lucide-react";
+import { BookOpen, Check, ChevronsUpDown, RefreshCw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { FlashcardStats } from "./flashcard-stats";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { FlashCard } from "@x/shared/dist/academic.js";
 import {
-  AcademicCard,
   AcademicEmptyState,
   AcademicPageHeader,
   AcademicPageShell,
-  AcademicSectionTitle,
 } from "@/components/academic/academic-shell";
-
-type Grade = 1 | 2 | 3 | 4;
 
 type FlashcardListResponse = {
   cards: FlashCard[];
-  dueCount: number;
   totalCount: number;
 };
 
@@ -42,14 +35,15 @@ type CourseOption = {
 export function FlashcardReview() {
   const [cards, setCards] = React.useState<FlashCard[]>([]);
   const [courses, setCourses] = React.useState<CourseOption[]>([]);
-  const [selectedCourse, setSelectedCourse] =
-    React.useState<string>("scholaros-demo");
+  const [selectedCourses, setSelectedCourses] = React.useState<string[]>([
+    "scholaros-demo",
+  ]);
   const [loading, setLoading] = React.useState(true);
   const [coursesLoading, setCoursesLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [flipped, setFlipped] = React.useState(false);
-  const [busyGrade, setBusyGrade] = React.useState<Grade | null>(null);
+  const [courseSelectorOpen, setCourseSelectorOpen] = React.useState(false);
 
   const loadCourses = React.useCallback(async () => {
     setCoursesLoading(true);
@@ -75,7 +69,7 @@ export function FlashcardReview() {
     setError(null);
     try {
       const result = (await window.ipc.invoke("academic:flashcards:list", {
-        courseId: selectedCourse,
+        courseIds: selectedCourses,
       })) as FlashcardListResponse;
       setCards(result.cards ?? []);
       setActiveIndex((current) =>
@@ -89,55 +83,19 @@ export function FlashcardReview() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCourse]);
+  }, [selectedCourses]);
 
   React.useEffect(() => {
     void loadCourses();
   }, [loadCourses]);
 
   React.useEffect(() => {
-    if (selectedCourse) {
+    if (selectedCourses.length > 0) {
       void loadCards();
     }
-  }, [selectedCourse, loadCards]);
+  }, [selectedCourses, loadCards]);
 
   const activeCard = cards[activeIndex];
-  const masteredCount = cards.filter(
-    (card) =>
-      card.nextReview &&
-      new Date(card.nextReview).getTime() >
-        Date.now() + 7 * 24 * 60 * 60 * 1000,
-  ).length;
-  const dueCount = cards.filter(
-    (card) =>
-      !card.nextReview || new Date(card.nextReview).getTime() <= Date.now(),
-  ).length;
-
-  const gradeCard = async (grade: Grade) => {
-    if (!activeCard) return;
-    setBusyGrade(grade);
-    try {
-      const result = (await window.ipc.invoke("academic:flashcards:grade", {
-        courseId: selectedCourse,
-        cardId: activeCard.id,
-        grade,
-      })) as { success: boolean; cards?: FlashCard[]; error?: string };
-
-      if (!result.success) {
-        throw new Error(result.error || "Failed to grade flashcard");
-      }
-
-      setCards(result.cards ?? []);
-      setActiveIndex(0);
-      setFlipped(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to grade flashcard",
-      );
-    } finally {
-      setBusyGrade(null);
-    }
-  };
 
   const nextCard = () => {
     if (cards.length === 0) return;
@@ -151,31 +109,128 @@ export function FlashcardReview() {
     setFlipped(false);
   };
 
+  const markCorrect = () => {
+    // Just move to next card
+    nextCard();
+  };
+
+  const markWrong = () => {
+    // Show answer if not flipped, then move to next card
+    if (!flipped) {
+      setFlipped(true);
+      // Stay on current card to show answer
+    } else {
+      nextCard();
+    }
+  };
+
+  const toggleCourse = (courseId: string) => {
+    setSelectedCourses((prev) => {
+      if (prev.includes(courseId)) {
+        return prev.filter((id) => id !== courseId);
+      } else {
+        return [...prev, courseId];
+      }
+    });
+  };
+
+  const selectAllCourses = () => {
+    setSelectedCourses(courses.map((c) => c.id));
+  };
+
+  const clearCourseSelection = () => {
+    setSelectedCourses([]);
+  };
+
   return (
     <AcademicPageShell>
       <AcademicPageHeader
-        eyebrow="ScholarOS Study Mode"
+        eyebrow="Study Mode"
         title="Flashcards"
-        description="Review high-yield concepts with spaced repetition and keep the session focused on recall, not rereading."
+        description="Review concepts. Flip to see the answer, then mark correct or wrong."
         actions={
           <>
-            <Select
-              value={selectedCourse}
-              onValueChange={(value) => setSelectedCourse(value)}
-              disabled={coursesLoading}
+            <Popover
+              open={courseSelectorOpen}
+              onOpenChange={setCourseSelectorOpen}
             >
-              <SelectTrigger className="w-[200px] rounded-full">
-                <BookOpen className="mr-2 size-4" />
-                <SelectValue placeholder="Select a course" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses.map((course) => (
-                  <SelectItem key={course.id} value={course.id}>
-                    {course.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={courseSelectorOpen}
+                  className="w-[250px] justify-between rounded-full"
+                  disabled={coursesLoading}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <BookOpen className="size-4 shrink-0" />
+                    {selectedCourses.length === 0 ? (
+                      <span className="text-muted-foreground">
+                        Select courses...
+                      </span>
+                    ) : selectedCourses.length === 1 ? (
+                      <span className="truncate">
+                        {courses.find((c) => c.id === selectedCourses[0])
+                          ?.name || selectedCourses[0]}
+                      </span>
+                    ) : (
+                      <span>{selectedCourses.length} courses selected</span>
+                    )}
+                  </div>
+                  <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[250px] p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Search courses..."
+                    className="h-9"
+                  />
+                  <CommandList>
+                    <CommandEmpty>No courses found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={selectAllCourses}
+                        className="cursor-pointer"
+                      >
+                        <Check
+                          className={`mr-2 size-4 ${
+                            selectedCourses.length === courses.length &&
+                            courses.length > 0
+                              ? "opacity-100"
+                              : "opacity-0"
+                          }`}
+                        />
+                        Select All
+                      </CommandItem>
+                      <CommandItem
+                        onSelect={clearCourseSelection}
+                        className="cursor-pointer"
+                      >
+                        <X className="mr-2 size-4" />
+                        Clear Selection
+                      </CommandItem>
+                      {courses.map((course) => (
+                        <CommandItem
+                          key={course.id}
+                          onSelect={() => toggleCourse(course.id)}
+                          className="cursor-pointer"
+                        >
+                          <Check
+                            className={`mr-2 size-4 ${
+                              selectedCourses.includes(course.id)
+                                ? "opacity-100"
+                                : "opacity-0"
+                            }`}
+                          />
+                          {course.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <Button
               variant="outline"
               size="sm"
@@ -189,12 +244,23 @@ export function FlashcardReview() {
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
-        <FlashcardStats
-          totalCount={cards.length}
-          dueCount={dueCount}
-          masteredCount={masteredCount}
-          className="mb-5"
-        />
+        {selectedCourses.length > 1 ? (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {selectedCourses.map((courseId) => {
+              const course = courses.find((c) => c.id === courseId);
+              const courseCards = cards.filter((c) => c.courseId === courseId);
+              return (
+                <Badge
+                  key={courseId}
+                  variant="secondary"
+                  className="rounded-full px-3 py-1.5"
+                >
+                  {course?.name || courseId}: {courseCards.length} cards
+                </Badge>
+              );
+            })}
+          </div>
+        ) : null}
 
         {error ? (
           <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -210,19 +276,19 @@ export function FlashcardReview() {
         ) : loading ? (
           <AcademicEmptyState
             title="Loading flashcards..."
-            description="Fetching the current review queue."
+            description="Fetching cards from selected courses."
           />
         ) : cards.length === 0 ? (
           <AcademicEmptyState
             title={
-              selectedCourse === "scholaros-demo"
-                ? "No cards yet"
-                : "No flashcards for this course"
+              selectedCourses.length === 0
+                ? "No courses selected"
+                : "No flashcards found"
             }
             description={
-              selectedCourse === "scholaros-demo"
-                ? "The backend seeds sample cards automatically. If you see this state, reload the tab."
-                : "Ingest course materials to automatically generate flashcards for review."
+              selectedCourses.length === 0
+                ? "Select one or more courses above to start reviewing."
+                : "Ingest course materials to generate flashcards automatically."
             }
             action={
               <Button variant="outline" onClick={() => void loadCards()}>
@@ -231,146 +297,69 @@ export function FlashcardReview() {
             }
           />
         ) : (
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <AcademicCard className="flex min-h-0 flex-col">
-              <AcademicSectionTitle
-                eyebrow="Review"
-                title={`Card ${activeIndex + 1} of ${cards.length}`}
-              />
-
-              <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-6 transition-colors duration-200">
-                <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
-                  {flipped ? "Answer" : "Prompt"}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFlipped((value) => !value)}
-                  className="mt-4 block w-full text-left text-2xl font-medium leading-tight text-foreground"
-                >
-                  {flipped ? activeCard.back : activeCard.front}
-                </button>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <Badge variant="outline" className="rounded-full px-3 py-1">
-                    Difficulty: {activeCard.difficulty}
-                  </Badge>
-                  <Badge variant="outline" className="rounded-full px-3 py-1">
-                    Concept: {activeCard.conceptTitle || activeCard.conceptId}
-                  </Badge>
-                  {activeCard.tags && activeCard.tags.length > 0
-                    ? activeCard.tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="rounded-full px-3 py-1"
-                        >
-                          {tag}
-                        </Badge>
-                      ))
-                    : null}
-                  {activeCard.nextReview ? (
-                    <Badge variant="outline" className="rounded-full px-3 py-1">
-                      Next review:{" "}
-                      {new Date(activeCard.nextReview).toLocaleDateString()}
-                    </Badge>
-                  ) : null}
-                </div>
-              </div>
-
-              {activeCard.sourceReferences &&
-              activeCard.sourceReferences.length > 0 ? (
-                <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
-                    Sources
-                  </div>
-                  <ul className="mt-2 space-y-1">
-                    {activeCard.sourceReferences.map((src, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground">
-                        📄 {src}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+          <div className="mx-auto max-w-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                Card {activeIndex + 1} of {cards.length}
+              </span>
+              {selectedCourses.length > 1 && activeCard ? (
+                <Badge variant="secondary" className="rounded-full px-3 py-1">
+                  {activeCard.courseName || activeCard.courseId}
+                </Badge>
               ) : null}
+            </div>
 
-              {activeCard.notes ? (
-                <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
-                    Notes
+            <div
+              className="relative mx-auto h-[300px] w-full cursor-pointer perspective-[1000px]"
+              onClick={() => setFlipped((value) => !value)}
+            >
+              <div
+                className={`relative h-full w-full transition-transform duration-500 transform-style-preserve-3d ${
+                  flipped ? "rotate-y-180" : ""
+                }`}
+              >
+                {/* Front */}
+                <div className="absolute inset-0 flex flex-col justify-center rounded-2xl border border-border bg-card p-8 backface-hidden">
+                  <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground mb-4">
+                    Question
                   </div>
-                  <p className="mt-2 text-sm text-foreground">
-                    {activeCard.notes}
+                  <p className="text-2xl font-medium leading-relaxed text-foreground">
+                    {activeCard.front}
+                  </p>
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    Click to flip
                   </p>
                 </div>
-              ) : null}
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <Button variant="ghost" onClick={previousCard}>
-                  Previous
-                </Button>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="destructive"
-                    className="gap-2"
-                    onClick={() => void gradeCard(1)}
-                    disabled={busyGrade !== null}
-                  >
-                    <XCircle className="size-4" />
-                    Again
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => void gradeCard(2)}
-                    disabled={busyGrade !== null}
-                  >
-                    <ThumbsDown className="size-4" />
-                    Hard
-                  </Button>
-                  <Button
-                    className="gap-2"
-                    onClick={() => void gradeCard(3)}
-                    disabled={busyGrade !== null}
-                  >
-                    <ArrowLeftRight className="size-4" />
-                    Good
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="gap-2"
-                    onClick={() => void gradeCard(4)}
-                    disabled={busyGrade !== null}
-                  >
-                    <ThumbsUp className="size-4" />
-                    Easy
-                  </Button>
+                {/* Back */}
+                <div className="absolute inset-0 flex flex-col justify-center rounded-2xl border border-border bg-card p-8 backface-hidden rotate-y-180">
+                  <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground mb-4">
+                    Answer
+                  </div>
+                  <p className="text-2xl font-medium leading-relaxed text-foreground">
+                    {activeCard.back}
+                  </p>
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    Click to flip back
+                  </p>
                 </div>
-                <Button variant="ghost" onClick={nextCard}>
-                  Next
-                </Button>
               </div>
-            </AcademicCard>
+            </div>
 
-            <aside className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
-              <AcademicSectionTitle
-                eyebrow="Session notes"
-                title="Review rules"
-              />
-              <ul className="mt-3 space-y-3">
-                <li className="rounded-xl border border-border bg-muted/30 p-3">
-                  Grade from memory first, then check the answer.
-                </li>
-                <li className="rounded-xl border border-border bg-muted/30 p-3">
-                  Use Hard only when you partially recalled the answer.
-                </li>
-                <li className="rounded-xl border border-border bg-muted/30 p-3">
-                  Easy should mean instant recall with confidence.
-                </li>
-              </ul>
-              <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3 text-sm text-foreground">
-                Flashcards are backed by JSON storage in the main process and
-                scheduled with FSRS.
+            <div className="mt-6 flex items-center justify-between">
+              <Button variant="ghost" onClick={previousCard}>
+                Previous
+              </Button>
+              <div className="flex gap-3">
+                <Button variant="destructive" onClick={() => void markWrong()}>
+                  Wrong
+                </Button>
+                <Button onClick={() => void markCorrect()}>Correct</Button>
               </div>
-            </aside>
+              <Button variant="ghost" onClick={nextCard}>
+                Next
+              </Button>
+            </div>
           </div>
         )}
       </div>

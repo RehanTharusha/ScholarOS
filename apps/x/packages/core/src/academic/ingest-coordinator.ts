@@ -276,8 +276,6 @@ Generate 5-8 high-quality study flashcards. Return JSON array with {front, back,
             conceptId:
               this.currentWorkflow!.suggestedConcepts[0]?.title || "general",
             courseId,
-            created: now,
-            reviewed: [],
             difficulty: card.difficulty || "normal",
           }),
         );

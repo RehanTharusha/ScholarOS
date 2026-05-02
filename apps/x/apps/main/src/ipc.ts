@@ -103,10 +103,7 @@ import {
   saveVaultPath,
   getVaultPath,
 } from "@x/core/dist/config/config.js";
-import {
-  CardStorage,
-  FSRSScheduler,
-} from "@x/core/dist/academic/fsrs-scheduler.js";
+import { CardStorage } from "@x/core/dist/academic/fsrs-scheduler.js";
 import { EssayGrader } from "@x/core/dist/academic/essay-grader.js";
 import {
   TaskManager,
@@ -114,7 +111,6 @@ import {
 } from "@x/core/dist/academic/task-manager.js";
 import type {
   FlashCard,
-  FSRSCard,
   AcademicDashboardSummary,
 } from "@x/shared/dist/academic.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
@@ -123,7 +119,6 @@ import { getRendererUrl } from "./app-url.js";
 // Store flashcards in knowledge base following LLM Wiki philosophy
 // Cards live in knowledge/courses/<course>/flashcards.json
 const flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
-const flashcardScheduler = new FSRSScheduler();
 const essayGrader = new EssayGrader();
 const taskManager = new TaskManager(path.join(WorkDir, "academic"));
 
@@ -153,52 +148,34 @@ async function ensureUniqueWorkspaceDestination(
 }
 
 function createSeedFlashcards(courseId: string): FlashCard[] {
-  const created = new Date().toISOString();
-
-  const seeds: Array<
-    Pick<FlashCard, "id" | "front" | "back" | "conceptId" | "difficulty">
-  > = [
+  const seeds = [
     {
       id: `${courseId}-photosynthesis-1`,
       front: "What is the main purpose of photosynthesis?",
       back: "To convert light energy into chemical energy stored in glucose.",
       conceptId: "photosynthesis",
-      difficulty: "normal",
+      difficulty: "normal" as const,
     },
     {
       id: `${courseId}-mechanics-1`,
       front: "State Newton's second law.",
       back: "Force equals mass times acceleration: F = ma.",
       conceptId: "newtons-second-law",
-      difficulty: "easy",
+      difficulty: "easy" as const,
     },
     {
       id: `${courseId}-essay-1`,
       front: "What makes a claim academically strong?",
       back: "It should be specific, supported by evidence, and connected to the rubric or source material.",
       conceptId: "academic-writing",
-      difficulty: "hard",
+      difficulty: "hard" as const,
     },
   ];
 
-  return seeds.map((seed) => {
-    const fsrs = flashcardScheduler.createNewCard(seed.id);
-    const nextReview = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    return {
-      ...seed,
-      courseId,
-      created,
-      reviewed: [],
-      nextReview,
-      fsrs: {
-        ...fsrs,
-        state: "review",
-        due: 1,
-        scheduledDays: 1,
-      } satisfies FSRSCard,
-    };
-  });
+  return seeds.map((seed) => ({
+    ...seed,
+    courseId,
+  }));
 }
 
 /**
@@ -648,22 +625,33 @@ export function setupIpcHandlers() {
       return { courses };
     },
     "academic:flashcards:list": async (_event, args) => {
-      const courseId = args.courseId || "scholaros-demo";
-      let cards = await flashcardStorage.loadCards(courseId);
+      const courseIds = args.courseIds || [];
+      let cards: FlashCard[] = [];
 
-      // Only seed demo cards for the default demo course
-      if (cards.length === 0 && courseId === "scholaros-demo") {
-        cards = createSeedFlashcards(courseId);
-        await flashcardStorage.saveCards(cards);
+      if (courseIds.length > 0) {
+        // Load cards from each selected course
+        for (const courseId of courseIds) {
+          let courseCards = await flashcardStorage.loadCards(courseId);
+          // Seed demo cards if needed
+          if (courseCards.length === 0 && courseId === "scholaros-demo") {
+            courseCards = createSeedFlashcards(courseId);
+            await flashcardStorage.saveCards(courseCards);
+          }
+          cards.push(...courseCards);
+        }
+      } else {
+        // Load all cards if no specific courses selected
+        cards = await flashcardStorage.loadAllCards();
+        // Seed demo if no cards exist at all
+        if (cards.length === 0) {
+          const demoCards = createSeedFlashcards("scholaros-demo");
+          await flashcardStorage.saveCards(demoCards);
+          cards = demoCards;
+        }
       }
 
-      const now = new Date().toISOString();
-      const dueCards = cards.filter(
-        (card) => !card.nextReview || card.nextReview <= now,
-      );
       return {
         cards,
-        dueCount: dueCards.length,
         totalCount: cards.length,
       };
     },
@@ -678,56 +666,6 @@ export function setupIpcHandlers() {
       const flashCards = cards as unknown as FlashCard[];
       await flashcardStorage.addCards(flashCards);
       return { success: true, count: cards.length };
-    },
-    "academic:flashcards:grade": async (_event, args) => {
-      const courseId = args.courseId || "scholaros-demo";
-      const cards = await flashcardStorage.loadCards(courseId);
-      const card = cards.find((item) => item.id === args.cardId);
-      if (!card) {
-        return { success: false, error: "Flashcard not found" };
-      }
-
-      const currentFsrs =
-        card.fsrs ?? flashcardScheduler.createNewCard(card.id);
-      const scheduledFsrs = flashcardScheduler.schedule(
-        currentFsrs,
-        args.grade,
-      );
-      const reviewDurationMs =
-        typeof args.durationMs === "number" ? args.durationMs : undefined;
-      const updatedCard: FlashCard = {
-        ...card,
-        reviewed: [
-          ...card.reviewed,
-          {
-            timestamp: new Date().toISOString(),
-            grade: args.grade,
-            duration: reviewDurationMs,
-            interval: scheduledFsrs.scheduledDays,
-            easeFactor: scheduledFsrs.difficulty,
-          },
-        ],
-        fsrs: scheduledFsrs,
-        nextReview: new Date(
-          Date.now() + scheduledFsrs.due * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-      };
-
-      const nextCards = cards.map((item) =>
-        item.id === updatedCard.id ? updatedCard : item,
-      );
-      await flashcardStorage.saveCards(nextCards);
-
-      return {
-        success: true,
-        card: updatedCard,
-        cards: nextCards,
-        dueCount: nextCards.filter(
-          (item) =>
-            !item.nextReview || item.nextReview <= new Date().toISOString(),
-        ).length,
-        totalCount: nextCards.length,
-      };
     },
     "academic:essay:grade": async (_event, args) => {
       return essayGrader.gradeEssay({

@@ -1,11 +1,5 @@
 import * as React from "react";
-import {
-  CalendarDays,
-  CheckSquare2,
-  Layers3,
-  RefreshCw,
-  Sparkles,
-} from "lucide-react";
+import { CalendarDays, CheckSquare2, Layers3, RefreshCw } from "lucide-react";
 import type {
   AcademicDashboardSummary,
   Assignment,
@@ -29,7 +23,6 @@ const emptySummary: AcademicDashboardSummary = {
   dueThisWeek: 0,
   completedAssignments: 0,
   totalAssignments: 0,
-  dueFlashcards: 0,
 };
 
 export function CourseDashboard() {
@@ -94,11 +87,6 @@ export function CourseDashboard() {
       label: "Due this week",
       value: summary.dueThisWeek,
       icon: CalendarDays,
-    },
-    {
-      label: "Cards due",
-      value: summary.dueFlashcards,
-      icon: Sparkles,
     },
     {
       label: "Assignment completion",

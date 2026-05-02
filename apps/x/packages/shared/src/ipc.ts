@@ -364,11 +364,10 @@ const ipcSchemas = {
   },
   "academic:flashcards:list": {
     req: z.object({
-      courseId: z.string().optional(),
+      courseIds: z.array(z.string()).optional(),
     }),
     res: z.object({
       cards: z.array(z.any()),
-      dueCount: z.number(),
       totalCount: z.number(),
     }),
   },
@@ -382,20 +381,12 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  "academic:flashcards:grade": {
-    req: z.object({
-      courseId: z.string().optional(),
-      cardId: z.string(),
-      grade: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
-      durationMs: z.number().optional(),
-    }),
+  "academic:flashcards:listAll": {
+    req: z.object({}),
     res: z.object({
-      success: z.boolean(),
-      card: z.unknown().optional(),
-      cards: z.array(z.unknown()).optional(),
-      dueCount: z.number().optional(),
-      totalCount: z.number().optional(),
-      error: z.string().optional(),
+      cards: z.array(z.any()),
+      dueCount: z.number(),
+      totalCount: z.number(),
     }),
   },
   "academic:essay:grade": {
@@ -437,7 +428,6 @@ const ipcSchemas = {
       dueThisWeek: z.number(),
       completedAssignments: z.number(),
       totalAssignments: z.number(),
-      dueFlashcards: z.number(),
     }),
   },
   "onboarding:getStatus": {

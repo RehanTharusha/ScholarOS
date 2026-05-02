@@ -163,10 +163,6 @@ export class TaskManager {
       (assignment) => normalizeKanbanStatus(assignment.status) === "done",
     ).length;
 
-    const dueFlashcards = flashcards.filter(
-      (card) => !card.nextReview || new Date(card.nextReview) <= now,
-    ).length;
-
     return {
       coursesCount: new Set(
         assignments.map((assignment) => assignment.courseId),
@@ -175,7 +171,6 @@ export class TaskManager {
       dueThisWeek,
       completedAssignments,
       totalAssignments: assignments.length,
-      dueFlashcards,
     };
   }
 
