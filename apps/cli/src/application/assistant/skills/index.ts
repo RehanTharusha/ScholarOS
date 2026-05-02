@@ -5,6 +5,7 @@ import deletionGuardrailsSkill from "./deletion-guardrails/skill.js";
 import mcpIntegrationSkill from "./mcp-integration/skill.js";
 import workflowAuthoringSkill from "./workflow-authoring/skill.js";
 import workflowRunOpsSkill from "./workflow-run-ops/skill.js";
+import pastPaperAnalysisSkill from "./past-paper-analysis/skill.js";
 
 const CURRENT_FILE = fileURLToPath(import.meta.url);
 const CURRENT_DIR = path.dirname(CURRENT_FILE);
@@ -29,36 +30,49 @@ const definitions: SkillDefinition[] = [
     id: "workflow-authoring",
     title: "Workflow Authoring",
     folder: "workflow-authoring",
-    summary: "Creating or editing workflows/agents, validating schema rules, and keeping filenames aligned with JSON ids.",
+    summary:
+      "Creating or editing workflows/agents, validating schema rules, and keeping filenames aligned with JSON ids.",
     content: workflowAuthoringSkill,
   },
   {
     id: "builtin-tools",
     title: "Builtin Tools Reference",
     folder: "builtin-tools",
-    summary: "Understanding and using builtin tools (especially executeCommand for bash/shell) in agent definitions.",
+    summary:
+      "Understanding and using builtin tools (especially executeCommand for bash/shell) in agent definitions.",
     content: builtinToolsSkill,
   },
   {
     id: "mcp-integration",
     title: "MCP Integration Guidance",
     folder: "mcp-integration",
-    summary: "Discovering, executing, and integrating MCP tools. Use this to check what external capabilities are available and execute MCP tools on behalf of users.",
+    summary:
+      "Discovering, executing, and integrating MCP tools. Use this to check what external capabilities are available and execute MCP tools on behalf of users.",
     content: mcpIntegrationSkill,
   },
   {
     id: "deletion-guardrails",
     title: "Deletion Guardrails",
     folder: "deletion-guardrails",
-    summary: "Following the confirmation process before removing workflows or agents and their dependencies.",
+    summary:
+      "Following the confirmation process before removing workflows or agents and their dependencies.",
     content: deletionGuardrailsSkill,
   },
   {
     id: "workflow-run-ops",
     title: "Workflow Run Operations",
     folder: "workflow-run-ops",
-    summary: "Commands that list workflow runs, inspect paused executions, or manage cron schedules for workflows.",
+    summary:
+      "Commands that list workflow runs, inspect paused executions, or manage cron schedules for workflows.",
     content: workflowRunOpsSkill,
+  },
+  {
+    id: "past-paper-analysis",
+    title: "Past Paper Analysis",
+    folder: "past-paper-analysis",
+    summary:
+      "Analyze past exam papers, cluster questions by concept, link to lessons, and build a persistent past-questions-kit.md for a course.",
+    content: pastPaperAnalysisSkill,
   },
 ];
 
@@ -67,11 +81,13 @@ const skillEntries = definitions.map((definition) => ({
   catalogPath: `${CATALOG_PREFIX}/${definition.folder}/skill.ts`,
 }));
 
-const catalogSections = skillEntries.map((entry) => [
-  `## ${entry.title}`,
-  `- **Skill file:** \`${entry.catalogPath}\``,
-  `- **Use it for:** ${entry.summary}`,
-].join("\n"));
+const catalogSections = skillEntries.map((entry) =>
+  [
+    `## ${entry.title}`,
+    `- **Skill file:** \`${entry.catalogPath}\``,
+    `- **Use it for:** ${entry.summary}`,
+  ].join("\n"),
+);
 
 export const skillCatalog = [
   "# Rowboat Skill Catalog",
@@ -82,7 +98,10 @@ export const skillCatalog = [
 ].join("\n");
 
 const normalizeIdentifier = (value: string) =>
-  value.trim().replace(/\\/g, "/").replace(/^\.\/+/, "");
+  value
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\.\/+/, "");
 
 const aliasMap = new Map<string, ResolvedSkill>();
 
@@ -101,7 +120,9 @@ const registerAliasVariants = (alias: string, entry: ResolvedSkill) => {
   if (/\.(ts|js)$/i.test(normalized)) {
     variants.add(normalized.replace(/\.(ts|js)$/i, ""));
     variants.add(
-      normalized.endsWith(".ts") ? normalized.replace(/\.ts$/i, ".js") : normalized.replace(/\.js$/i, ".ts"),
+      normalized.endsWith(".ts")
+        ? normalized.replace(/\.ts$/i, ".js")
+        : normalized.replace(/\.js$/i, ".ts"),
     );
   } else {
     variants.add(`${normalized}.ts`);
