@@ -11,6 +11,7 @@ import createPresentationsSkill from "./create-presentations/skill.js";
 import appNavigationSkill from "./app-navigation/skill.js";
 import browserControlSkill from "./browser-control/skill.js";
 import composioIntegrationSkill from "./composio-integration/skill.js";
+import { skill as cavemanSkill } from "./caveman/skill.js";
 import tracksSkill from "./tracks/skill.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -101,6 +102,13 @@ const definitions: SkillDefinition[] = [
     summary:
       "Create and manage track blocks — YAML-scheduled auto-updating content blocks in notes (weather, news, prices, status, dashboards). Insert at cursor (Cmd+K) or append to notes.",
     content: tracksSkill,
+  },
+  {
+    id: "caveman",
+    title: "Caveman Mode",
+    summary:
+      "Terse compressed assistant tone modes (lite/full/ultra/wenyan). Load to make assistant reply in caveman style.",
+    content: cavemanSkill,
   },
   {
     id: "browser-control",

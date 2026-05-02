@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   ArrowUp,
   AudioLines,
@@ -15,120 +19,145 @@ import {
   LoaderIcon,
   Mic,
   Plus,
+  Settings,
   Square,
   X,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { Button } from '@/components/ui/button'
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   type AttachmentIconKind,
   getAttachmentDisplayName,
   getAttachmentIconKind,
   getAttachmentToneClass,
   getAttachmentTypeLabel,
-} from '@/lib/attachment-presentation'
-import { getExtension, getFileDisplayName, getMimeFromExtension, isImageMime } from '@/lib/file-utils'
-import { cn } from '@/lib/utils'
+} from "@/lib/attachment-presentation";
+import {
+  getExtension,
+  getFileDisplayName,
+  getMimeFromExtension,
+  isImageMime,
+} from "@/lib/file-utils";
+import { cn } from "@/lib/utils";
 import {
   type FileMention,
   type PromptInputMessage,
   PromptInputProvider,
   PromptInputTextarea,
   usePromptInputController,
-} from '@/components/ai-elements/prompt-input'
-import { toast } from 'sonner'
+} from "@/components/ai-elements/prompt-input";
+import { toast } from "sonner";
 
 export type StagedAttachment = {
-  id: string
-  path: string
-  filename: string
-  mimeType: string
-  isImage: boolean
-  size: number
-  thumbnailUrl?: string
-}
+  id: string;
+  path: string;
+  filename: string;
+  mimeType: string;
+  isImage: boolean;
+  size: number;
+  thumbnailUrl?: string;
+};
 
-const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024 // 10MB
-
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
 const providerDisplayNames: Record<string, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  google: 'Gemini',
-  ollama: 'Ollama',
-  openrouter: 'OpenRouter',
-  aigateway: 'AI Gateway',
-  'openai-compatible': 'OpenAI-Compatible',
-  rowboat: 'Rowboat',
-}
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  google: "Gemini",
+  ollama: "Ollama",
+  openrouter: "OpenRouter",
+  aigateway: "AI Gateway",
+  "openai-compatible": "OpenAI-Compatible",
+  rowboat: "Rowboat",
+};
 
-type ProviderName = "openai" | "anthropic" | "google" | "openrouter" | "aigateway" | "ollama" | "openai-compatible" | "rowboat"
+type ProviderName =
+  | "openai"
+  | "anthropic"
+  | "google"
+  | "openrouter"
+  | "aigateway"
+  | "ollama"
+  | "openai-compatible"
+  | "rowboat";
 
 interface ConfiguredModel {
-  provider: ProviderName
-  model: string
+  provider: ProviderName;
+  model: string;
 }
 
 export interface SelectedModel {
-  provider: string
-  model: string
+  provider: string;
+  model: string;
 }
 
 function getSelectedModelDisplayName(model: string) {
-  return model.split('/').pop() || model
+  return model.split("/").pop() || model;
 }
 
 function getAttachmentIcon(kind: AttachmentIconKind) {
   switch (kind) {
-    case 'audio':
-      return AudioLines
-    case 'video':
-      return FileVideo
-    case 'spreadsheet':
-      return FileSpreadsheet
-    case 'archive':
-      return FileArchive
-    case 'code':
-      return FileCode2
-    case 'text':
-      return FileText
+    case "audio":
+      return AudioLines;
+    case "video":
+      return FileVideo;
+    case "spreadsheet":
+      return FileSpreadsheet;
+    case "archive":
+      return FileArchive;
+    case "code":
+      return FileCode2;
+    case "text":
+      return FileText;
     default:
-      return FileIcon
+      return FileIcon;
   }
 }
 
 interface ChatInputInnerProps {
-  onSubmit: (message: PromptInputMessage, mentions?: FileMention[], attachments?: StagedAttachment[], searchEnabled?: boolean) => void
-  onStop?: () => void
-  isProcessing: boolean
-  isStopping?: boolean
-  isActive: boolean
-  presetMessage?: string
-  onPresetMessageConsumed?: () => void
-  runId?: string | null
-  initialDraft?: string
-  onDraftChange?: (text: string) => void
-  isRecording?: boolean
-  recordingText?: string
-  recordingState?: 'connecting' | 'listening'
-  onStartRecording?: () => void
-  onSubmitRecording?: () => void
-  onCancelRecording?: () => void
-  voiceAvailable?: boolean
-  ttsAvailable?: boolean
-  ttsEnabled?: boolean
-  ttsMode?: 'summary' | 'full'
-  onToggleTts?: () => void
-  onTtsModeChange?: (mode: 'summary' | 'full') => void
+  onSubmit: (
+    message: PromptInputMessage,
+    mentions?: FileMention[],
+    attachments?: StagedAttachment[],
+    searchEnabled?: boolean,
+  ) => void;
+  onStop?: () => void;
+  isProcessing: boolean;
+  isStopping?: boolean;
+  isActive: boolean;
+  presetMessage?: string;
+  onPresetMessageConsumed?: () => void;
+  runId?: string | null;
+  initialDraft?: string;
+  onDraftChange?: (text: string) => void;
+  isRecording?: boolean;
+  recordingText?: string;
+  recordingState?: "connecting" | "listening";
+  onStartRecording?: () => void;
+  onSubmitRecording?: () => void;
+  onCancelRecording?: () => void;
+  voiceAvailable?: boolean;
+  ttsAvailable?: boolean;
+  ttsEnabled?: boolean;
+  ttsMode?: "summary" | "full";
+  onToggleTts?: () => void;
+  onTtsModeChange?: (mode: "summary" | "full") => void;
   /** Fired when the user picks a different model in the dropdown (only when no run exists yet). */
-  onSelectedModelChange?: (model: SelectedModel | null) => void
+  onSelectedModelChange?: (model: SelectedModel | null) => void;
+  cavemanEnabled?: boolean;
+  onToggleCaveman?: () => void;
 }
 
 function ChatInputInner({
@@ -155,160 +184,203 @@ function ChatInputInner({
   onToggleTts,
   onTtsModeChange,
   onSelectedModelChange,
+  cavemanEnabled = false,
+  onToggleCaveman,
 }: ChatInputInnerProps) {
-  const controller = usePromptInputController()
-  const message = controller.textInput.value
-  const [attachments, setAttachments] = useState<StagedAttachment[]>([])
-  const [focusNonce, setFocusNonce] = useState(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const canSubmit = (Boolean(message.trim()) || attachments.length > 0) && !isProcessing
+  const controller = usePromptInputController();
+  const message = controller.textInput.value;
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
+  const [focusNonce, setFocusNonce] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canSubmit =
+    (Boolean(message.trim()) || attachments.length > 0) && !isProcessing;
 
-  const [configuredModels, setConfiguredModels] = useState<ConfiguredModel[]>([])
-  const [activeModelKey, setActiveModelKey] = useState('')
-  const [lockedModel, setLockedModel] = useState<SelectedModel | null>(null)
-  const [searchEnabled, setSearchEnabled] = useState(false)
-  const [searchAvailable, setSearchAvailable] = useState(false)
-  const [isRowboatConnected, setIsRowboatConnected] = useState(false)
+  const [configuredModels, setConfiguredModels] = useState<ConfiguredModel[]>(
+    [],
+  );
+  const [activeModelKey, setActiveModelKey] = useState("");
+  const [lockedModel, setLockedModel] = useState<SelectedModel | null>(null);
+  const [searchEnabled, setSearchEnabled] = useState(false);
+  const [searchAvailable, setSearchAvailable] = useState(false);
+  const [isRowboatConnected, setIsRowboatConnected] = useState(false);
 
   // When a run exists, freeze the dropdown to the run's resolved model+provider.
   useEffect(() => {
     if (!runId) {
-      setLockedModel(null)
-      return
+      setLockedModel(null);
+      return;
     }
-    let cancelled = false
-    window.ipc.invoke('runs:fetch', { runId }).then((run) => {
-      if (cancelled) return
-      if (run.provider && run.model) {
-        setLockedModel({ provider: run.provider, model: run.model })
-      }
-    }).catch(() => { /* legacy run or fetch failure — leave unlocked */ })
-    return () => { cancelled = true }
-  }, [runId])
+    let cancelled = false;
+    window.ipc
+      .invoke("runs:fetch", { runId })
+      .then((run) => {
+        if (cancelled) return;
+        if (run.provider && run.model) {
+          setLockedModel({ provider: run.provider, model: run.model });
+        }
+      })
+      .catch(() => {
+        /* legacy run or fetch failure — leave unlocked */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [runId]);
 
   // Check Rowboat sign-in state
   useEffect(() => {
-    window.ipc.invoke('oauth:getState', null).then((result) => {
-      setIsRowboatConnected(result.config?.rowboat?.connected ?? false)
-    }).catch(() => setIsRowboatConnected(false))
-  }, [isActive])
+    window.ipc
+      .invoke("oauth:getState", null)
+      .then((result) => {
+        setIsRowboatConnected(result.config?.rowboat?.connected ?? false);
+      })
+      .catch(() => setIsRowboatConnected(false));
+  }, [isActive]);
 
   // Update sign-in state when OAuth events fire
   useEffect(() => {
-    const cleanup = window.ipc.on('oauth:didConnect', () => {
-      window.ipc.invoke('oauth:getState', null).then((result) => {
-        setIsRowboatConnected(result.config?.rowboat?.connected ?? false)
-      }).catch(() => setIsRowboatConnected(false))
-    })
-    return cleanup
-  }, [])
+    const cleanup = window.ipc.on("oauth:didConnect", () => {
+      window.ipc
+        .invoke("oauth:getState", null)
+        .then((result) => {
+          setIsRowboatConnected(result.config?.rowboat?.connected ?? false);
+        })
+        .catch(() => setIsRowboatConnected(false));
+    });
+    return cleanup;
+  }, []);
 
   // Load the list of models the user can choose from.
   // Signed-in: gateway model list. Signed-out: providers configured in models.json.
   const loadModelConfig = useCallback(async () => {
     try {
       if (isRowboatConnected) {
-        const listResult = await window.ipc.invoke('models:list', null)
+        const listResult = await window.ipc.invoke("models:list", null);
         const rowboatProvider = listResult.providers?.find(
-          (p: { id: string }) => p.id === 'rowboat'
-        )
+          (p: { id: string }) => p.id === "rowboat",
+        );
         const models: ConfiguredModel[] = (rowboatProvider?.models || []).map(
-          (m: { id: string }) => ({ provider: 'rowboat', model: m.id })
-        )
-        setConfiguredModels(models)
+          (m: { id: string }) => ({ provider: "rowboat", model: m.id }),
+        );
+        setConfiguredModels(models);
       } else {
-        const result = await window.ipc.invoke('workspace:readFile', { path: 'config/models.json' })
-        const parsed = JSON.parse(result.data)
-        const models: ConfiguredModel[] = []
+        const result = await window.ipc.invoke("workspace:readFile", {
+          path: "config/models.json",
+        });
+        const parsed = JSON.parse(result.data);
+        const models: ConfiguredModel[] = [];
         if (parsed?.providers) {
           for (const [flavor, entry] of Object.entries(parsed.providers)) {
-            const e = entry as Record<string, unknown>
-            const modelList: string[] = Array.isArray(e.models) ? e.models as string[] : []
-            const singleModel = typeof e.model === 'string' ? e.model : ''
-            const allModels = modelList.length > 0 ? modelList : singleModel ? [singleModel] : []
+            const e = entry as Record<string, unknown>;
+            const modelList: string[] = Array.isArray(e.models)
+              ? (e.models as string[])
+              : [];
+            const singleModel = typeof e.model === "string" ? e.model : "";
+            const allModels =
+              modelList.length > 0
+                ? modelList
+                : singleModel
+                  ? [singleModel]
+                  : [];
             for (const model of allModels) {
               if (model) {
-                models.push({ provider: flavor as ProviderName, model })
+                models.push({ provider: flavor as ProviderName, model });
               }
             }
           }
         }
-        setConfiguredModels(models)
+        setConfiguredModels(models);
       }
     } catch {
       // No config yet
     }
-  }, [isRowboatConnected])
+  }, [isRowboatConnected]);
 
   useEffect(() => {
-    loadModelConfig()
-  }, [isActive, loadModelConfig])
+    loadModelConfig();
+  }, [isActive, loadModelConfig]);
 
   // Reload when model config changes (e.g. from settings dialog)
   useEffect(() => {
-    const handler = () => { loadModelConfig() }
-    window.addEventListener('models-config-changed', handler)
-    return () => window.removeEventListener('models-config-changed', handler)
-  }, [loadModelConfig])
+    const handler = () => {
+      loadModelConfig();
+    };
+    window.addEventListener("models-config-changed", handler);
+    return () => window.removeEventListener("models-config-changed", handler);
+  }, [loadModelConfig]);
 
   // Check search tool availability (exa or signed-in via gateway)
   useEffect(() => {
     const checkSearch = async () => {
       if (isRowboatConnected) {
-        setSearchAvailable(true)
-        return
+        setSearchAvailable(true);
+        return;
       }
-      let available = false
+      let available = false;
       try {
-        const raw = await window.ipc.invoke('workspace:readFile', { path: 'config/exa-search.json' })
-        const config = JSON.parse(raw.data)
-        if (config.apiKey) available = true
-      } catch { /* not configured */ }
-      setSearchAvailable(available)
-    }
-    checkSearch()
-  }, [isActive, isRowboatConnected])
+        const raw = await window.ipc.invoke("workspace:readFile", {
+          path: "config/exa-search.json",
+        });
+        const config = JSON.parse(raw.data);
+        if (config.apiKey) available = true;
+      } catch {
+        /* not configured */
+      }
+      setSearchAvailable(available);
+    };
+    checkSearch();
+  }, [isActive, isRowboatConnected]);
 
   // Selecting a model affects only the *next* run created from this tab.
   // Once a run exists, model is frozen on the run and the dropdown is read-only.
-  const handleModelChange = useCallback((key: string) => {
-    if (lockedModel) return
-    const entry = configuredModels.find((m) => `${m.provider}/${m.model}` === key)
-    if (!entry) return
-    setActiveModelKey(key)
-    onSelectedModelChange?.({ provider: entry.provider, model: entry.model })
-  }, [configuredModels, lockedModel, onSelectedModelChange])
+  const handleModelChange = useCallback(
+    (key: string) => {
+      if (lockedModel) return;
+      const entry = configuredModels.find(
+        (m) => `${m.provider}/${m.model}` === key,
+      );
+      if (!entry) return;
+      setActiveModelKey(key);
+      onSelectedModelChange?.({ provider: entry.provider, model: entry.model });
+    },
+    [configuredModels, lockedModel, onSelectedModelChange],
+  );
 
   // Restore the tab draft when this input mounts.
   useEffect(() => {
     if (initialDraft) {
-      controller.textInput.setInput(initialDraft)
+      controller.textInput.setInput(initialDraft);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []);
 
   useEffect(() => {
-    onDraftChange?.(message)
-  }, [message, onDraftChange])
+    onDraftChange?.(message);
+  }, [message, onDraftChange]);
 
   useEffect(() => {
     if (presetMessage) {
-      controller.textInput.setInput(presetMessage)
-      onPresetMessageConsumed?.()
+      controller.textInput.setInput(presetMessage);
+      onPresetMessageConsumed?.();
     }
-  }, [presetMessage, controller.textInput, onPresetMessageConsumed])
+  }, [presetMessage, controller.textInput, onPresetMessageConsumed]);
 
   const addFiles = useCallback(async (paths: string[]) => {
-    const newAttachments: StagedAttachment[] = []
+    const newAttachments: StagedAttachment[] = [];
     for (const filePath of paths) {
       try {
-        const result = await window.ipc.invoke('shell:readFileBase64', { path: filePath })
+        const result = await window.ipc.invoke("shell:readFileBase64", {
+          path: filePath,
+        });
         if (result.size > MAX_ATTACHMENT_SIZE) {
-          toast.error(`File too large: ${getFileDisplayName(filePath)} (max 10MB)`)
-          continue
+          toast.error(
+            `File too large: ${getFileDisplayName(filePath)} (max 10MB)`,
+          );
+          continue;
         }
-        const mime = result.mimeType || getMimeFromExtension(getExtension(filePath))
-        const image = isImageMime(mime)
+        const mime =
+          result.mimeType || getMimeFromExtension(getExtension(filePath));
+        const image = isImageMime(mime);
         newAttachments.push({
           id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           path: filePath,
@@ -316,77 +388,87 @@ function ChatInputInner({
           mimeType: mime,
           isImage: image,
           size: result.size,
-          thumbnailUrl: image ? `data:${mime};base64,${result.data}` : undefined,
-        })
+          thumbnailUrl: image
+            ? `data:${mime};base64,${result.data}`
+            : undefined,
+        });
       } catch (err) {
-        console.error('Failed to read file:', filePath, err)
-        toast.error(`Failed to read: ${getFileDisplayName(filePath)}`)
+        console.error("Failed to read file:", filePath, err);
+        toast.error(`Failed to read: ${getFileDisplayName(filePath)}`);
       }
     }
     if (newAttachments.length > 0) {
-      setAttachments((prev) => [...prev, ...newAttachments])
-      setFocusNonce((value) => value + 1)
+      setAttachments((prev) => [...prev, ...newAttachments]);
+      setFocusNonce((value) => value + 1);
     }
-  }, [])
+  }, []);
 
   const removeAttachment = useCallback((id: string) => {
-    setAttachments((prev) => prev.filter((attachment) => attachment.id !== id))
-  }, [])
+    setAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
+  }, []);
 
   const handleSubmit = useCallback(() => {
-    if (!canSubmit) return
-    onSubmit({ text: message.trim(), files: [] }, controller.mentions.mentions, attachments, searchEnabled || undefined)
-    controller.textInput.clear()
-    controller.mentions.clearMentions()
-    setAttachments([])
-    setSearchEnabled(false)
-  }, [attachments, canSubmit, controller, message, onSubmit, searchEnabled])
+    if (!canSubmit) return;
+    onSubmit(
+      { text: message.trim(), files: [] },
+      controller.mentions.mentions,
+      attachments,
+      searchEnabled || undefined,
+    );
+    controller.textInput.clear();
+    controller.mentions.clearMentions();
+    setAttachments([]);
+    setSearchEnabled(false);
+  }, [attachments, canSubmit, controller, message, onSubmit, searchEnabled]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit()
-    }
-  }, [handleSubmit])
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit],
+  );
 
   useEffect(() => {
-    if (!isActive) return
+    if (!isActive) return;
     const onDragOver = (e: DragEvent) => {
-      if (e.dataTransfer?.types?.includes('Files')) {
-        e.preventDefault()
+      if (e.dataTransfer?.types?.includes("Files")) {
+        e.preventDefault();
       }
-    }
+    };
 
     const onDrop = (e: DragEvent) => {
-      if (e.dataTransfer?.types?.includes('Files')) {
-        e.preventDefault()
+      if (e.dataTransfer?.types?.includes("Files")) {
+        e.preventDefault();
       }
       if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
         const paths = Array.from(e.dataTransfer.files)
           .map((file) => window.electronUtils?.getPathForFile(file))
-          .filter(Boolean) as string[]
+          .filter(Boolean) as string[];
         if (paths.length > 0) {
-          void addFiles(paths)
+          void addFiles(paths);
         }
       }
-    }
+    };
 
-    document.addEventListener('dragover', onDragOver)
-    document.addEventListener('drop', onDrop)
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("drop", onDrop);
     return () => {
-      document.removeEventListener('dragover', onDragOver)
-      document.removeEventListener('drop', onDrop)
-    }
-  }, [addFiles, isActive])
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, [addFiles, isActive]);
 
   return (
     <div className="rounded-lg border border-border bg-background shadow-none">
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-4 pb-1 pt-3">
           {attachments.map((attachment) => {
-            const attachmentType = getAttachmentTypeLabel(attachment)
-            const attachmentName = getAttachmentDisplayName(attachment)
-            const Icon = getAttachmentIcon(getAttachmentIconKind(attachment))
+            const attachmentType = getAttachmentTypeLabel(attachment);
+            const attachmentName = getAttachmentDisplayName(attachment);
+            const Icon = getAttachmentIcon(getAttachmentIconKind(attachment));
 
             return (
               <span
@@ -395,21 +477,29 @@ function ChatInputInner({
               >
                 <span
                   className={cn(
-                    'flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg',
+                    "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg",
                     attachment.isImage && attachment.thumbnailUrl
-                      ? 'bg-muted'
-                      : getAttachmentToneClass(attachmentType)
+                      ? "bg-muted"
+                      : getAttachmentToneClass(attachmentType),
                   )}
                 >
                   {attachment.isImage && attachment.thumbnailUrl ? (
-                    <img src={attachment.thumbnailUrl} alt="" className="size-full object-cover" />
+                    <img
+                      src={attachment.thumbnailUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
                   ) : (
                     <Icon className="size-5" />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm leading-tight font-medium">{attachmentName}</span>
-                  <span className="block pt-0.5 text-xs leading-tight text-muted-foreground">{attachmentType}</span>
+                  <span className="block truncate text-sm leading-tight font-medium">
+                    {attachmentName}
+                  </span>
+                  <span className="block pt-0.5 text-xs leading-tight text-muted-foreground">
+                    {attachmentType}
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -419,7 +509,7 @@ function ChatInputInner({
                   <X className="size-3.5" />
                 </button>
               </span>
-            )
+            );
           })}
         </div>
       )}
@@ -429,15 +519,15 @@ function ChatInputInner({
         multiple
         className="hidden"
         onChange={(e) => {
-          const files = e.target.files
-          if (!files || files.length === 0) return
+          const files = e.target.files;
+          if (!files || files.length === 0) return;
           const paths = Array.from(files)
             .map((file) => window.electronUtils?.getPathForFile(file))
-            .filter(Boolean) as string[]
+            .filter(Boolean) as string[];
           if (paths.length > 0) {
-            void addFiles(paths)
+            void addFiles(paths);
           }
-          e.target.value = ''
+          e.target.value = "";
         }}
       />
       {isRecording ? (
@@ -454,7 +544,9 @@ function ChatInputInner({
           <div className="flex flex-1 items-center gap-2 overflow-hidden">
             <VoiceWaveform />
             <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-              {recordingState === 'connecting' ? 'Connecting...' : recordingText || 'Listening...'}
+              {recordingState === "connecting"
+                ? "Connecting..."
+                : recordingText || "Listening..."}
             </span>
           </div>
           <Button
@@ -462,10 +554,10 @@ function ChatInputInner({
             onClick={onSubmitRecording}
             disabled={!recordingText?.trim()}
             className={cn(
-              'h-7 w-7 shrink-0 rounded-full transition-all',
+              "h-7 w-7 shrink-0 rounded-full transition-all",
               recordingText?.trim()
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-muted text-muted-foreground'
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-muted text-muted-foreground",
             )}
           >
             <ArrowUp className="h-4 w-4" />
@@ -474,177 +566,232 @@ function ChatInputInner({
       ) : (
         /* ── Normal input ── */
         <>
-      <div className="px-4 pt-4 pb-2">
-        <PromptInputTextarea
-          placeholder="Type your message..."
-          onKeyDown={handleKeyDown}
-          autoFocus={isActive}
-          focusTrigger={isActive ? `${runId ?? 'new'}:${focusNonce}` : undefined}
-          className="min-h-6 rounded-none border-0 py-0 shadow-none focus-visible:ring-0"
-        />
-      </div>
-      <div className="flex items-center gap-2 px-4 pb-3">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Attach files"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-        {searchAvailable && (
-          searchEnabled ? (
+          <div className="px-4 pt-4 pb-2">
+            <PromptInputTextarea
+              placeholder="Type your message..."
+              onKeyDown={handleKeyDown}
+              autoFocus={isActive}
+              focusTrigger={
+                isActive ? `${runId ?? "new"}:${focusNonce}` : undefined
+              }
+              className="min-h-6 rounded-none border-0 py-0 shadow-none focus-visible:ring-0"
+            />
+          </div>
+          <div className="flex items-center gap-2 px-4 pb-3">
             <button
               type="button"
-              onClick={() => setSearchEnabled(false)}
-              className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
-            >
-              <Globe className="h-3.5 w-3.5" />
-              <span className="text-xs font-medium">Search</span>
-              <X className="h-3 w-3" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setSearchEnabled(true)}
+              onClick={() => fileInputRef.current?.click()}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Search"
+              aria-label="Attach files"
             >
-              <Globe className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
             </button>
-          )
-        )}
-        <div className="flex-1" />
-        {lockedModel ? (
-          <span
-            className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground"
-            title={`${providerDisplayNames[lockedModel.provider] || lockedModel.provider} — fixed for this chat`}
-          >
-            <span className="max-w-[150px] truncate">{getSelectedModelDisplayName(lockedModel.model)}</span>
-          </span>
-        ) : configuredModels.length > 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <span className="max-w-[150px] truncate">
-                  {getSelectedModelDisplayName(configuredModels.find((m) => `${m.provider}/${m.model}` === activeModelKey)?.model || configuredModels[0]?.model || 'Model')}
-                </span>
-                <ChevronDown className="h-3 w-3" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup value={activeModelKey} onValueChange={handleModelChange}>
-                {configuredModels.map((m) => {
-                  const key = `${m.provider}/${m.model}`
-                  return (
-                    <DropdownMenuRadioItem key={key} value={key}>
-                      <span className="truncate">{m.model}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">{providerDisplayNames[m.provider] || m.provider}</span>
-                    </DropdownMenuRadioItem>
-                  )
-                })}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-        {onToggleTts && ttsAvailable && (
-          <div className="flex shrink-0 items-center">
-            <Tooltip>
-              <TooltipTrigger asChild>
+            <Popover>
+              <PopoverTrigger asChild>
                 <button
                   type="button"
-                  onClick={onToggleTts}
-                  className={cn(
-                    'relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors',
-                    ttsEnabled
-                      ? 'text-foreground hover:bg-muted'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                  aria-label={ttsEnabled ? 'Disable voice output' : 'Enable voice output'}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Chat options"
                 >
-                  <Headphones className="h-4 w-4" />
-                  {!ttsEnabled && (
-                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <span className="block h-[1.5px] w-5 -rotate-45 rounded-full bg-muted-foreground" />
-                    </span>
-                  )}
+                  <Settings className="h-4 w-4" />
                 </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {ttsEnabled ? 'Voice output on' : 'Voice output off'}
-              </TooltipContent>
-            </Tooltip>
-            {ttsEnabled && onTtsModeChange && (
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" className="w-56 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Caveman mode</span>
+                  <button
+                    type="button"
+                    onClick={onToggleCaveman}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${cavemanEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+                    aria-label="Toggle caveman mode"
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${cavemanEnabled ? "translate-x-[18px]" : "translate-x-[3px]"}`}
+                    />
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            {searchAvailable &&
+              (searchEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchEnabled(false)}
+                  className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">Search</span>
+                  <X className="h-3 w-3" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSearchEnabled(true)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Search"
+                >
+                  <Globe className="h-4 w-4" />
+                </button>
+              ))}
+            <div className="flex-1" />
+            {lockedModel ? (
+              <span
+                className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground"
+                title={`${providerDisplayNames[lockedModel.provider] || lockedModel.provider} — fixed for this chat`}
+              >
+                <span className="max-w-[150px] truncate">
+                  {getSelectedModelDisplayName(lockedModel.model)}
+                </span>
+              </span>
+            ) : configuredModels.length > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex h-7 w-4 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
+                    <span className="max-w-[150px] truncate">
+                      {getSelectedModelDisplayName(
+                        configuredModels.find(
+                          (m) => `${m.provider}/${m.model}` === activeModelKey,
+                        )?.model ||
+                          configuredModels[0]?.model ||
+                          "Model",
+                      )}
+                    </span>
                     <ChevronDown className="h-3 w-3" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuRadioGroup value={ttsMode ?? 'summary'} onValueChange={(v) => onTtsModeChange(v as 'summary' | 'full')}>
-                    <DropdownMenuRadioItem value="summary">Speak summary</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="full">Speak full response</DropdownMenuRadioItem>
+                  <DropdownMenuRadioGroup
+                    value={activeModelKey}
+                    onValueChange={handleModelChange}
+                  >
+                    {configuredModels.map((m) => {
+                      const key = `${m.provider}/${m.model}`;
+                      return (
+                        <DropdownMenuRadioItem key={key} value={key}>
+                          <span className="truncate">{m.model}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {providerDisplayNames[m.provider] || m.provider}
+                          </span>
+                        </DropdownMenuRadioItem>
+                      );
+                    })}
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
+            ) : null}
+            {onToggleTts && ttsAvailable && (
+              <div className="flex shrink-0 items-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={onToggleTts}
+                      className={cn(
+                        "relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors",
+                        ttsEnabled
+                          ? "text-foreground hover:bg-muted"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                      aria-label={
+                        ttsEnabled
+                          ? "Disable voice output"
+                          : "Enable voice output"
+                      }
+                    >
+                      <Headphones className="h-4 w-4" />
+                      {!ttsEnabled && (
+                        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <span className="block h-[1.5px] w-5 -rotate-45 rounded-full bg-muted-foreground" />
+                        </span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {ttsEnabled ? "Voice output on" : "Voice output off"}
+                  </TooltipContent>
+                </Tooltip>
+                {ttsEnabled && onTtsModeChange && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex h-7 w-4 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuRadioGroup
+                        value={ttsMode ?? "summary"}
+                        onValueChange={(v) =>
+                          onTtsModeChange(v as "summary" | "full")
+                        }
+                      >
+                        <DropdownMenuRadioItem value="summary">
+                          Speak summary
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="full">
+                          Speak full response
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            )}
+            {voiceAvailable && onStartRecording && (
+              <button
+                type="button"
+                onClick={onStartRecording}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Voice input"
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+            )}
+            {isProcessing ? (
+              <Button
+                size="icon"
+                onClick={onStop}
+                title={
+                  isStopping ? "Click again to force stop" : "Stop generation"
+                }
+                className={cn(
+                  "h-7 w-7 shrink-0 rounded-full transition-all",
+                  isStopping
+                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                )}
+              >
+                {isStopping ? (
+                  <LoaderIcon className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="h-3 w-3 fill-current" />
+                )}
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={cn(
+                  "h-7 w-7 shrink-0 rounded-full transition-all",
+                  canSubmit
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
             )}
           </div>
-        )}
-        {voiceAvailable && onStartRecording && (
-          <button
-            type="button"
-            onClick={onStartRecording}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Voice input"
-          >
-            <Mic className="h-4 w-4" />
-          </button>
-        )}
-        {isProcessing ? (
-          <Button
-            size="icon"
-            onClick={onStop}
-            title={isStopping ? 'Click again to force stop' : 'Stop generation'}
-            className={cn(
-              'h-7 w-7 shrink-0 rounded-full transition-all',
-              isStopping
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-            )}
-          >
-            {isStopping ? (
-              <LoaderIcon className="h-4 w-4 animate-spin" />
-            ) : (
-              <Square className="h-3 w-3 fill-current" />
-            )}
-          </Button>
-        ) : (
-          <Button
-            size="icon"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className={cn(
-              'h-7 w-7 shrink-0 rounded-full transition-all',
-              canSubmit
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-muted text-muted-foreground'
-            )}
-          >
-            <ArrowUp className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
         </>
       )}
     </div>
-  )
+  );
 }
 
 /** Animated waveform bars for the recording indicator */
@@ -667,36 +814,42 @@ function VoiceWaveform() {
         }
       `}</style>
     </div>
-  )
+  );
 }
 
 export interface ChatInputWithMentionsProps {
-  knowledgeFiles: string[]
-  recentFiles: string[]
-  visibleFiles: string[]
-  onSubmit: (message: PromptInputMessage, mentions?: FileMention[], attachments?: StagedAttachment[]) => void
-  onStop?: () => void
-  isProcessing: boolean
-  isStopping?: boolean
-  isActive?: boolean
-  presetMessage?: string
-  onPresetMessageConsumed?: () => void
-  runId?: string | null
-  initialDraft?: string
-  onDraftChange?: (text: string) => void
-  isRecording?: boolean
-  recordingText?: string
-  recordingState?: 'connecting' | 'listening'
-  onStartRecording?: () => void
-  onSubmitRecording?: () => void
-  onCancelRecording?: () => void
-  voiceAvailable?: boolean
-  ttsAvailable?: boolean
-  ttsEnabled?: boolean
-  ttsMode?: 'summary' | 'full'
-  onToggleTts?: () => void
-  onTtsModeChange?: (mode: 'summary' | 'full') => void
-  onSelectedModelChange?: (model: SelectedModel | null) => void
+  knowledgeFiles: string[];
+  recentFiles: string[];
+  visibleFiles: string[];
+  onSubmit: (
+    message: PromptInputMessage,
+    mentions?: FileMention[],
+    attachments?: StagedAttachment[],
+  ) => void;
+  onStop?: () => void;
+  isProcessing: boolean;
+  isStopping?: boolean;
+  isActive?: boolean;
+  presetMessage?: string;
+  onPresetMessageConsumed?: () => void;
+  runId?: string | null;
+  initialDraft?: string;
+  onDraftChange?: (text: string) => void;
+  isRecording?: boolean;
+  recordingText?: string;
+  recordingState?: "connecting" | "listening";
+  onStartRecording?: () => void;
+  onSubmitRecording?: () => void;
+  onCancelRecording?: () => void;
+  voiceAvailable?: boolean;
+  ttsAvailable?: boolean;
+  ttsEnabled?: boolean;
+  ttsMode?: "summary" | "full";
+  onToggleTts?: () => void;
+  onTtsModeChange?: (mode: "summary" | "full") => void;
+  onSelectedModelChange?: (model: SelectedModel | null) => void;
+  cavemanEnabled?: boolean;
+  onToggleCaveman?: () => void;
 }
 
 export function ChatInputWithMentions({
@@ -726,9 +879,15 @@ export function ChatInputWithMentions({
   onToggleTts,
   onTtsModeChange,
   onSelectedModelChange,
+  cavemanEnabled = false,
+  onToggleCaveman,
 }: ChatInputWithMentionsProps) {
   return (
-    <PromptInputProvider knowledgeFiles={knowledgeFiles} recentFiles={recentFiles} visibleFiles={visibleFiles}>
+    <PromptInputProvider
+      knowledgeFiles={knowledgeFiles}
+      recentFiles={recentFiles}
+      visibleFiles={visibleFiles}
+    >
       <ChatInputInner
         onSubmit={onSubmit}
         onStop={onStop}
@@ -753,7 +912,9 @@ export function ChatInputWithMentions({
         onToggleTts={onToggleTts}
         onTtsModeChange={onTtsModeChange}
         onSelectedModelChange={onSelectedModelChange}
+        cavemanEnabled={cavemanEnabled}
+        onToggleCaveman={onToggleCaveman}
       />
     </PromptInputProvider>
-  )
+  );
 }

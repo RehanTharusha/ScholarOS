@@ -389,16 +389,6 @@ const ipcSchemas = {
       totalCount: z.number(),
     }),
   },
-  "academic:essay:grade": {
-    req: z.object({
-      title: z.string(),
-      essayText: z.string(),
-      rubricMarkdown: z.string(),
-      sourceNames: z.array(z.string()).optional(),
-      wordGoal: z.number().optional(),
-    }),
-    res: z.unknown(),
-  },
   "academic:assignments:list": {
     req: z.object({
       courseId: z.string().optional(),

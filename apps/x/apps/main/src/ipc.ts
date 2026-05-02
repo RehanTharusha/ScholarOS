@@ -104,7 +104,6 @@ import {
   getVaultPath,
 } from "@x/core/dist/config/config.js";
 import { CardStorage } from "@x/core/dist/academic/fsrs-scheduler.js";
-import { EssayGrader } from "@x/core/dist/academic/essay-grader.js";
 import {
   TaskManager,
   type KanbanStatus,
@@ -119,9 +118,18 @@ import { getRendererUrl } from "./app-url.js";
 // Store flashcards in knowledge base following LLM Wiki philosophy
 // Cards live in knowledge/courses/<course>/flashcards.json
 const flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
-const essayGrader = new EssayGrader();
 const taskManager = new TaskManager(path.join(WorkDir, "academic"));
 
+// Minimal demo flashcards used for seeding demo content when none exist
+const demoCards: FlashCard[] = [
+  {
+    id: "demo-1",
+    front: "What is ScholarOS?",
+    back: "ScholarOS is an AI-driven study assistant.",
+    due: null,
+    metadata: {},
+  } as unknown as FlashCard,
+];
 async function ensureUniqueWorkspaceDestination(
   destinationPath: string,
 ): Promise<string> {
@@ -147,36 +155,6 @@ async function ensureUniqueWorkspaceDestination(
   }
 }
 
-function createSeedFlashcards(courseId: string): FlashCard[] {
-  const seeds = [
-    {
-      id: `${courseId}-photosynthesis-1`,
-      front: "What is the main purpose of photosynthesis?",
-      back: "To convert light energy into chemical energy stored in glucose.",
-      conceptId: "photosynthesis",
-      difficulty: "normal" as const,
-    },
-    {
-      id: `${courseId}-mechanics-1`,
-      front: "State Newton's second law.",
-      back: "Force equals mass times acceleration: F = ma.",
-      conceptId: "newtons-second-law",
-      difficulty: "easy" as const,
-    },
-    {
-      id: `${courseId}-essay-1`,
-      front: "What makes a claim academically strong?",
-      back: "It should be specific, supported by evidence, and connected to the rubric or source material.",
-      conceptId: "academic-writing",
-      difficulty: "hard" as const,
-    },
-  ];
-
-  return seeds.map((seed) => ({
-    ...seed,
-    courseId,
-  }));
-}
 
 /**
  * Convert markdown to a styled HTML document for PDF/DOCX export.
@@ -634,7 +612,6 @@ export function setupIpcHandlers() {
           let courseCards = await flashcardStorage.loadCards(courseId);
           // Seed demo cards if needed
           if (courseCards.length === 0 && courseId === "scholaros-demo") {
-            courseCards = createSeedFlashcards(courseId);
             await flashcardStorage.saveCards(courseCards);
           }
           cards.push(...courseCards);
@@ -644,7 +621,6 @@ export function setupIpcHandlers() {
         cards = await flashcardStorage.loadAllCards();
         // Seed demo if no cards exist at all
         if (cards.length === 0) {
-          const demoCards = createSeedFlashcards("scholaros-demo");
           await flashcardStorage.saveCards(demoCards);
           cards = demoCards;
         }
@@ -654,6 +630,11 @@ export function setupIpcHandlers() {
         cards,
         totalCount: cards.length,
       };
+    },
+    "academic:flashcards:listAll": async () => {
+      const cards = await flashcardStorage.loadAllCards();
+      const dueCount = cards.filter((c) => (c as any).due != null).length;
+      return { cards, dueCount, totalCount: cards.length };
     },
     "academic:flashcards:addFromIngest": async (_event, args) => {
       // Called during ingest to add newly generated flashcards
@@ -666,15 +647,6 @@ export function setupIpcHandlers() {
       const flashCards = cards as unknown as FlashCard[];
       await flashcardStorage.addCards(flashCards);
       return { success: true, count: cards.length };
-    },
-    "academic:essay:grade": async (_event, args) => {
-      return essayGrader.gradeEssay({
-        title: args.title,
-        essayText: args.essayText,
-        rubricMarkdown: args.rubricMarkdown,
-        sourceNames: args.sourceNames,
-        wordGoal: args.wordGoal,
-      });
     },
     "academic:assignments:list": async (_event, args) => {
       const assignments = await taskManager.listAssignments(args.courseId);
@@ -695,7 +667,6 @@ export function setupIpcHandlers() {
       const courseId = args.courseId || "scholaros-demo";
       let cards = await flashcardStorage.loadCards(courseId);
       if (cards.length === 0) {
-        cards = createSeedFlashcards(courseId);
         await flashcardStorage.saveCards(cards);
       }
 

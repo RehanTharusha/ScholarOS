@@ -43,6 +43,7 @@ Drop a file into `/raw` and tell ScholarOS to process it. The agent will:
 - Update the central index and operation log
 - Surgically update existing concept pages — noting where the new material agrees, contradicts, or extends what you already know
 - Cross-reference entities: authors, institutions, theories, datasets
+- Identify suitable flashcard questions from the source (if any), update course-specific flashcard JSON files
 
 A single paper might touch 10–15 wiki pages. Your knowledge compounds with every source you add.
 
@@ -67,16 +68,6 @@ Because it's plain Markdown, the wiki is also a git repository. You get version 
 ### 📊 Generate Slide Decks from Your Notes
 
 When you need to present, ScholarOS can turn a directory of wiki pages into a natively editable `.pptx` file. The agent analyzes your notes, proposes a slide-by-slide narrative strategy, and then builds the deck using DrawingML — not images, not PDFs. The output is a real PowerPoint file you can edit in any presentation tool.
-
-### ✍️ Assignment and Essay Assistance
-
-Draft your essay in the BlockNote editor (a Notion-style block editor built on Yjs). Then invoke the writing aid module to:
-
-- Get automated feedback against the specific assignment rubric
-- Verify that your claims are grounded in your wiki references
-- Identify claims that lack cited sources from your reading material
-
-The AI works from _your_ notes — it's checking your argument against the papers you've actually read, not the open internet.
 
 ### 🃏 Flashcard Scheduling with FSRS
 
@@ -155,6 +146,9 @@ Agent surgically updates existing concept pages
  strengthening or revising ongoing syntheses)
         │
         ▼
+Agent identifies suitable flashcard questions from source (if any), updates course-specific flashcard JSON
+        │
+        ▼
 You browse the results in Obsidian in real time
 ```
 
@@ -168,11 +162,7 @@ Ask questions against the wiki. The agent reads the index, drills into relevant 
 
 Point ScholarOS at a course folder or a set of concept pages. The agent analyzes the material, proposes a narrative arc for the presentation, gets your approval, and exports a native `.pptx` file. All text is editable. All layout is generated from DrawingML, not screenshots of your notes.
 
-### 4. Assignment Mode
-
-Open a new document in the BlockNote editor. Write your draft. Paste in the assignment rubric. The writing aid module reads both your draft and your wiki reference material, then returns structured feedback: which arguments are well-supported by your readings, which claims need citation, which sections don't address the rubric criteria.
-
-### 5. Wiki Health Check (Lint)
+### 4. Wiki Health Check (Lint)
 
 Periodically ask the agent to audit the vault:
 
@@ -207,7 +197,6 @@ You and the agent will evolve these rules over time as you discover what works f
 | ----------------- | -------------------------- | -------------------------------------------------------------- |
 | Editing           | BlockNote                  | Notion-style block editor, built on Yjs for real-time collab   |
 | Presentations     | ppt-master                 | Multi-agent pipeline → native `.pptx` via DrawingML            |
-| Writing Aid       | ProjectIsidore             | Rubric-based essay grader and reference checker                |
 | Memorization      | ts-fsrs                    | TypeScript FSRS v6 spaced repetition scheduler                 |
 | PDF Annotation    | react-pdf-highlighter-plus | 100% client-side, highlights pipe into the wiki                |
 | Task Board        | react-kanban-kit           | Virtual-scrolling kanban for semester task management          |
@@ -216,8 +205,6 @@ You and the agent will evolve these rules over time as you discover what works f
 All components are open-source. The core tools are MIT-licensed; see [Licensing](#licensing) for details.
 
 ---
-
-## Indexing and Logging
 
 Two files are the navigational backbone of the wiki as it scales.
 
@@ -266,6 +253,7 @@ npm install
    - Move them into course subfolders (e.g., `/raw/Biology 101/`, `/raw/CS 201/`)
    - Extract metadata and create concept pages under `/knowledge/courses/<course-name>/concepts/`
    - Update the course index page with links to all materials
+   - Identify suitable flashcard questions from the source (if any), update the course-specific flashcard JSON file
 5. Watch the wiki update in Obsidian in real time
 
 ---

@@ -35,19 +35,6 @@ function createSeedAssignments(): Assignment[] {
 
   return [
     {
-      id: "bio-essay-1",
-      courseId: "BIO101",
-      title: "Essay Draft: Energy Conversion",
-      description: "Draft a 1200-word essay on photosynthesis and respiration.",
-      dueDate: plusDays(1),
-      status: "in-progress",
-      priority: "high",
-      wikiLinks: [
-        "knowledge/courses/Biology 101/index.md",
-        "knowledge/courses/Biology 101/concepts/Photosynthesis.md",
-      ],
-    },
-    {
       id: "phys-pset-4",
       courseId: "PHYS220",
       title: "Problem Set 4",

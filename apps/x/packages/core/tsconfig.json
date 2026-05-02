@@ -1,13 +1,12 @@
 {
-    "extends": "../../tsconfig.base.json",
-    "compilerOptions": {
-        "declaration": true,
-        "outDir": "dist",
-        "rootDir": "src",
-        "types": ["node"],
-        "jsx": "react-jsx"
-    },
-    "include": [
-        "src"
-    ]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "allowJs": true
+  },
+  "include": ["src"]
 }

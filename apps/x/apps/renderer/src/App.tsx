@@ -114,7 +114,7 @@ import { BrowserPane } from "@/components/browser-pane/BrowserPane";
 import { VersionHistoryPanel } from "@/components/version-history-panel";
 import { FileCardProvider } from "@/contexts/file-card-context";
 import { FlashcardReview } from "@/components/flashcards/flashcard-review";
-import { EssayFeedbackPanel } from "@/components/academic/essay-feedback";
+
 import { CourseDashboard } from "@/components/academic/course-dashboard";
 import { KanbanAcademic } from "@/components/academic/kanban-academic";
 import { IngestWindow } from "@/components/ingest-window";
@@ -211,7 +211,6 @@ const GRAPH_TAB_PATH = "__rowboat_graph_view__";
 const SUGGESTED_TOPICS_TAB_PATH = "__rowboat_suggested_topics__";
 const BASES_DEFAULT_TAB_PATH = "__rowboat_bases_default__";
 const FLASHCARDS_TAB_PATH = "__scholar_flashcards__";
-const ESSAY_REVIEW_TAB_PATH = "__scholar_essay_review__";
 const DASHBOARD_TAB_PATH = "__scholar_dashboard__";
 const KANBAN_TAB_PATH = "__scholar_assignment_board__";
 const INGEST_TAB_PATH = "__scholar_ingest__";
@@ -368,7 +367,6 @@ const isGraphTabPath = (path: string) => path === GRAPH_TAB_PATH;
 const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
 const isFlashcardsTabPath = (path: string) => path === FLASHCARDS_TAB_PATH;
-const isEssayReviewTabPath = (path: string) => path === ESSAY_REVIEW_TAB_PATH;
 const isDashboardTabPath = (path: string) => path === DASHBOARD_TAB_PATH;
 const isKanbanTabPath = (path: string) => path === KANBAN_TAB_PATH;
 const isBaseFilePath = (path: string) =>
@@ -685,7 +683,6 @@ function ContentHeader({
   canNavigateForward,
   collapsedLeftPaddingPx,
   onOpenFlashcards,
-  onOpenEssayReview,
   onOpenDashboard,
   onOpenKanban,
 }: {
@@ -696,7 +693,6 @@ function ContentHeader({
   canNavigateForward?: boolean;
   collapsedLeftPaddingPx?: number;
   onOpenFlashcards?: () => void;
-  onOpenEssayReview?: () => void;
   onOpenDashboard?: () => void;
   onOpenKanban?: () => void;
 }) {
@@ -748,17 +744,6 @@ function ContentHeader({
             className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background/80 px-3 text-xs text-foreground transition-colors hover:bg-accent/60"
           >
             Flashcards
-          </button>
-        </div>
-      ) : null}
-      {onOpenEssayReview ? (
-        <div className="titlebar-no-drag flex items-center pl-2">
-          <button
-            type="button"
-            onClick={onOpenEssayReview}
-            className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background/80 px-3 text-xs text-foreground transition-colors hover:bg-accent/60"
-          >
-            Essay Review
           </button>
         </div>
       ) : null}
@@ -1079,6 +1064,7 @@ function App() {
     new Map<string, { provider: string; model: string }>(),
   );
   const chatScrollTopByTabRef = useRef(new Map<string, number>());
+  const cavemanByTabRef = useRef(new Map<string, boolean>());
   const [toolOpenByTab, setToolOpenByTab] = useState<
     Record<string, Record<string, boolean>>
   >({});
@@ -1193,7 +1179,6 @@ function App() {
     if (isGraphTabPath(tab.path)) return "Graph View";
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
     if (isFlashcardsTabPath(tab.path)) return "Flashcards";
-    if (isEssayReviewTabPath(tab.path)) return "Essay Review";
     if (isDashboardTabPath(tab.path)) return "Dashboard";
     if (isKanbanTabPath(tab.path)) return "Assignment Board";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
@@ -1591,14 +1576,6 @@ function App() {
       return;
     }
     if (isFlashcardsTabPath(selectedPath)) {
-      setFileContent("");
-      setEditorContent("");
-      editorContentRef.current = "";
-      initialContentRef.current = "";
-      setLastSaved(null);
-      return;
-    }
-    if (isEssayReviewTabPath(selectedPath)) {
       setFileContent("");
       setEditorContent("");
       editorContentRef.current = "";
@@ -2831,6 +2808,21 @@ function App() {
   };
   handlePromptSubmitRef.current = handlePromptSubmit;
 
+  const handleToggleCaveman = useCallback((tabId: string) => {
+    const next = !cavemanByTabRef.current.get(tabId);
+    cavemanByTabRef.current.set(tabId, next);
+    // Submit /caveman or stop caveman as a user message
+    handlePromptSubmitRef.current?.(
+      {
+        text: next ? "/caveman" : "stop caveman",
+        files: [],
+      },
+      undefined,
+      [],
+      false,
+    );
+  }, []);
+
   const handleComposioConnected = useCallback((toolkitSlug: string) => {
     // Auto-send a continuation message when a Composio toolkit connects
     const name = composioDisplayNames[toolkitSlug] || toolkitSlug;
@@ -3752,10 +3744,6 @@ function App() {
 
   const openFlashcards = useCallback(() => {
     void navigateToView({ type: "file", path: FLASHCARDS_TAB_PATH });
-  }, [navigateToView]);
-
-  const openEssayReview = useCallback(() => {
-    void navigateToView({ type: "file", path: ESSAY_REVIEW_TAB_PATH });
   }, [navigateToView]);
 
   const openDashboard = useCallback(() => {
@@ -5265,7 +5253,6 @@ function App() {
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
                 onOpenFlashcards={openFlashcards}
-                onOpenEssayReview={openEssayReview}
                 onOpenDashboard={openDashboard}
                 onOpenKanban={openKanban}
               >
@@ -5285,7 +5272,6 @@ function App() {
                         (selectedPath != null &&
                           (isBaseFilePath(selectedPath) ||
                             isFlashcardsTabPath(selectedPath) ||
-                            isEssayReviewTabPath(selectedPath) ||
                             isDashboardTabPath(selectedPath))))
                     }
                   />
@@ -5419,8 +5405,6 @@ function App() {
                 <BrowserPane onClose={handleCloseBrowser} />
               ) : selectedPath === FLASHCARDS_TAB_PATH ? (
                 <FlashcardReview />
-              ) : selectedPath === ESSAY_REVIEW_TAB_PATH ? (
-                <EssayFeedbackPanel />
               ) : selectedPath === DASHBOARD_TAB_PATH ? (
                 <CourseDashboard />
               ) : selectedPath === KANBAN_TAB_PATH ? (
@@ -5900,6 +5884,14 @@ function App() {
                                 onToggleTts={
                                   isActive ? handleToggleTts : undefined
                                 }
+                                cavemanEnabled={
+                                  cavemanByTabRef.current.get(tab.id) ?? false
+                                }
+                                onToggleCaveman={
+                                  isActive
+                                    ? () => handleToggleCaveman(tab.id)
+                                    : undefined
+                                }
                                 onTtsModeChange={
                                   isActive ? handleTtsModeChange : undefined
                                 }
@@ -5977,6 +5969,10 @@ function App() {
                 onToggleTts={handleToggleTts}
                 onTtsModeChange={handleTtsModeChange}
                 onComposioConnected={handleComposioConnected}
+                cavemanEnabled={
+                  cavemanByTabRef.current.get(activeChatTabId) ?? false
+                }
+                onToggleCaveman={() => handleToggleCaveman(activeChatTabId)}
               />
             )}
             {/* Rendered last so its no-drag region paints over the sidebar drag region */}

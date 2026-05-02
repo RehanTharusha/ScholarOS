@@ -45,7 +45,6 @@ export interface Assignment {
   dueDate: string; // ISO 8601
   status: "not-started" | "in-progress" | "submitted" | "graded";
   priority?: "high" | "medium" | "low";
-  rubric?: AssignmentRubric;
   wikiLinks?: string[]; // Related concept pages
   notes?: string; // User's working notes
 }
@@ -62,30 +61,6 @@ export interface AcademicDashboardSummary {
 }
 
 /**
- * Rubric for grading essays/assignments
- */
-export interface AssignmentRubric {
-  id: string;
-  title: string;
-  criteria: RubricCriterion[];
-  totalPoints?: number;
-}
-
-export interface RubricCriterion {
-  id: string;
-  name: string;
-  description: string;
-  maxPoints: number;
-  levels?: GradingLevel[];
-}
-
-export interface GradingLevel {
-  score: number;
-  label: string;
-  description: string;
-}
-
-/**
  * Flashcard for study mode
  * Simple Q&A cards linked to course concepts
  */
@@ -98,56 +73,6 @@ export interface FlashCard {
   courseId: string;
   courseName?: string; // Human-readable course name
   difficulty?: "easy" | "normal" | "hard"; // Optional difficulty indicator
-}
-
-/**
- * Essay draft with grading feedback
- */
-export interface EssayDraft {
-  id: string;
-  assignmentId: string;
-  title: string;
-  content: string;
-  status: "draft" | "submitted" | "graded";
-  created: string; // ISO 8601
-  lastModified: string;
-  feedback?: EssayFeedback;
-  citationErrors?: CitationError[];
-}
-
-/**
- * Essay feedback from grader
- */
-export interface EssayFeedback {
-  generatedAt: string; // ISO 8601
-  criteriaScores: Map<string, CriterionFeedback>;
-  overallScore: number;
-  suggestions: string[];
-  revisionSuggestions: RevisionSuggestion[];
-}
-
-export interface CriterionFeedback {
-  criterion: string;
-  score: number;
-  feedback: string;
-}
-
-export interface RevisionSuggestion {
-  location: string; // Quote or paragraph reference
-  issue: string;
-  suggestion: string;
-  priority: "high" | "medium" | "low";
-}
-
-/**
- * Citation error found during essay verification
- */
-export interface CitationError {
-  claim: string;
-  sourceLocation: string; // Paragraph/sentence reference
-  verificationStatus: "verified" | "unsupported" | "contradicted";
-  relatedWikiPages?: string[];
-  evidence?: string;
 }
 
 /**

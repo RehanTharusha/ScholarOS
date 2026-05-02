@@ -270,25 +270,6 @@ Do not:
 - Use saturated green/cyan/blue call-to-action bars as the primary visual device.
 - Introduce 3D flip animations unless they improve comprehension.
 
-### Essay Feedback
-
-Essay review should read as a document workspace with a feedback sidebar.
-
-- Left side: draft, rubric, and controls.
-- Right side: score summary, criterion breakdown, citation checks.
-- Keep the draft area dominant.
-- Use standard form controls, not custom editor chrome.
-
-Do:
-
-- Keep rubric and draft editing grounded in plain form components.
-- Use score badges or compact chips for rubric criteria.
-
-Do not:
-
-- Build a separate design system just for writing feedback.
-- Use dark emerald hero panels or glowing feedback boxes.
-
 ### Dashboard
 
 Dashboards should be informational, not promotional.
@@ -461,7 +442,7 @@ If a new component is created, it should clearly solve a repeated problem and sh
 The current study-mode screens are intended to be the examples for future feature design:
 
 - Flashcards show the neutral metric cards, a centered review panel, and a support notes column.
-- Essay feedback shows a working surface on the left and a summary sidebar on the right.
+
 - The dashboard uses small metric cards and a simple upcoming-deadlines section.
 - The assignment board uses standard column cards and task cards.
 
