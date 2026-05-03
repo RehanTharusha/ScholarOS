@@ -15,6 +15,7 @@ import {
   ChevronRightIcon,
   SquarePen,
   HistoryIcon,
+  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -121,6 +122,7 @@ import { IngestWindow } from "@/components/ingest-window";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
+import { TerminalPanel } from "@/components/terminal-panel";
 import { TabBar, type ChatTab, type FileTab } from "@/components/tab-bar";
 import {
   type ChatMessage,
@@ -1048,7 +1050,7 @@ function App() {
 
   // Chat tab state
   const [chatTabs, setChatTabs] = useState<ChatTab[]>([
-    { id: "default-chat-tab", runId: null },
+    { id: "default-chat-tab", runId: null, mode: "agent" },
   ]);
   const [activeChatTabId, setActiveChatTabId] = useState("default-chat-tab");
   const [chatViewStateByTab, setChatViewStateByTab] = useState<
@@ -1148,6 +1150,10 @@ function App() {
 
   const getChatTabTitle = useCallback(
     (tab: ChatTab) => {
+      if (tab.mode === "terminal") {
+        const cmd = tab.terminalConfig?.command || "claude";
+        return `Terminal: ${cmd}`;
+      }
       if (!tab.runId) return "New chat";
       return runs.find((r) => r.id === tab.runId)?.title || "(Untitled chat)";
     },
@@ -2999,7 +3005,10 @@ function App() {
         return;
       }
       const id = newChatTabId();
-      setChatTabs((prev) => [...prev, { id, runId: targetRunId }]);
+      setChatTabs((prev) => [
+        ...prev,
+        { id, runId: targetRunId, mode: "agent" },
+      ]);
       setActiveChatTabId(id);
       loadRun(targetRunId);
     },
@@ -3092,6 +3101,24 @@ function App() {
       restoreChatTabState,
       saveChatScrollForTab,
     ],
+  );
+
+  const switchChatTabMode = useCallback(
+    (tabId: string, mode: "agent" | "terminal") => {
+      setChatTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? {
+                ...t,
+                mode,
+                terminalConfig:
+                  mode === "terminal" ? { command: "claude" } : undefined,
+              }
+            : t,
+        ),
+      );
+    },
+    [],
   );
 
   useEffect(() => {
@@ -3286,57 +3313,78 @@ function App() {
     [activeFileTabId, fileTabs, removeEditorCacheForPath],
   );
 
-  const handleNewChatTab = useCallback(() => {
-    // If there's already an empty "New chat" tab, switch to it
-    const emptyTab = chatTabs.find((t) => !t.runId);
-    if (emptyTab) {
-      if (emptyTab.id !== activeChatTabId) {
-        setActiveChatTabId(emptyTab.id);
+  const handleNewChatTab = useCallback(
+    (
+      mode: "agent" | "terminal" = "agent",
+      terminalConfig?: { command: string; cwd?: string },
+    ) => {
+      // If there's already an empty "New chat" tab with same mode, switch to it
+      const emptyTab = chatTabs.find((t) => !t.runId && t.mode === mode);
+      if (emptyTab) {
+        if (emptyTab.id !== activeChatTabId) {
+          setActiveChatTabId(emptyTab.id);
+        }
+      } else {
+        // Create a new tab
+        const id = newChatTabId();
+        setChatTabs((prev) => [
+          ...prev,
+          {
+            id,
+            runId: null,
+            mode,
+            ...(terminalConfig ? { terminalConfig } : {}),
+          },
+        ]);
+        setActiveChatTabId(id);
       }
-    } else {
-      // Create a new tab
-      const id = newChatTabId();
-      setChatTabs((prev) => [...prev, { id, runId: null }]);
-      setActiveChatTabId(id);
-    }
-    handleNewChat();
-    // Left-pane "new chat" should always open full chat view.
-    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
-      setExpandedFrom({
-        path: selectedPath,
-        graph: isGraphOpen,
-        suggestedTopics: isSuggestedTopicsOpen,
-      });
-    } else {
-      setExpandedFrom(null);
-    }
-    setIsRightPaneMaximized(false);
-    setSelectedPath(null);
-    setIsGraphOpen(false);
-    setIsSuggestedTopicsOpen(false);
-  }, [
-    chatTabs,
-    activeChatTabId,
-    handleNewChat,
-    selectedPath,
-    isGraphOpen,
-    isSuggestedTopicsOpen,
-  ]);
+      handleNewChat();
+      // Left-pane "new chat" should always open full chat view.
+      if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
+        setExpandedFrom({
+          path: selectedPath,
+          graph: isGraphOpen,
+          suggestedTopics: isSuggestedTopicsOpen,
+        });
+      } else {
+        setExpandedFrom(null);
+      }
+      setIsRightPaneMaximized(false);
+      setSelectedPath(null);
+      setIsGraphOpen(false);
+      setIsSuggestedTopicsOpen(false);
+    },
+    [chatTabs, activeChatTabId, handleNewChat],
+  );
 
   // Sidebar variant: create/switch chat tab without leaving file/graph context.
-  const handleNewChatTabInSidebar = useCallback(() => {
-    const emptyTab = chatTabs.find((t) => !t.runId);
-    if (emptyTab) {
-      if (emptyTab.id !== activeChatTabId) {
-        setActiveChatTabId(emptyTab.id);
+  const handleNewChatTabInSidebar = useCallback(
+    (
+      mode: "agent" | "terminal" = "agent",
+      terminalConfig?: { command: string; cwd?: string },
+    ) => {
+      const emptyTab = chatTabs.find((t) => !t.runId && t.mode === mode);
+      if (emptyTab) {
+        if (emptyTab.id !== activeChatTabId) {
+          setActiveChatTabId(emptyTab.id);
+        }
+      } else {
+        const id = newChatTabId();
+        setChatTabs((prev) => [
+          ...prev,
+          {
+            id,
+            runId: null,
+            mode,
+            ...(terminalConfig ? { terminalConfig } : {}),
+          },
+        ]);
+        setActiveChatTabId(id);
       }
-    } else {
-      const id = newChatTabId();
-      setChatTabs((prev) => [...prev, { id, runId: null }]);
-      setActiveChatTabId(id);
-    }
-    handleNewChat();
-  }, [chatTabs, activeChatTabId, handleNewChat]);
+      handleNewChat();
+    },
+    [chatTabs, activeChatTabId, handleNewChat],
+  );
 
   // Palette → sidebar submission. Opens the sidebar (if closed), forces a fresh chat tab,
   // queues the message; the pending-submit effect (below) flushes it once state has settled
@@ -5169,7 +5217,9 @@ function App() {
                         closeChatTab(tabForRun.id);
                       } else {
                         // Only one tab, reset it to new chat
-                        setChatTabs([{ id: tabForRun.id, runId: null }]);
+                        setChatTabs([
+                          { id: tabForRun.id, runId: null, mode: "agent" },
+                        ]);
                         if (
                           selectedPath ||
                           isGraphOpen ||
@@ -5284,6 +5334,7 @@ function App() {
                     isProcessing={isChatTabProcessing}
                     onSwitchTab={switchChatTab}
                     onCloseTab={closeChatTab}
+                    onSwitchMode={switchChatTabMode}
                   />
                 )}
                 {selectedPath && selectedPath.endsWith(".md") && (
@@ -5339,7 +5390,7 @@ function App() {
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={handleNewChatTab}
+                          onClick={() => handleNewChatTab()}
                           className="titlebar-no-drag flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors self-center shrink-0"
                           aria-label="New chat tab"
                         >
@@ -5348,6 +5399,29 @@ function App() {
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
                         New chat tab
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                {!selectedPath &&
+                  !isGraphOpen &&
+                  !isSuggestedTopicsOpen &&
+                  !selectedTask &&
+                  !isBrowserOpen && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleNewChatTab("terminal", { command: "claude" })
+                          }
+                          className="titlebar-no-drag flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors self-center shrink-0"
+                          aria-label="New terminal tab (Claude)"
+                        >
+                          <Monitor className="size-5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        New terminal tab (Claude)
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -5666,139 +5740,155 @@ function App() {
                             data-chat-tab-panel={tab.id}
                             aria-hidden={!isActive}
                           >
-                            <Conversation
-                              anchorMessageId={
-                                chatViewportAnchorByTab[tab.id]?.messageId
-                              }
-                              anchorRequestKey={
-                                chatViewportAnchorByTab[tab.id]?.requestKey
-                              }
-                              className="relative flex-1"
-                            >
-                              <ConversationContent
-                                className={tabConversationContentClassName}
+                            {tab.mode === "terminal" ? (
+                              <div className="flex-1 min-h-0">
+                                <TerminalPanel
+                                  tabId={tab.id}
+                                  command={
+                                    tab.terminalConfig?.command || "claude"
+                                  }
+                                  cwd={tab.terminalConfig?.cwd}
+                                />
+                              </div>
+                            ) : (
+                              <Conversation
+                                anchorMessageId={
+                                  chatViewportAnchorByTab[tab.id]?.messageId
+                                }
+                                anchorRequestKey={
+                                  chatViewportAnchorByTab[tab.id]?.requestKey
+                                }
+                                className="relative flex-1"
                               >
-                                {!tabHasConversation ? (
-                                  <ConversationEmptyState className="h-auto">
-                                    <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
-                                      What are we working on?
-                                    </div>
-                                  </ConversationEmptyState>
-                                ) : (
-                                  <>
-                                    {tabState.conversation.map((item) => {
-                                      const rendered = renderConversationItem(
-                                        item,
-                                        tab.id,
-                                      );
-                                      if (isToolCall(item)) {
-                                        const permRequest =
-                                          tabState.allPermissionRequests.get(
-                                            item.id,
-                                          );
-                                        if (permRequest) {
-                                          const response =
-                                            tabState.permissionResponses.get(
+                                <ConversationContent
+                                  className={tabConversationContentClassName}
+                                >
+                                  {!tabHasConversation ? (
+                                    <ConversationEmptyState className="h-auto">
+                                      <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
+                                        What are we working on?
+                                      </div>
+                                    </ConversationEmptyState>
+                                  ) : (
+                                    <>
+                                      {tabState.conversation.map((item) => {
+                                        const rendered = renderConversationItem(
+                                          item,
+                                          tab.id,
+                                        );
+                                        if (isToolCall(item)) {
+                                          const permRequest =
+                                            tabState.allPermissionRequests.get(
                                               item.id,
-                                            ) || null;
-                                          return (
-                                            <React.Fragment key={item.id}>
-                                              {rendered}
-                                              <PermissionRequest
-                                                toolCall={permRequest.toolCall}
-                                                onApprove={() =>
-                                                  handlePermissionResponse(
+                                            );
+                                          if (permRequest) {
+                                            const response =
+                                              tabState.permissionResponses.get(
+                                                item.id,
+                                              ) || null;
+                                            return (
+                                              <React.Fragment key={item.id}>
+                                                {rendered}
+                                                <PermissionRequest
+                                                  toolCall={
                                                     permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                  )
-                                                }
-                                                onApproveSession={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                    "session",
-                                                  )
-                                                }
-                                                onApproveAlways={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                    "always",
-                                                  )
-                                                }
-                                                onDeny={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "deny",
-                                                  )
-                                                }
-                                                isProcessing={
-                                                  isActive && isProcessing
-                                                }
-                                                response={response}
-                                              />
-                                            </React.Fragment>
-                                          );
+                                                  }
+                                                  onApprove={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                    )
+                                                  }
+                                                  onApproveSession={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                      "session",
+                                                    )
+                                                  }
+                                                  onApproveAlways={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                      "always",
+                                                    )
+                                                  }
+                                                  onDeny={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "deny",
+                                                    )
+                                                  }
+                                                  isProcessing={
+                                                    isActive && isProcessing
+                                                  }
+                                                  response={response}
+                                                />
+                                              </React.Fragment>
+                                            );
+                                          }
                                         }
-                                      }
-                                      return rendered;
-                                    })}
+                                        return rendered;
+                                      })}
 
-                                    {Array.from(
-                                      tabState.pendingAskHumanRequests.values(),
-                                    ).map((request) => (
-                                      <AskHumanRequest
-                                        key={request.toolCallId}
-                                        query={request.query}
-                                        onResponse={(response) =>
-                                          handleAskHumanResponse(
-                                            request.toolCallId,
-                                            request.subflow,
-                                            response,
-                                          )
-                                        }
-                                        isProcessing={isActive && isProcessing}
-                                      />
-                                    ))}
+                                      {Array.from(
+                                        tabState.pendingAskHumanRequests.values(),
+                                      ).map((request) => (
+                                        <AskHumanRequest
+                                          key={request.toolCallId}
+                                          query={request.query}
+                                          onResponse={(response) =>
+                                            handleAskHumanResponse(
+                                              request.toolCallId,
+                                              request.subflow,
+                                              response,
+                                            )
+                                          }
+                                          isProcessing={
+                                            isActive && isProcessing
+                                          }
+                                        />
+                                      ))}
 
-                                    {tabState.currentAssistantMessage && (
-                                      <Message from="assistant">
-                                        <MessageContent>
-                                          <SmoothStreamingMessage
-                                            text={tabState.currentAssistantMessage.replace(
-                                              /<\/?voice>/g,
-                                              "",
-                                            )}
-                                            components={streamdownComponents}
-                                          />
-                                        </MessageContent>
-                                      </Message>
-                                    )}
-
-                                    {isActive &&
-                                      isProcessing &&
-                                      !tabState.currentAssistantMessage && (
+                                      {tabState.currentAssistantMessage && (
                                         <Message from="assistant">
                                           <MessageContent>
-                                            <Shimmer duration={1}>
-                                              Thinking...
-                                            </Shimmer>
+                                            <SmoothStreamingMessage
+                                              text={tabState.currentAssistantMessage.replace(
+                                                /<\/?voice>/g,
+                                                "",
+                                              )}
+                                              components={streamdownComponents}
+                                            />
                                           </MessageContent>
                                         </Message>
                                       )}
-                                  </>
-                                )}
-                              </ConversationContent>
-                              <ConversationScrollButton />
-                            </Conversation>
+
+                                      {isActive &&
+                                        isProcessing &&
+                                        !tabState.currentAssistantMessage && (
+                                          <Message from="assistant">
+                                            <MessageContent>
+                                              <Shimmer duration={1}>
+                                                Thinking...
+                                              </Shimmer>
+                                            </MessageContent>
+                                          </Message>
+                                        )}
+                                    </>
+                                  )}
+                                </ConversationContent>
+                                <ConversationScrollButton />
+                              </Conversation>
+                            )}
                           </div>
                         );
                       })}

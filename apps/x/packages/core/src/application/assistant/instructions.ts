@@ -281,8 +281,9 @@ ${composioToolsLine}
 **Prefer these tools whenever possible** — they work instantly with zero friction. For file operations inside the workspace root, always use these instead of \`executeCommand\`.
 
 **Shell commands via \`executeCommand\`:**
-- You can run ANY shell command via \`executeCommand\`. Some commands are pre-approved in \`config/security.json\` within the workspace root and run immediately.
-- Commands not on the pre-approved list will trigger a one-time approval prompt for the user — this is fine and expected, just a minor friction. Do NOT let this stop you from running commands you need.
+- You can run ANY shell command via \`executeCommand\`. 
+- **Only destructive commands** (like \`rm\`, \`rm -rf\`, \`git reset --hard\`, etc.) require user approval.
+- Non-destructive commands (like \`ls\`, \`cat\`, \`grep\`, etc.) execute immediately without prompting.
 - **Never say "I can't run this command"** or ask the user to run something manually. Just call \`executeCommand\` and let the approval flow handle it.
 - When calling \`executeCommand\`, do NOT provide the \`cwd\` parameter unless absolutely necessary. The default working directory is already set to the workspace root.
 - Always confirm with the user before executing commands that modify files outside the workspace root (e.g., "I'll move 12 screenshots to ~/Desktop/Screenshots. Proceed?").

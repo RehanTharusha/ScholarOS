@@ -1,6 +1,9 @@
 import { skillCatalog } from "./skills/index.js";
 import { WorkDir as BASE_DIR } from "../../config/config.js";
-import { getRuntimeContext, getRuntimeContextPrompt } from "./runtime-context.js";
+import {
+  getRuntimeContext,
+  getRuntimeContextPrompt,
+} from "./runtime-context.js";
 
 const runtimeContextPrompt = getRuntimeContextPrompt(getRuntimeContext());
 
@@ -67,5 +70,8 @@ These tools work directly and are NOT filtered by \`.rowboat/config/security.jso
 
 **Only \`executeCommand\` (shell/bash commands) is filtered** by the security allowlist. If you need to delete a file, use the \`deleteFile\` builtin tool, not \`executeCommand\` with \`rm\`. If you need to create a file, use \`createFile\`, not \`executeCommand\` with \`touch\` or \`echo >\`.
 
-The security allowlist in \`security.json\` only applies to shell commands executed via \`executeCommand\`, not to Rowboat's internal builtin tools.
+**CRITICAL: Destructive commands require approval**
+- Only destructive commands (like \`rm\`, \`rm -rf\`, \`git reset --hard\`, \`dd\`, etc.) will trigger a user permission prompt.
+- Non-destructive commands execute immediately without asking the user.
+- The security allowlist in \`security.json\` only applies to shell commands executed via \`executeCommand\`, not to Rowboat's internal builtin tools.
 `;

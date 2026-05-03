@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpFromLine,
-  FileText,
   FolderOpen,
   Inbox,
   Loader2,
@@ -42,7 +41,6 @@ export function IngestWindow({
   const [isStaging, setIsStaging] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
-  const [lastDropCount, setLastDropCount] = useState(0);
 
   const rawPath = useMemo(() => {
     if (!workspaceRoot) return null;
@@ -70,7 +68,6 @@ export function IngestWindow({
 
     setIsStaging(true);
     setErrors([]);
-    setLastDropCount(paths.length);
 
     try {
       const result = await window.ipc.invoke("ingest:addFiles", {
@@ -281,28 +278,6 @@ export function IngestWindow({
               <span className="pb-1 text-sm text-muted-foreground">ready</span>
             </div>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Last drop
-            </p>
-            <div className="mt-2 flex items-end gap-2">
-              <span className="text-2xl font-semibold text-foreground">
-                {lastDropCount}
-              </span>
-              <span className="pb-1 text-sm text-muted-foreground">files</span>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Raw folder
-            </p>
-            <div className="mt-2 flex items-center gap-2 text-sm text-foreground">
-              <FileText className="size-4 text-muted-foreground" />
-              <span className="truncate">
-                {rawPath ?? "Loading workspace…"}
-              </span>
-            </div>
-          </div>
         </div>
 
         <AcademicCard>
@@ -325,7 +300,7 @@ export function IngestWindow({
                   key={`${file.sourcePath}-${file.targetPath}`}
                   className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
                       {file.name}
                     </p>
@@ -333,9 +308,22 @@ export function IngestWindow({
                       {file.sourcePath}
                     </p>
                   </div>
-                  <Badge variant="outline" className="shrink-0">
-                    Copied
-                  </Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline">Copied</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        setStagedFiles((prev) =>
+                          prev.filter((f) => f.sourcePath !== file.sourcePath),
+                        );
+                        toast.info(`Removed ${file.name}`);
+                      }}
+                    >
+                      ×
+                    </Button>
+                  </div>
                 </div>
               ))
             ) : (

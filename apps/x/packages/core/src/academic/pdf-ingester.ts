@@ -5,6 +5,7 @@
 
 import { promises as fs } from "fs";
 import path from "path";
+import { PDFParse } from "pdf-parse";
 
 interface LlmAgent {
   generate(prompt: string): Promise<{ text: string }>;
@@ -156,17 +157,18 @@ class PDFExtractor {
     pageCount: number;
     metadata: Record<string, unknown>;
   }> {
-    const pdfParseModule = (await import("pdf-parse")) as {
-      default?: (buffer: Buffer) => Promise<PdfParseResult>;
-    };
-    const pdfParse =
-      pdfParseModule.default ??
-      (pdfParseModule as unknown as (
-        buffer: Buffer,
-      ) => Promise<PdfParseResult>);
     const fileBuffer = await fs.readFile(filepath);
 
-    const data = (await pdfParse(fileBuffer as Buffer)) as PdfParseResult;
+    const parser = new PDFParse({ data: new Uint8Array(fileBuffer) });
+    const textResult = await parser.getText();
+    const infoResult = await parser.getInfo();
+    await parser.destroy();
+
+    const data = {
+      text: textResult.text,
+      numpages: textResult.total,
+      info: infoResult.info,
+    } as PdfParseResult;
 
     return {
       text: data.text,

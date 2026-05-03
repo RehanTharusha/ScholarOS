@@ -1,7 +1,9 @@
 import { Loader2, CheckCircle2, FolderOpen } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { OnboardingState } from "../use-onboarding-state";
+import { useState, useEffect } from "react";
 
 interface WelcomeStepProps {
   state: OnboardingState;
@@ -13,6 +15,102 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
     isLoading: false,
     isConnecting: false,
   };
+
+  const [userName, setUserName] = useState("");
+  const [showNamePrompt, setShowNamePrompt] = useState(true);
+
+  // Check localStorage on mount to see if user already provided a name or skipped
+  useEffect(() => {
+    const hasShownPrompt = localStorage.getItem("rowboat-name-prompt-shown");
+    if (hasShownPrompt !== null) {
+      // User already saw the prompt (either provided name or skipped)
+      setShowNamePrompt(false);
+    }
+  }, []);
+
+  const handleNameSubmit = () => {
+    if (userName.trim()) {
+      localStorage.setItem("rowboat-user-name", userName.trim());
+    }
+    localStorage.setItem("rowboat-name-prompt-shown", "true");
+    setShowNamePrompt(false);
+  };
+
+  const handleSkip = () => {
+    localStorage.removeItem("rowboat-user-name");
+    localStorage.setItem("rowboat-name-prompt-shown", "true");
+    setShowNamePrompt(false);
+  };
+
+  if (showNamePrompt) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center flex-1">
+        {/* Logo with ambient glow */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="relative mb-8"
+        >
+          <div className="absolute inset-0 size-16 rounded-2xl bg-primary/10 blur-xl scale-[2.5]" />
+          <img
+            src="/logo-only.png"
+            alt="Rowboat"
+            className="relative size-16"
+          />
+        </motion.div>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-3xl font-bold tracking-tight mb-3"
+        >
+          What should we call you?
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-base text-muted-foreground leading-relaxed max-w-sm mb-6"
+        >
+          (dw we don't save this info)
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="w-full max-w-xs space-y-3"
+        >
+          <Input
+            type="text"
+            placeholder="Enter your name"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
+            className="text-center"
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <Button
+              onClick={handleNameSubmit}
+              size="lg"
+              className="flex-1 h-12 text-base font-medium"
+            >
+              Continue
+            </Button>
+          </div>
+          <button
+            onClick={handleSkip}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground/50 w-full"
+          >
+            Skip
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center text-center flex-1">

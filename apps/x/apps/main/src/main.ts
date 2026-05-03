@@ -271,7 +271,10 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
+  // On all platforms except macOS, quit the app when all windows are closed
+  // On macOS, apps typically stay active until explicitly quit
   if (process.platform !== "darwin") {
+    // Force quit to ensure all processes are terminated
     app.quit();
   }
 });

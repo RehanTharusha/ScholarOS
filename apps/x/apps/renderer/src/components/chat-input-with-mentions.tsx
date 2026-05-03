@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FileUIPart } from "ai";
 import {
   Tooltip,
   TooltipContent,
@@ -411,7 +412,7 @@ function ChatInputInner({
   const handleSubmit = useCallback(() => {
     if (!canSubmit) return;
     onSubmit(
-      { text: message.trim(), files: [] },
+      { text: message.trim(), files: attachments as unknown as FileUIPart[] },
       controller.mentions.mentions,
       attachments,
       searchEnabled || undefined,

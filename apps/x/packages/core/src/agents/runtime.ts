@@ -33,6 +33,7 @@ import { buildCopilotAgent } from "../application/assistant/agent.js";
 import { buildTrackRunAgent } from "../knowledge/track/run-agent.js";
 import {
   isBlocked,
+  isDestructive,
   extractCommandNames,
 } from "../application/lib/command-executor.js";
 import container from "../di/container.js";
@@ -1291,12 +1292,11 @@ export async function* streamAgent({
             underlyingTool.type === "builtin" &&
             underlyingTool.name === "executeCommand"
           ) {
-            // if command is blocked, then seek permission
-            if (
-              isBlocked(part.arguments.command, state.sessionAllowedCommands)
-            ) {
+            // Only seek permission for destructive commands
+            // Non-destructive commands execute immediately without prompting
+            if (isDestructive(part.arguments.command)) {
               loopLogger.log(
-                "emitting tool-permission-request, toolCallId:",
+                "emitting tool-permission-request (destructive command), toolCallId:",
                 part.toolCallId,
               );
               yield* processEvent({
@@ -1305,6 +1305,11 @@ export async function* streamAgent({
                 toolCall: part,
                 subflow: [],
               });
+            } else {
+              loopLogger.log(
+                "skipping permission request (non-destructive command), toolCallId:",
+                part.toolCallId,
+              );
             }
           }
           if (underlyingTool.type === "agent" && underlyingTool.name) {
