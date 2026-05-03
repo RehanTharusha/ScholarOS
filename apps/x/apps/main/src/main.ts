@@ -49,6 +49,28 @@ import { configureSessionPermissions } from "./session-utils.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Handle EPIPE errors that can occur when stdout/stderr pipes are closed
+// (e.g., when running under concurrently with broken pipes)
+// This must be done very early to catch any errors from initialization code
+if (process.stdout) {
+  process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EPIPE") {
+      // Silently ignore broken pipe errors
+      return;
+    }
+    console.error("Stdout error:", err);
+  });
+}
+if (process.stderr) {
+  process.stderr.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EPIPE") {
+      // Silently ignore broken pipe errors
+      return;
+    }
+    console.error("Stderr error:", err);
+  });
+}
+
 // run this as early in the main process as possible
 if (started) app.quit();
 

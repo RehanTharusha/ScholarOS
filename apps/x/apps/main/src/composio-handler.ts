@@ -325,15 +325,6 @@ export async function useComposioForGoogle(): Promise<{ enabled: boolean }> {
 }
 
 /**
- * Check if Composio should be used for Google Calendar
- */
-export async function useComposioForGoogleCalendar(): Promise<{
-  enabled: boolean;
-}> {
-  return { enabled: await composioClient.useComposioForGoogleCalendar() };
-}
-
-/**
  * List available Composio toolkits — filtered to curated list only.
  * Return type matches the ZToolkit schema from core/composio/types.ts.
  */

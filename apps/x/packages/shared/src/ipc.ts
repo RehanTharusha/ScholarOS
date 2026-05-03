@@ -631,26 +631,6 @@ const ipcSchemas = {
       mimeType: z.string(),
     }),
   },
-  "meeting:checkScreenPermission": {
-    req: z.null(),
-    res: z.object({
-      granted: z.boolean(),
-    }),
-  },
-  "meeting:openScreenRecordingSettings": {
-    req: z.null(),
-    res: z.object({ success: z.boolean() }),
-  },
-  "meeting:summarize": {
-    req: z.object({
-      transcript: z.string(),
-      meetingStartTime: z.string().optional(),
-      calendarEventJson: z.string().optional(),
-    }),
-    res: z.object({
-      notes: z.string(),
-    }),
-  },
   // Inline task schedule classification
   "export:note": {
     req: z.object({

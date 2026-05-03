@@ -101,7 +101,6 @@ import { SettingsDialog } from "@/components/settings-dialog";
 import { toast } from "@/lib/toast";
 import { useBilling } from "@/hooks/useBilling";
 import { ServiceEvent } from "@x/shared/src/service-events.js";
-import type { MeetingTranscriptionState } from "@/hooks/useMeetingTranscription";
 import z from "zod";
 
 interface TreeNode {
@@ -155,9 +154,6 @@ const MAX_SYNC_EVENTS = 1000;
 const RUN_STALE_MS = 2 * 60 * 60 * 1000;
 
 const SERVICE_LABELS: Record<string, string> = {
-  gmail: "Syncing Gmail",
-  calendar: "Syncing Calendar",
-  fireflies: "Syncing Fireflies",
   granola: "Syncing Granola",
   graph: "Updating knowledge",
   voice_memo: "Processing voice memo",
@@ -188,10 +184,6 @@ type SidebarContentPanelProps = {
   onNewChat?: () => void;
   onOpenSearch?: () => void;
   onOpenIngestWindow?: () => void;
-  meetingState?: MeetingTranscriptionState;
-  meetingSummarizing?: boolean;
-  meetingAvailable?: boolean;
-  onToggleMeeting?: () => void;
   isBrowserOpen?: boolean;
   onToggleBrowser?: () => void;
   isSuggestedTopicsOpen?: boolean;
@@ -437,10 +429,7 @@ export function SidebarContentPanel({
   onNewChat,
   onOpenSearch,
   onOpenIngestWindow,
-  meetingState = "idle",
-  meetingSummarizing = false,
-  meetingAvailable = false,
-  onToggleMeeting,
+
   isBrowserOpen = false,
   onToggleBrowser,
   isSuggestedTopicsOpen = false,
@@ -594,40 +583,6 @@ export function SidebarContentPanel({
             >
               <SearchIcon className="size-4" />
               <span>Search</span>
-            </button>
-          )}
-          {meetingAvailable && onToggleMeeting && (
-            <button
-              type="button"
-              onClick={onToggleMeeting}
-              disabled={
-                meetingState === "connecting" ||
-                meetingState === "stopping" ||
-                meetingSummarizing
-              }
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors disabled:pointer-events-none",
-                meetingState === "recording"
-                  ? "text-red-500 hover:bg-sidebar-accent"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              )}
-            >
-              {meetingSummarizing || meetingState === "connecting" ? (
-                <LoaderIcon className="size-4 animate-spin" />
-              ) : meetingState === "recording" ? (
-                <Square className="size-4 animate-pulse" />
-              ) : (
-                <Radio className="size-4" />
-              )}
-              <span>
-                {meetingSummarizing
-                  ? "Generating notes…"
-                  : meetingState === "connecting"
-                    ? "Starting…"
-                    : meetingState === "recording"
-                      ? "Stop recording"
-                      : "Take meeting notes"}
-              </span>
             </button>
           )}
           {onToggleBrowser && (

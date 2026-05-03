@@ -936,7 +936,7 @@ export function setupIpcHandlers() {
       return composioHandler.useComposioForGoogle();
     },
     "composio:use-composio-for-google-calendar": async () => {
-      return composioHandler.useComposioForGoogleCalendar();
+      return { enabled: false };
     },
     // Agent schedule handlers
     "agent-schedule:getConfig": async () => {
@@ -1094,39 +1094,6 @@ export function setupIpcHandlers() {
       }
 
       return { success: false, error: "Unknown format" };
-    },
-    "meeting:checkScreenPermission": async () => {
-      if (process.platform !== "darwin") return { granted: true };
-      const status = systemPreferences.getMediaAccessStatus("screen");
-      console.log("[meeting] Screen recording permission status:", status);
-      if (status === "granted") return { granted: true };
-      // Not granted — call desktopCapturer.getSources() to register the app
-      // in the macOS Screen Recording list. On first call this shows the
-      // native permission prompt (signed apps are remembered across restarts).
-      try {
-        await desktopCapturer.getSources({ types: ["screen"] });
-      } catch {
-        /* ignore */
-      }
-      // Re-check after the native prompt was dismissed
-      const statusAfter = systemPreferences.getMediaAccessStatus("screen");
-      console.log(
-        "[meeting] Screen recording permission status after prompt:",
-        statusAfter,
-      );
-      return { granted: statusAfter === "granted" };
-    },
-    "meeting:openScreenRecordingSettings": async () => {
-      await shell.openExternal(
-        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
-      );
-      return { success: true };
-    },
-    "meeting:summarize": async () => {
-      return {
-        notes:
-          "Meeting summarization is disabled in ScholarOS. Use academic ingest and notes instead.",
-      };
     },
     "inline-task:classifySchedule": async (_event, args) => {
       const schedule = await classifySchedule(args.instruction);

@@ -171,6 +171,25 @@ module.exports = {
       fs.mkdirSync(rendererDest, { recursive: true });
       fs.cpSync(rendererSrc, rendererDest, { recursive: true });
 
+      // Copy pdf.worker.mjs to renderer dist in staging
+      console.log("Copying pdf.worker.mjs...");
+      const pdfWorkerSrc = path.join(
+        __dirname,
+        "../renderer/node_modules/react-pdf/dist/pdf.worker.min.mjs",
+      );
+      const pdfWorkerDest = path.join(rendererDest, "pdf.worker.min.mjs");
+      if (fs.existsSync(pdfWorkerSrc)) {
+        fs.copyFileSync(pdfWorkerSrc, pdfWorkerDest);
+        // Also copy a worker into the package root as `pdf.worker.mjs` because
+        // bundled main.cjs expects `./pdf.worker.mjs` at the package root.
+        const packageRootPdf = path.join(packageDir, "pdf.worker.mjs");
+        try {
+          fs.copyFileSync(pdfWorkerSrc, packageRootPdf);
+        } catch (e) {
+          console.warn("Failed to copy pdf worker to package root:", e.message);
+        }
+      }
+
       console.log("Copying ingestion assets...");
       // Optional ingest files - only copy if they exist
       const preloadIngestSrc = path.join(__dirname, "preload-ingest.js");

@@ -25,7 +25,9 @@ interface ConversationContextValue {
   scrollToBottom: () => void;
 }
 
-const ConversationContext = createContext<ConversationContextValue | null>(null);
+const ConversationContext = createContext<ConversationContextValue | null>(
+  null,
+);
 
 export type ConversationProps = ComponentProps<"div"> & {
   anchorMessageId?: string | null;
@@ -70,7 +72,7 @@ export const Conversation = ({
       }
 
       const anchor = content.querySelector<HTMLElement>(
-        `[data-message-id="${anchorMessageId}"]`
+        `[data-message-id="${anchorMessageId}"]`,
       );
 
       if (!anchor) {
@@ -82,13 +84,13 @@ export const Conversation = ({
       spacer.style.height = "0px";
 
       const contentPaddingTop = Number.parseFloat(
-        window.getComputedStyle(content).paddingTop || "0"
+        window.getComputedStyle(content).paddingTop || "0",
       );
       const anchorTop = anchor.offsetTop;
       const targetScrollTop = Math.max(0, anchorTop - contentPaddingTop);
       const requiredSlack = Math.max(
         0,
-        targetScrollTop - (content.scrollHeight - container.clientHeight)
+        targetScrollTop - (content.scrollHeight - container.clientHeight),
       );
 
       spacer.style.height = `${Math.ceil(requiredSlack)}px`;
@@ -100,7 +102,7 @@ export const Conversation = ({
       updateBottomState();
       return true;
     },
-    [anchorMessageId, updateBottomState]
+    [anchorMessageId, updateBottomState],
   );
 
   useEffect(() => {
@@ -188,7 +190,7 @@ export const Conversation = ({
       scrollRef,
       scrollToBottom,
     }),
-    [isAtBottom, scrollToBottom]
+    [isAtBottom, scrollToBottom],
   );
 
   return (
@@ -215,7 +217,7 @@ const useConversationContext = () => {
 
   if (!context) {
     throw new Error(
-      "Conversation components must be used within a Conversation component."
+      "Conversation components must be used within a Conversation component.",
     );
   }
 
@@ -256,7 +258,7 @@ export const ConversationEmptyState = ({
   <div
     className={cn(
       "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
-      className
+      className,
     )}
     {...props}
   >
@@ -293,7 +295,7 @@ export const ConversationScrollButton = ({
       <Button
         className={cn(
           "absolute bottom-6 left-[50%] z-10 h-12 w-12 translate-x-[-50%] rounded-full border border-border/70 bg-background/95 text-foreground shadow-lg backdrop-blur-sm transition hover:bg-background",
-          className
+          className,
         )}
         aria-label="Scroll to latest message"
         onClick={handleScrollToBottom}

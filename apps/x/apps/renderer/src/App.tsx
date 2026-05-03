@@ -150,10 +150,6 @@ import { AgentScheduleState } from "@x/shared/dist/agent-schedule-state.js";
 import { toast } from "sonner";
 import { useVoiceMode } from "@/hooks/useVoiceMode";
 import { useVoiceTTS } from "@/hooks/useVoiceTTS";
-import {
-  useMeetingTranscription,
-  type CalendarEventMeta,
-} from "@/hooks/useMeetingTranscription";
 import { useAnalyticsIdentity } from "@/hooks/useAnalyticsIdentity";
 import * as analytics from "@/lib/analytics";
 
@@ -386,9 +382,6 @@ const getSuggestedTopicTargetFolder = (category?: string) => {
     case "projects":
     case "project":
       return "Projects";
-    case "meetings":
-    case "meeting":
-      return "Meetings";
     case "topics":
     case "topic":
     default:
@@ -456,7 +449,6 @@ const FOLDER_ORDER = [
   "Organizations",
   "Projects",
   "Topics",
-  "Meetings",
   "Agent Notes",
   "Notes",
 ];
@@ -489,10 +481,6 @@ const FOLDER_BASE_CONFIGS: Record<
     visibleColumns: ["name", "mtimeMs"],
     sort: { field: "name", dir: "asc" },
   },
-  Meetings: {
-    visibleColumns: ["name", "topic", "mtimeMs"],
-    sort: { field: "mtimeMs", dir: "desc" },
-  },
 };
 
 // Sort nodes (dirs first, ordered folders by FOLDER_ORDER, then alphabetically)
@@ -513,76 +501,6 @@ function sortNodes(nodes: TreeNode[]): TreeNode[] {
       }
       return node;
     });
-}
-
-/**
- * Organize Meetings/ source folders into date-grouped subfolders.
- *
- * - rowboat:  rowboat/2026-03-20/meeting-xxx.md  → keeps date folders as-is
- * - granola:  granola/2026/03/18/Title.md         → collapses into "2026-03-18" folders
- * - Files directly under a source folder (no date subfolder) are grouped
- *   by the date prefix in their filename (e.g. meeting-2026-03-17T...).
- */
-function flattenMeetingsTree(nodes: TreeNode[]): TreeNode[] {
-  return nodes.flatMap((node) => {
-    if (node.kind !== "dir" || node.name !== "Meetings") return [node];
-
-    const flattenedSourceChildren = (node.children ?? []).flatMap(
-      (sourceNode) => {
-        if (sourceNode.kind !== "dir") return [sourceNode];
-
-        // Collect all files with their date group label
-        const dateGroups = new Map<string, TreeNode[]>();
-
-        function collectFiles(n: TreeNode, dateParts: string[]) {
-          for (const child of n.children ?? []) {
-            if (child.kind === "file") {
-              const dateStr = dateParts.join("-");
-              // If file is at root of source folder, try to extract date from filename
-              const groupKey =
-                dateStr || extractDateFromFilename(child.name) || "other";
-              const group = dateGroups.get(groupKey) ?? [];
-              group.push(child);
-              dateGroups.set(groupKey, group);
-            } else if (child.kind === "dir") {
-              collectFiles(child, [...dateParts, child.name]);
-            }
-          }
-        }
-        collectFiles(sourceNode, []);
-
-        if (dateGroups.size === 0) return [];
-
-        // Build date folder nodes, sorted reverse chronologically
-        const dateFolderNodes: TreeNode[] = [...dateGroups.entries()]
-          .sort(([a], [b]) => b.localeCompare(a))
-          .map(([dateKey, files]) => {
-            // Sort files within each date group reverse chronologically
-            files.sort((a, b) => b.name.localeCompare(a.name));
-            return {
-              name: dateKey,
-              path: `${sourceNode.path}/${dateKey}`,
-              kind: "dir" as const,
-              children: files,
-              loaded: true,
-            };
-          });
-
-        return [{ ...sourceNode, children: dateFolderNodes }];
-      },
-    );
-
-    // Hide Meetings folder entirely if no source folders have files
-    if (flattenedSourceChildren.length === 0) return [];
-
-    return [{ ...node, children: flattenedSourceChildren }];
-  });
-}
-
-/** Extract YYYY-MM-DD from filenames like "meeting-2026-03-17T05-01-47.md" */
-function extractDateFromFilename(name: string): string | null {
-  const match = name.match(/(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : null;
 }
 
 // Build tree structure from flat entries
@@ -917,11 +835,6 @@ function App() {
   const voice = useVoiceMode();
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
-
-  const handleToggleMeetingRef = useRef<(() => void) | undefined>(undefined);
-  const meetingTranscription = useMeetingTranscription(() => {
-    handleToggleMeetingRef.current?.();
-  });
 
   // Check if voice is available on mount and when OAuth state changes
   const refreshVoiceAvailability = useCallback(() => {
@@ -1451,7 +1364,7 @@ function App() {
           })
           .catch(() => [] as DirEntry[]),
       ]);
-      const knowledgeTree = flattenMeetingsTree(buildTree(knowledgeResult));
+      const knowledgeTree = buildTree(knowledgeResult);
       const basesChildren: TreeNode[] = (basesResult as DirEntry[])
         .filter((e) => e.name.endsWith(".base"))
         .map((e) => ({ ...e, kind: "file" as const }));
@@ -4586,163 +4499,6 @@ function App() {
     [loadDirectory, navigateToFile, fileTabs],
   );
 
-  const meetingNotePathRef = useRef<string | null>(null);
-  const pendingCalendarEventRef = useRef<CalendarEventMeta | undefined>(
-    undefined,
-  );
-  const [meetingSummarizing, setMeetingSummarizing] = useState(false);
-  const [showMeetingPermissions, setShowMeetingPermissions] = useState(false);
-
-  const [checkingPermission, setCheckingPermission] = useState(false);
-
-  const startMeetingNow = useCallback(async () => {
-    const calEvent = pendingCalendarEventRef.current;
-    pendingCalendarEventRef.current = undefined;
-    const notePath = await meetingTranscription.start(calEvent);
-    if (notePath) {
-      meetingNotePathRef.current = notePath;
-      await handleVoiceNoteCreated(notePath);
-    }
-  }, [meetingTranscription, handleVoiceNoteCreated]);
-
-  const handleCheckPermissionAndRetry = useCallback(async () => {
-    setCheckingPermission(true);
-    try {
-      const { granted } = await window.ipc.invoke(
-        "meeting:checkScreenPermission",
-        null,
-      );
-      if (granted) {
-        setShowMeetingPermissions(false);
-        await startMeetingNow();
-      }
-    } finally {
-      setCheckingPermission(false);
-    }
-  }, [startMeetingNow]);
-
-  const handleOpenScreenRecordingSettings = useCallback(async () => {
-    await window.ipc.invoke("meeting:openScreenRecordingSettings", null);
-  }, []);
-
-  const handleToggleMeeting = useCallback(async () => {
-    if (meetingTranscription.state === "recording") {
-      await meetingTranscription.stop();
-
-      // Read the final transcript and generate meeting notes via LLM
-      const notePath = meetingNotePathRef.current;
-      if (notePath) {
-        setMeetingSummarizing(true);
-        try {
-          const result = await window.ipc.invoke("workspace:readFile", {
-            path: notePath,
-            encoding: "utf8",
-          });
-          const fileContent = result.data;
-          if (fileContent && fileContent.trim()) {
-            // Extract meeting start time and calendar event from frontmatter
-            const dateMatch = fileContent.match(/^date:\s*"(.+)"$/m);
-            const meetingStartTime = dateMatch?.[1];
-            // If a calendar event was linked, pass it directly so the summarizer
-            // skips scanning and uses this event for attendee/title info.
-            const calEventMatch = fileContent.match(
-              /^calendar_event:\s*'(.+)'$/m,
-            );
-            const calendarEventJson = calEventMatch?.[1]?.replace(/''/g, "'");
-            const { notes } = await window.ipc.invoke("meeting:summarize", {
-              transcript: fileContent,
-              meetingStartTime,
-              calendarEventJson,
-            });
-            if (notes) {
-              // Prepend meeting notes above the existing transcript block
-              const { raw: fm, body } = splitFrontmatter(fileContent);
-              const fmTitleMatch = fileContent.match(/^title:\s*(.+)$/m);
-              const noteTitle = fmTitleMatch?.[1]?.trim() || "Meeting Notes";
-              const cleanedNotes = notes.replace(/^#{1,2}\s+.+\n+/, "");
-              // Extract the existing transcript block and preserve it as-is
-              const transcriptBlockMatch = body.match(
-                /(```transcript\n[\s\S]*?\n```)/,
-              );
-              const transcriptBlock = transcriptBlockMatch?.[1] || "";
-              const newBody =
-                `# ${noteTitle}\n\n` +
-                cleanedNotes +
-                (transcriptBlock ? "\n\n" + transcriptBlock : "");
-              const newContent = fm ? `${fm}\n${newBody}` : newBody;
-              await window.ipc.invoke("workspace:writeFile", {
-                path: notePath,
-                data: newContent,
-                opts: { encoding: "utf8" },
-              });
-              // Refresh the file view
-              await handleVoiceNoteCreated(notePath);
-            }
-          }
-        } catch (err) {
-          console.error("[meeting] Failed to generate meeting notes:", err);
-        }
-        setMeetingSummarizing(false);
-        meetingNotePathRef.current = null;
-      }
-    } else if (meetingTranscription.state === "idle") {
-      // On macOS, check screen recording permission before starting
-      if (isMac) {
-        const result = await window.ipc.invoke(
-          "meeting:checkScreenPermission",
-          null,
-        );
-        console.log("[meeting] Permission check result:", result);
-        if (!result.granted) {
-          setShowMeetingPermissions(true);
-          return;
-        }
-      }
-      await startMeetingNow();
-    }
-  }, [meetingTranscription, handleVoiceNoteCreated, startMeetingNow]);
-  handleToggleMeetingRef.current = handleToggleMeeting;
-
-  // Listen for calendar block "join meeting & take notes" events
-  useEffect(() => {
-    const handler = () => {
-      // Read calendar event data set by the calendar block on window
-      const pending = window.__pendingCalendarEvent;
-      window.__pendingCalendarEvent = undefined;
-      if (pending) {
-        pendingCalendarEventRef.current = {
-          summary: pending.summary,
-          start: pending.start,
-          end: pending.end,
-          location: pending.location,
-          htmlLink: pending.htmlLink,
-          conferenceLink: pending.conferenceLink,
-          source: pending.source,
-        };
-      }
-      // Use the same toggle flow — it will pick up pendingCalendarEventRef
-      handleToggleMeetingRef.current?.();
-    };
-    window.addEventListener("calendar-block:join-meeting", handler);
-    return () =>
-      window.removeEventListener("calendar-block:join-meeting", handler);
-  }, []);
-
-  // Email block: draft with assistant
-  useEffect(() => {
-    const handler = () => {
-      const pending = window.__pendingEmailDraft;
-      if (pending) {
-        setPresetMessage(pending.prompt);
-        setIsChatSidebarOpen(true);
-        window.__pendingEmailDraft = undefined;
-      }
-    };
-    window.addEventListener("email-block:draft-with-assistant", handler);
-    return () =>
-      window.removeEventListener("email-block:draft-with-assistant", handler);
-  }, []);
-
   const ensureWikiFile = useCallback(async (wikiPath: string) => {
     const resolvedPath = toKnowledgePath(wikiPath);
     if (!resolvedPath) return null;
@@ -4803,10 +4559,7 @@ function App() {
         return;
       }
 
-      const graphFilePaths = knowledgeFilePaths.filter((p) => {
-        const normalized = stripKnowledgePrefix(p);
-        return !normalized.toLowerCase().startsWith("meetings/");
-      });
+      const graphFilePaths = knowledgeFilePaths;
 
       const nodeSet = new Set(graphFilePaths);
       const edges: GraphEdge[] = [];
@@ -5263,12 +5016,6 @@ function App() {
               selectedBackgroundTask={selectedBackgroundTask}
               onNewChat={handleNewChatTab}
               onOpenSearch={() => setIsSearchOpen(true)}
-              meetingState={meetingTranscription.state}
-              meetingSummarizing={meetingSummarizing}
-              meetingAvailable={voiceAvailable}
-              onToggleMeeting={() => {
-                void handleToggleMeeting();
-              }}
               isBrowserOpen={isBrowserOpen}
               onToggleBrowser={handleToggleBrowser}
               isSuggestedTopicsOpen={isSuggestedTopicsOpen}
@@ -6088,59 +5835,6 @@ function App() {
         open={showOnboarding}
         onComplete={handleOnboardingComplete}
       />
-      <Dialog
-        open={showMeetingPermissions}
-        onOpenChange={setShowMeetingPermissions}
-      >
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Screen recording permission required</DialogTitle>
-            <DialogDescription>
-              Rowboat needs <strong>Screen Recording</strong> permission to
-              capture meeting audio from other apps (Zoom, Meet, etc.). This
-              feature won't work without it.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>To enable this:</p>
-            <ol className="list-decimal list-inside space-y-1.5">
-              <li>
-                Open <strong>System Settings</strong> →{" "}
-                <strong>Privacy & Security</strong> →{" "}
-                <strong>Screen Recording</strong>
-              </li>
-              <li>
-                Toggle on <strong>Rowboat</strong>
-              </li>
-              <li>You may need to restart the app after granting permission</li>
-            </ol>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowMeetingPermissions(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                void handleOpenScreenRecordingSettings();
-              }}
-            >
-              Open System Settings
-            </Button>
-            <Button
-              onClick={() => {
-                void handleCheckPermissionAndRetry();
-              }}
-              disabled={checkingPermission}
-            >
-              {checkingPermission ? "Checking..." : "Check Again"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </TooltipProvider>
   );
 }
