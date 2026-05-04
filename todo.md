@@ -1,7 +1,3 @@
-## a pdf viewer
-
-i need to integrate a pdf viewer into my application. I want to be able to display pdf files directly within the app without needing to open them in an external program.
-
 # important note before moving forward with the next few tasks
 
 everything needs to be stored in md files, jsons and csvs within courses folders. ofcourse while keeping things smooth, lean and token efficient. my main point if that i dont want to use some complex database system for storing data.

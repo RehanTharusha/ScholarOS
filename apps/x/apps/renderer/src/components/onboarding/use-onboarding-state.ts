@@ -836,11 +836,7 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
       setVaultLoading(true);
       const result = await window.ipc.invoke("vault:select", null);
       if (result.success && result.path) {
-        toast.success(`Vault set to: ${result.path.split(/[\\/]/).pop()}`);
-        // Reload the page to use the new vault
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        toast.success(`Vault set to: ${result.path.split(/[\\/]/).pop()}.`);
       }
     } catch (err) {
       console.error("Failed to select vault:", err);

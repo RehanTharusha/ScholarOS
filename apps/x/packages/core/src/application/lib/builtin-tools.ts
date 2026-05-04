@@ -4,6 +4,7 @@ import * as fs from "fs/promises";
 import { createReadStream } from "fs";
 import { createInterface } from "readline";
 import { execSync } from "child_process";
+import { homedir } from "os";
 import { glob } from "glob";
 import { executeCommand, executeCommandAbortable } from "./command-executor.js";
 import { resolveSkill, availableSkills } from "../assistant/skills/index.js";
@@ -1667,12 +1668,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         ),
     }),
     execute: async ({ note }: { note: string }) => {
-      const inboxPath = path.join(
-        WorkDir,
-        "knowledge",
-        "Agent Notes",
-        "inbox.md",
-      );
+      const inboxPath = path.join(homedir(), ".rowboat", "memory", "inbox.md");
       const dir = path.dirname(inboxPath);
       await fs.mkdir(dir, { recursive: true });
 
@@ -1901,7 +1897,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       filePath: z
         .string()
         .describe(
-          "Workspace-relative path to the note file (e.g., 'knowledge/Notes/my-note.md')",
+          "Workspace-relative path to the note file (e.g., 'notes/my-note.md')",
         ),
       trackId: z.string().describe("The track block's trackId"),
       content: z
@@ -1940,7 +1936,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       filePath: z
         .string()
         .describe(
-          "Workspace-relative path to the note file (e.g., 'knowledge/Notes/my-note.md')",
+          "Workspace-relative path to the note file (e.g., 'notes/my-note.md')",
         ),
       trackId: z
         .string()

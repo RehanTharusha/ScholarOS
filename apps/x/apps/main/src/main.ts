@@ -6,6 +6,7 @@ import {
   net,
   shell,
   session,
+  dialog,
   type Session,
 } from "electron";
 import path from "node:path";
@@ -27,7 +28,6 @@ import { init as initGraphBuilder } from "@x/core/dist/knowledge/build_graph.js"
 import { init as initNoteTagging } from "@x/core/dist/knowledge/tag_notes.js";
 import { init as initInlineTasks } from "@x/core/dist/knowledge/inline_tasks.js";
 import { init as initAgentRunner } from "@x/core/dist/agent-schedule/runner.js";
-import { init as initAgentNotes } from "@x/core/dist/knowledge/agent_notes.js";
 import { init as initTrackScheduler } from "@x/core/dist/knowledge/track/scheduler.js";
 import { init as initTrackEventProcessor } from "@x/core/dist/knowledge/track/events.js";
 import {
@@ -194,6 +194,23 @@ function createWindow() {
   // The WebContentsView is created lazily on first `browser:setVisible`.
   browserViewManager.attach(win);
 
+  // In development, open devtools and forward renderer console messages
+  if (!app.isPackaged) {
+    try {
+      win.webContents.openDevTools({ mode: "detach" });
+      win.webContents.on(
+        "console-message",
+        (_event, level, message, line, sourceId) => {
+          console.log(
+            `[Renderer][console:${level}] ${message} (${sourceId}:${line})`,
+          );
+        },
+      );
+    } catch (err) {
+      console.warn("Failed to open devtools or attach console listener:", err);
+    }
+  }
+
   if (app.isPackaged) {
     win.loadURL(getRendererUrl());
   } else {
@@ -202,94 +219,103 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Register custom protocol before creating window (for production builds)
-  if (app.isPackaged) {
-    registerAppProtocol();
-  }
-
-  // Initialize auto-updater (only in production)
-  if (app.isPackaged) {
-    updateElectronApp({
-      updateSource: {
-        type: UpdateSourceType.ElectronPublicUpdateService,
-        repo: "rowboatlabs/rowboat",
-      },
-      notifyUser: true, // Shows native dialog when update is available
-    });
-  }
-
-  // Ensure agent-slack CLI is available
   try {
-    execSync("agent-slack --version", { stdio: "ignore", timeout: 5000 });
-  } catch {
-    console.warn(
-      "agent-slack not found; Slack connector features will stay disabled until it is installed.",
-    );
-  }
-
-  // Initialize all config files before UI can access them
-  await initConfigs();
-
-  registerBrowserControlService(new ElectronBrowserControlService());
-
-  setupIpcHandlers();
-  setupBrowserEventForwarding();
-
-  createWindow();
-
-  // Start workspace watcher as a main-process service
-  // Watcher runs independently and catches ALL filesystem changes:
-  // - Changes made via IPC handlers (workspace:writeFile, etc.)
-  // - External changes (terminal, git, other editors)
-  // Only starts once (guarded in startWorkspaceWatcher)
-  startWorkspaceWatcher();
-
-  // start runs watcher
-  startRunsWatcher();
-
-  // start services watcher
-  startServicesWatcher();
-
-  // start tracks watcher
-  startTracksWatcher();
-
-  // start track scheduler (cron/window/once)
-  initTrackScheduler();
-
-  // start track event processor (consumes events/pending/, triggers matching tracks)
-  initTrackEventProcessor();
-
-  // start granola sync
-  initGranolaSync();
-
-  // start knowledge graph builder
-  initGraphBuilder();
-
-  // start note tagging service
-  initNoteTagging();
-
-  // start inline task service (@rowboat: mentions)
-  initInlineTasks();
-
-  // start background agent runner (scheduled agents)
-  initAgentRunner();
-
-  // start agent notes learning service
-  initAgentNotes();
-
-  // start chrome extension sync server
-  initChromeSync();
-
-  // start local sites server for iframe dashboards and other mini apps
-  initLocalSites().catch((error) => {
-    console.error("[LocalSites] Failed to start:", error);
-  });
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+    // Register custom protocol before creating window (for production builds)
+    if (app.isPackaged) {
+      registerAppProtocol();
     }
-  });
+
+    // Initialize auto-updater (only in production)
+    if (app.isPackaged) {
+      updateElectronApp({
+        updateSource: {
+          type: UpdateSourceType.ElectronPublicUpdateService,
+          repo: "rowboatlabs/rowboat",
+        },
+        notifyUser: true, // Shows native dialog when update is available
+      });
+    }
+
+    // Ensure agent-slack CLI is available
+    try {
+      execSync("agent-slack --version", { stdio: "ignore", timeout: 5000 });
+    } catch {
+      console.warn(
+        "agent-slack not found; Slack connector features will stay disabled until it is installed.",
+      );
+    }
+
+    // Initialize all config files before UI can access them
+    console.log("[Main] Initializing config files...");
+    await initConfigs();
+    console.log("[Main] Config files initialized successfully");
+
+    registerBrowserControlService(new ElectronBrowserControlService());
+
+    setupIpcHandlers();
+    setupBrowserEventForwarding();
+
+    createWindow();
+
+    // Start workspace watcher as a main-process service
+    // Watcher runs independently and catches ALL filesystem changes:
+    // - Changes made via IPC handlers (workspace:writeFile, etc.)
+    // - External changes (terminal, git, other editors)
+    // Only starts once (guarded in startWorkspaceWatcher)
+    startWorkspaceWatcher();
+
+    // start runs watcher
+    startRunsWatcher();
+
+    // start services watcher
+    startServicesWatcher();
+
+    // start tracks watcher
+    startTracksWatcher();
+
+    // start track scheduler (cron/window/once)
+    initTrackScheduler();
+
+    // start track event processor (consumes events/pending/, triggers matching tracks)
+    initTrackEventProcessor();
+
+    // start granola sync
+    initGranolaSync();
+
+    // start knowledge graph builder
+    initGraphBuilder();
+
+    // start note tagging service
+    initNoteTagging();
+
+    // start inline task service (@rowboat: mentions)
+    initInlineTasks();
+
+    // start background agent runner (scheduled agents)
+    initAgentRunner();
+
+    // start chrome extension sync server
+    initChromeSync();
+
+    // start local sites server for iframe dashboards and other mini apps
+    initLocalSites().catch((error) => {
+      console.error("[LocalSites] Failed to start:", error);
+    });
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  } catch (error) {
+    console.error("[Main] Fatal error during initialization:", error);
+    // Show error dialog and quit
+    dialog.showErrorBox(
+      "Application Error",
+      "Failed to initialize application. Please check the logs.",
+    );
+    app.quit();
+  }
 });
 
 app.on("window-all-closed", () => {

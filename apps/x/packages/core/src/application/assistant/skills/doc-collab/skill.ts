@@ -71,24 +71,24 @@ workspace-grep({ pattern: "[name]", path: "knowledge/" })
 - Ask: "Which document would you like to work on?"
 
 **Creating new documents:**
-1. Ask simply: "Shall I create [filename]?" (don't ask about location - default to \`knowledge/Notes/\` unless the user specifies a different folder)
+1. Ask simply: "Shall I create [filename]?" (don't ask about location - default to vault root unless the user specifies a different folder)
 2. Create it with just a title - don't pre-populate with structure or outlines
 3. Ask: "What would you like in this?"
 
 \`\`\`
 workspace-createFile({
-  path: "knowledge/Notes/[Document Name].md",
-  content: "# [Document Title]\n\n"
+   path: "[Document Name].md",
+   content: "# [Document Title]\n\n"
 })
 \`\`\`
 
 **WRONG approach:**
-- "Should this be in Projects/ or Topics/?" - don't ask, just use \`knowledge/Notes/\`
+- "Should this be in Projects/ or Topics/?" - don't ask, just use vault root
 - "Here's a proposed outline..." - don't propose, let the user guide
 - "I'll create a structure with sections for X, Y, Z" - don't assume structure
 
 **RIGHT approach:**
-- "Shall I create knowledge/Notes/roadmap.md?"
+- "Shall I create roadmap.md?"
 - *creates file with just the title*
 - "Created. What would you like in this?"
 

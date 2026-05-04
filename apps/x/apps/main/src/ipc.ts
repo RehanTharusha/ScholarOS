@@ -9,7 +9,6 @@ import {
   session,
   type Session,
 } from "electron";
-
 const ALLOWED_SESSION_PERMISSIONS = new Set([
   "media",
   "display-capture",
@@ -49,6 +48,7 @@ import {
   listProviders,
 } from "./oauth-handler.js";
 import { watcher as watcherCore, workspace } from "@x/core";
+import { refreshWorkDir } from "@x/core/dist/config/config.js";
 import { workspace as workspaceShared } from "@x/shared";
 import * as mcpCore from "@x/core/dist/mcp/mcp.js";
 import * as runsCore from "@x/core/dist/runs/runs.js";
@@ -189,8 +189,8 @@ import { getRendererUrl } from "./app-url.js";
 
 // Store flashcards in knowledge base following LLM Wiki philosophy
 // Cards live in knowledge/courses/<course>/flashcards.json
-const flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
-const taskManager = new TaskManager(path.join(WorkDir, "academic"));
+let flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
+let taskManager = new TaskManager(path.join(WorkDir, "academic"));
 
 // Minimal demo flashcards used for seeding demo content when none exist
 const demoCards: FlashCard[] = [
@@ -517,6 +517,16 @@ function emitServiceEvent(event: z.infer<typeof ServiceEvent>): void {
   for (const win of windows) {
     if (!win.isDestroyed() && win.webContents) {
       win.webContents.send("services:events", event);
+    }
+  }
+}
+
+function emitVaultChanged(path: string): void {
+  console.log(`[Vault] Emitting vault:changed -> ${path}`);
+  const windows = BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    if (!win.isDestroyed() && win.webContents) {
+      win.webContents.send("vault:changed", { path });
     }
   }
 }
@@ -1180,9 +1190,19 @@ export function setupIpcHandlers() {
     "billing:getInfo": async () => {
       return await getBillingInfo();
     },
+    // App control handlers
+    "app:restart": async () => {
+      // Schedule restart after IPC response is sent
+      setImmediate(() => {
+        app.relaunch();
+        app.quit();
+      });
+      return { ok: true as const };
+    },
     // Vault selection handlers (Obsidian-like vault switcher)
     "vault:select": async () => {
       try {
+        console.log("[Vault] Opening folder selection dialog...");
         const result = await dialog.showOpenDialog({
           title: "Select Vault Folder",
           message: "Choose a folder to use as your ScholarOS vault",
@@ -1191,16 +1211,68 @@ export function setupIpcHandlers() {
         });
 
         if (result.canceled || result.filePaths.length === 0) {
+          console.log("[Vault] Selection canceled or no paths selected");
           return { success: false };
         }
 
         const selectedPath = result.filePaths[0];
+        console.log(`[Vault] User selected path: ${selectedPath}`);
 
         // Save the vault path for future sessions
+        console.log("[Vault] Saving vault path to config...");
         saveVaultPath(selectedPath);
+        console.log("[Vault] Vault path saved successfully");
+
+        // Try to hot-refresh WorkDir and restart in-process watchers
+        try {
+          console.log("[Vault] Refreshing WorkDir in core...");
+          refreshWorkDir();
+          console.log("[Vault] WorkDir refreshed");
+
+          // Restart watchers/services so they pick up the new WorkDir
+          stopWorkspaceWatcher();
+          await startWorkspaceWatcher();
+          stopRunsWatcher();
+          await startRunsWatcher();
+          stopServicesWatcher();
+          await startServicesWatcher();
+          // Recreate vault-scoped helpers
+          try {
+            flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
+            taskManager = new TaskManager(path.join(WorkDir, "academic"));
+          } catch (err) {
+            console.warn(
+              "[Vault] Failed to recreate vault-scoped helpers:",
+              err,
+            );
+          }
+
+          // Notify renderer windows about vault change so they reload UI
+          try {
+            emitVaultChanged(WorkDir);
+          } catch (err) {
+            console.warn("[Vault] Failed to emit vault change:", err);
+          }
+
+          console.log("[Vault] Restarted in-process watchers for new vault");
+        } catch (err) {
+          console.error(
+            "[Vault] Hot-refresh failed, falling back to restart:",
+            err,
+          );
+          // Fallback: schedule full app restart if hot-refresh fails
+          setImmediate(() => {
+            console.log(
+              `[Vault] Initiating app restart for vault: ${selectedPath}`,
+            );
+            app.relaunch();
+            app.quit();
+          });
+        }
 
         return { success: true, path: selectedPath };
       } catch (err) {
+        console.error("[Vault] Selection failed:", err);
         return {
           success: false,
           error: err instanceof Error ? err.message : String(err),

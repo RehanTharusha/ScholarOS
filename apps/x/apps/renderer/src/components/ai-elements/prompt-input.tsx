@@ -89,9 +89,9 @@ export type AttachmentsContext = {
 
 export type FileMention = {
   id: string;
-  path: string;         // "knowledge/notes.md"
-  displayName: string;  // "notes"
-  lineNumber?: number;  // 1-indexed source-line reference (for editor-context mentions)
+  path: string; // "notes.md"
+  displayName: string; // "notes"
+  lineNumber?: number; // 1-indexed source-line reference (for editor-context mentions)
 };
 
 export type MentionsContext = {
@@ -114,15 +114,15 @@ export type PromptInputControllerProps = {
   /** INTERNAL: Allows PromptInput to register its file textInput + "open" callback */
   __registerFileInput: (
     ref: RefObject<HTMLInputElement | null>,
-    open: () => void
+    open: () => void,
   ) => void;
 };
 
 const PromptInputController = createContext<PromptInputControllerProps | null>(
-  null
+  null,
 );
 const ProviderAttachmentsContext = createContext<AttachmentsContext | null>(
-  null
+  null,
 );
 const ProviderMentionsContext = createContext<MentionsContext | null>(null);
 
@@ -130,7 +130,7 @@ export const usePromptInputController = () => {
   const ctx = useContext(PromptInputController);
   if (!ctx) {
     throw new Error(
-      "Wrap your component inside <PromptInputProvider> to use usePromptInputController()."
+      "Wrap your component inside <PromptInputProvider> to use usePromptInputController().",
     );
   }
   return ctx;
@@ -144,7 +144,7 @@ export const useProviderAttachments = () => {
   const ctx = useContext(ProviderAttachmentsContext);
   if (!ctx) {
     throw new Error(
-      "Wrap your component inside <PromptInputProvider> to use useProviderAttachments()."
+      "Wrap your component inside <PromptInputProvider> to use useProviderAttachments().",
     );
   }
   return ctx;
@@ -157,7 +157,7 @@ export const useProviderMentions = () => {
   const ctx = useContext(ProviderMentionsContext);
   if (!ctx) {
     throw new Error(
-      "Wrap your component inside <PromptInputProvider> to use useProviderMentions()."
+      "Wrap your component inside <PromptInputProvider> to use useProviderMentions().",
     );
   }
   return ctx;
@@ -171,7 +171,8 @@ export type KnowledgeFilesContext = {
   visibleFiles: string[];
 };
 
-const ProviderKnowledgeFilesContext = createContext<KnowledgeFilesContext | null>(null);
+const ProviderKnowledgeFilesContext =
+  createContext<KnowledgeFilesContext | null>(null);
 
 export const useProviderKnowledgeFiles = () => {
   return useContext(ProviderKnowledgeFilesContext);
@@ -220,8 +221,8 @@ export function PromptInputProvider({
           url: URL.createObjectURL(file),
           mediaType: file.type,
           filename: file.name,
-        }))
-      )
+        })),
+      ),
     );
   }, []);
 
@@ -274,21 +275,24 @@ export function PromptInputProvider({
       openFileDialog,
       fileInputRef,
     }),
-    [attachmentFiles, add, remove, clear, openFileDialog]
+    [attachmentFiles, add, remove, clear, openFileDialog],
   );
 
   // ----- mentions state (for @ file mentions)
   const [mentionsList, setMentionsList] = useState<FileMention[]>([]);
 
-  const addMention = useCallback((path: string, displayName: string, lineNumber?: number) => {
-    setMentionsList((prev) => {
-      // Avoid duplicates (same path AND same lineNumber — line-specific mentions are distinct)
-      if (prev.some((m) => m.path === path && m.lineNumber === lineNumber)) {
-        return prev;
-      }
-      return [...prev, { id: nanoid(), path, displayName, lineNumber }];
-    });
-  }, []);
+  const addMention = useCallback(
+    (path: string, displayName: string, lineNumber?: number) => {
+      setMentionsList((prev) => {
+        // Avoid duplicates (same path AND same lineNumber — line-specific mentions are distinct)
+        if (prev.some((m) => m.path === path && m.lineNumber === lineNumber)) {
+          return prev;
+        }
+        return [...prev, { id: nanoid(), path, displayName, lineNumber }];
+      });
+    },
+    [],
+  );
 
   const removeMention = useCallback((id: string) => {
     setMentionsList((prev) => prev.filter((m) => m.id !== id));
@@ -305,7 +309,7 @@ export function PromptInputProvider({
       removeMention,
       clearMentions,
     }),
-    [mentionsList, addMention, removeMention, clearMentions]
+    [mentionsList, addMention, removeMention, clearMentions],
   );
 
   const __registerFileInput = useCallback(
@@ -313,7 +317,7 @@ export function PromptInputProvider({
       fileInputRef.current = ref.current;
       openRef.current = open;
     },
-    []
+    [],
   );
 
   const controller = useMemo<PromptInputControllerProps>(
@@ -327,12 +331,12 @@ export function PromptInputProvider({
       mentions,
       __registerFileInput,
     }),
-    [textInput, clearInput, attachments, mentions, __registerFileInput]
+    [textInput, clearInput, attachments, mentions, __registerFileInput],
   );
 
   const knowledgeFilesContext = useMemo<KnowledgeFilesContext>(
     () => ({ files: knowledgeFiles, recentFiles, visibleFiles }),
-    [knowledgeFiles, recentFiles, visibleFiles]
+    [knowledgeFiles, recentFiles, visibleFiles],
   );
 
   return (
@@ -361,7 +365,7 @@ export const usePromptInputAttachments = () => {
   const context = provider ?? local;
   if (!context) {
     throw new Error(
-      "usePromptInputAttachments must be used within a PromptInput or PromptInputProvider"
+      "usePromptInputAttachments must be used within a PromptInput or PromptInputProvider",
     );
   }
   return context;
@@ -393,7 +397,7 @@ export function PromptInputAttachment({
         <div
           className={cn(
             "group relative flex h-8 cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-            className
+            className,
           )}
           key={data.id}
           {...props}
@@ -542,7 +546,7 @@ export type PromptInputProps = Omit<
   }) => void;
   onSubmit: (
     message: PromptInputMessage,
-    event: FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>,
   ) => void | Promise<void>;
 };
 
@@ -598,7 +602,7 @@ export const PromptInput = ({
         return f.type === pattern;
       });
     },
-    [accept]
+    [accept],
   );
 
   const addLocal = useCallback(
@@ -649,7 +653,7 @@ export const PromptInput = ({
         return prev.concat(next);
       });
     },
-    [matchesAccept, maxFiles, maxFileSize, onError]
+    [matchesAccept, maxFiles, maxFileSize, onError],
   );
 
   const removeLocal = useCallback(
@@ -661,7 +665,7 @@ export const PromptInput = ({
         }
         return prev.filter((file) => file.id !== id);
       }),
-    []
+    [],
   );
 
   const clearLocal = useCallback(
@@ -674,7 +678,7 @@ export const PromptInput = ({
         }
         return [];
       }),
-    []
+    [],
   );
 
   const add = usingProvider ? controller.attachments.add : addLocal;
@@ -702,7 +706,7 @@ export const PromptInput = ({
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
-    if (globalDrop) return // when global drop is on, let the document-level handler own drops
+    if (globalDrop) return; // when global drop is on, let the document-level handler own drops
 
     const onDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes("Files")) {
@@ -757,8 +761,8 @@ export const PromptInput = ({
         }
       }
     },
-     
-    [usingProvider]
+
+    [usingProvider],
   );
 
   const handleChange: ChangeEventHandler<HTMLInputElement> = (event) => {
@@ -770,7 +774,7 @@ export const PromptInput = ({
   };
 
   const convertBlobUrlToDataUrl = async (
-    url: string
+    url: string,
   ): Promise<string | null> => {
     try {
       const response = await fetch(url);
@@ -795,7 +799,7 @@ export const PromptInput = ({
       openFileDialog,
       fileInputRef: inputRef,
     }),
-    [files, add, remove, clear, openFileDialog]
+    [files, add, remove, clear, openFileDialog],
   );
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = (event) => {
@@ -827,7 +831,7 @@ export const PromptInput = ({
           };
         }
         return item;
-      })
+      }),
     )
       .then((convertedFiles: FileUIPart[]) => {
         try {
@@ -964,13 +968,14 @@ export const PromptInputTextarea = ({
   const { activeMention, cursorCoords } = useMentionDetection(
     textareaRef,
     currentValue,
-    knowledgeFiles.length > 0
+    knowledgeFiles.length > 0,
   );
 
   // Use proper regex-based highlight segmentation that handles multi-word names
   const mentionHighlights = useMemo(
-    () => getMentionHighlightSegments(currentValue, activeMention, mentionLabels),
-    [currentValue, activeMention, mentionLabels]
+    () =>
+      getMentionHighlightSegments(currentValue, activeMention, mentionLabels),
+    [currentValue, activeMention, mentionLabels],
   );
 
   // Sync highlight overlay scroll with textarea
@@ -994,7 +999,7 @@ export const PromptInputTextarea = ({
       const currentText = controller.textInput.value;
       const beforeAt = currentText.substring(0, activeMention.triggerIndex);
       const afterQuery = currentText.substring(
-        activeMention.triggerIndex + 1 + activeMention.query.length
+        activeMention.triggerIndex + 1 + activeMention.query.length,
       );
 
       // Replace @query with @displayName followed by a space
@@ -1010,7 +1015,7 @@ export const PromptInputTextarea = ({
       // Focus back on textarea
       textareaRef.current?.focus();
     },
-    [controller, activeMention, mentionsCtx]
+    [controller, activeMention, mentionsCtx],
   );
 
   const handleMentionClose = useCallback(() => {
@@ -1041,7 +1046,7 @@ export const PromptInputTextarea = ({
       // Check if the submit button is disabled before submitting
       const form = e.currentTarget.form;
       const submitButton = form?.querySelector(
-        'button[type="submit"]'
+        'button[type="submit"]',
       ) as HTMLButtonElement | null;
       if (submitButton?.disabled) {
         return;
@@ -1069,17 +1074,21 @@ export const PromptInputTextarea = ({
               // Check if it's at word boundary (start of string or preceded by whitespace)
               if (startPos === 0 || /\s/.test(textValue[startPos - 1])) {
                 e.preventDefault();
-                const newText = textValue.substring(0, startPos) + textValue.substring(cursorPos);
+                const newText =
+                  textValue.substring(0, startPos) +
+                  textValue.substring(cursorPos);
                 if (controller) {
                   controller.textInput.setInput(newText);
                 } else {
                   // Fallback: directly set textarea value and trigger change
                   textarea.value = newText;
-                  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                  textarea.dispatchEvent(new Event("input", { bubbles: true }));
                 }
                 // Remove the mention from state
                 if (mentionsCtx) {
-                  const mentionToRemove = mentionsCtx.mentions.find(m => m.displayName === label);
+                  const mentionToRemove = mentionsCtx.mentions.find(
+                    (m) => m.displayName === label,
+                  );
                   if (mentionToRemove) {
                     mentionsCtx.removeMention(mentionToRemove.id);
                   }
@@ -1174,13 +1183,16 @@ export const PromptInputTextarea = ({
               </span>
             ) : (
               <span key={`text-${index}`}>{segment.text}</span>
-            )
+            ),
           )}
         </div>
       )}
       <InputGroupTextarea
         ref={textareaRef}
-        className={cn("relative z-10 !p-0 field-sizing-content max-h-48 min-h-10", className)}
+        className={cn(
+          "relative z-10 !p-0 field-sizing-content max-h-48 min-h-10",
+          className,
+        )}
         name="message"
         onCompositionEnd={() => setIsComposing(false)}
         onCompositionStart={() => setIsComposing(true)}
@@ -1418,7 +1430,7 @@ export const PromptInputSpeechButton = ({
 }: PromptInputSpeechButtonProps) => {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(
-    null
+    null,
   );
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -1498,7 +1510,7 @@ export const PromptInputSpeechButton = ({
       className={cn(
         "relative transition-all duration-200",
         isListening && "animate-pulse bg-accent text-accent-foreground",
-        className
+        className,
       )}
       disabled={!recognition}
       onClick={toggleListening}
@@ -1527,7 +1539,7 @@ export const PromptInputSelectTrigger = ({
     className={cn(
       "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
       "hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
-      className
+      className,
     )}
     {...props}
   />
@@ -1577,7 +1589,7 @@ export type PromptInputHoverCardTriggerProps = ComponentProps<
 >;
 
 export const PromptInputHoverCardTrigger = (
-  props: PromptInputHoverCardTriggerProps
+  props: PromptInputHoverCardTriggerProps,
 ) => <HoverCardTrigger {...props} />;
 
 export type PromptInputHoverCardContentProps = ComponentProps<
@@ -1614,7 +1626,7 @@ export const PromptInputTabLabel = ({
   <h3
     className={cn(
       "mb-2 px-3 font-medium text-muted-foreground text-xs",
-      className
+      className,
     )}
     {...props}
   />
@@ -1638,7 +1650,7 @@ export const PromptInputTabItem = ({
   <div
     className={cn(
       "flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent",
-      className
+      className,
     )}
     {...props}
   />

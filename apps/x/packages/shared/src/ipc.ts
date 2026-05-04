@@ -127,6 +127,12 @@ const ipcSchemas = {
     req: WorkspaceChangeEvent,
     res: z.null(),
   },
+  "vault:changed": {
+    req: z.object({
+      path: z.string(),
+    }),
+    res: z.null(),
+  },
   "mcp:listTools": {
     req: z.object({
       serverName: z.string(),
@@ -867,6 +873,11 @@ const ipcSchemas = {
       sanctionedCredits: z.number(),
       availableCredits: z.number(),
     }),
+  },
+  // App control channels
+  "app:restart": {
+    req: z.null(),
+    res: z.object({ ok: z.literal(true) }),
   },
   // Vault selection channels (similar to Obsidian's vault switcher)
   "vault:select": {

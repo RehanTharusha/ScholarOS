@@ -463,6 +463,13 @@ export function SidebarContentPanel({
       });
   }, []);
 
+  useEffect(() => {
+    const cleanup = window.ipc.on("vault:changed", (event) => {
+      setVaultPath(event.path);
+    });
+    return cleanup;
+  }, []);
+
   // Handle vault selection
   const handleVaultSelect = useCallback(async () => {
     try {
@@ -471,13 +478,9 @@ export function SidebarContentPanel({
       if (result.success && result.path) {
         setVaultPath(result.path);
         toast(
-          `Vault changed to: ${result.path.split(/[\\/]/).pop()}`,
+          `Vault changed to: ${result.path.split(/[\\/]/).pop()}.`,
           "success",
         );
-        // Reload the page to use the new vault
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
       }
     } catch (err) {
       console.error("Failed to select vault:", err);

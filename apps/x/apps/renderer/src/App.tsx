@@ -444,14 +444,7 @@ const normalizeUsage = (
 };
 
 // Sidebar folder ordering — listed folders appear in this order, unlisted ones follow alphabetically
-const FOLDER_ORDER = [
-  "People",
-  "Organizations",
-  "Projects",
-  "Topics",
-  "Agent Notes",
-  "Notes",
-];
+const FOLDER_ORDER = ["People", "Organizations", "Projects", "Topics"];
 
 /**
  * Per-folder base view config: which columns to show and default sort.
@@ -461,10 +454,6 @@ const FOLDER_BASE_CONFIGS: Record<
   string,
   { visibleColumns: string[]; sort: { field: string; dir: "asc" | "desc" } }
 > = {
-  "Agent Notes": {
-    visibleColumns: ["name", "folder", "mtimeMs"],
-    sort: { field: "mtimeMs", dir: "desc" },
-  },
   People: {
     visibleColumns: ["name", "relationship", "organization", "mtimeMs"],
     sort: { field: "name", dir: "asc" },
@@ -1345,56 +1334,55 @@ function App() {
     }
   }, [runId, processingRunIds]);
 
-  // Load directory tree (knowledge + bases)
+  // Load directory tree (entire vault)
   const loadDirectory = useCallback(async () => {
     try {
-      const [knowledgeResult, basesResult] = await Promise.all([
-        window.ipc.invoke("workspace:readdir", {
-          path: "knowledge",
-          opts: { recursive: true, includeHidden: false, includeStats: true },
-        }),
-        window.ipc
-          .invoke("workspace:readdir", {
-            path: "bases",
-            opts: {
-              recursive: false,
-              includeHidden: false,
-              includeStats: true,
-            },
-          })
-          .catch(() => [] as DirEntry[]),
-      ]);
-      const knowledgeTree = buildTree(knowledgeResult);
-      const basesChildren: TreeNode[] = (basesResult as DirEntry[])
-        .filter((e) => e.name.endsWith(".base"))
-        .map((e) => ({ ...e, kind: "file" as const }));
-      if (basesChildren.length > 0) {
-        const basesFolder: TreeNode = {
-          name: "Bases",
-          path: "bases",
-          kind: "dir",
-          children: basesChildren,
-        };
-        return [...knowledgeTree, basesFolder];
-      }
-      return knowledgeTree;
+      console.debug("[Renderer] loadDirectory: requesting root readdir");
+      const rootEntries = await window.ipc.invoke("workspace:readdir", {
+        path: "",
+        opts: { recursive: true, includeHidden: false, includeStats: true },
+      });
+      console.debug(
+        `[Renderer] loadDirectory: received ${rootEntries.length} root entries`,
+      );
+      return buildTree(rootEntries);
     } catch (err) {
       console.error("Failed to load directory:", err);
       return [];
     }
   }, []);
 
-  // Ensure bases/ and knowledge/Notes/ directories exist on startup
+  const resetWorkspaceState = useCallback(
+    (root: string) => {
+      setWorkspaceRoot(root);
+      setSelectedPath(null);
+      setTree([]);
+      setExpandedPaths(new Set());
+      setFileContent("");
+      setEditorContent("");
+      editorContentRef.current = "";
+      initialContentRef.current = "";
+      editorPathRef.current = null;
+      editorContentByPathRef.current.clear();
+      initialContentByPathRef.current.clear();
+      frontmatterByPathRef.current.clear();
+    },
+    [
+      setExpandedPaths,
+      setFileContent,
+      setEditorContent,
+      setSelectedPath,
+      setTree,
+      setWorkspaceRoot,
+    ],
+  );
+
+  // Ensure only shared app folders exist on startup
   useEffect(() => {
     window.ipc
       .invoke("workspace:mkdir", { path: "bases", recursive: true })
       .catch((err: unknown) =>
         console.error("Failed to ensure bases directory:", err),
-      );
-    window.ipc
-      .invoke("workspace:mkdir", { path: "knowledge/Notes", recursive: true })
-      .catch((err: unknown) =>
-        console.error("Failed to ensure Notes directory:", err),
       );
   }, []);
 
@@ -1402,6 +1390,21 @@ function App() {
   useEffect(() => {
     loadDirectory().then(setTree);
   }, [loadDirectory]);
+
+  // Refresh workspace state when vault changes
+  useEffect(() => {
+    const cleanup = window.ipc.on("vault:changed", async (event) => {
+      console.debug("[Renderer] vault:changed received ->", event.path);
+      resetWorkspaceState(event.path);
+      await window.ipc
+        .invoke("workspace:mkdir", { path: "bases", recursive: true })
+        .catch((err: unknown) =>
+          console.error("Failed to ensure bases directory:", err),
+        );
+      loadDirectory().then(setTree);
+    });
+    return cleanup;
+  }, [loadDirectory, resetWorkspaceState]);
 
   // Listen to workspace change events
   useEffect(() => {
@@ -4178,9 +4181,11 @@ function App() {
     setExpandedPaths(newExpanded);
   };
 
-  // Knowledge quick actions
+  // Knowledge quick actions (only consider files under knowledge/)
   const knowledgeFiles = React.useMemo(() => {
-    const files = collectFilePaths(tree).filter((path) => path.endsWith(".md"));
+    const files = collectFilePaths(tree).filter(
+      (path) => path.startsWith("knowledge/") && path.endsWith(".md"),
+    );
     return Array.from(new Set(files.map(stripKnowledgePrefix)));
   }, [tree]);
   const knowledgeFilePaths = React.useMemo(
@@ -4250,11 +4255,11 @@ function App() {
 
   const knowledgeActions = React.useMemo(
     () => ({
-      createNote: async (parentPath: string = "knowledge/Notes") => {
+      createNote: async (parentPath: string = "") => {
         try {
           let index = 0;
           let name = untitledBaseName;
-          let fullPath = `${parentPath}/${name}.md`;
+          let fullPath = parentPath ? `${parentPath}/${name}.md` : `${name}.md`;
           while (index < 1000) {
             const exists = await window.ipc.invoke("workspace:exists", {
               path: fullPath,
@@ -4262,7 +4267,7 @@ function App() {
             if (!exists.exists) break;
             index += 1;
             name = `${untitledBaseName}-${index}`;
-            fullPath = `${parentPath}/${name}.md`;
+            fullPath = parentPath ? `${parentPath}/${name}.md` : `${name}.md`;
           }
           await window.ipc.invoke("workspace:writeFile", {
             path: fullPath,
@@ -4275,10 +4280,14 @@ function App() {
           throw err;
         }
       },
-      createFolder: async (parentPath: string = "knowledge/Notes") => {
+      createFolder: async (parentPath: string = "") => {
         try {
+          const folderName = `new-folder-${Date.now()}`;
+          const folderPath = parentPath
+            ? `${parentPath}/${folderName}`
+            : folderName;
           await window.ipc.invoke("workspace:mkdir", {
-            path: `${parentPath}/new-folder-${Date.now()}`,
+            path: folderPath,
             recursive: true,
           });
         } catch (err) {

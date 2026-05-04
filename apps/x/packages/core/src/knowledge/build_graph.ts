@@ -39,14 +39,6 @@ const LEGACY_SUGGESTED_TOPICS_PATH = path.join(
   "config",
   "suggested-topics.md",
 );
-const LEGACY_SUGGESTED_TOPICS_KNOWLEDGE_REL_PATH =
-  "knowledge/Notes/Suggested Topics.md";
-const LEGACY_SUGGESTED_TOPICS_KNOWLEDGE_PATH = path.join(
-  WorkDir,
-  "knowledge",
-  "Notes",
-  "Suggested Topics.md",
-);
 
 // Configuration for the graph builder service
 const SYNC_INTERVAL_MS = 15 * 1000; // 15 seconds
@@ -125,10 +117,6 @@ function ensureSuggestedTopicsFileLocation(): string {
     {
       absPath: LEGACY_SUGGESTED_TOPICS_PATH,
       relPath: LEGACY_SUGGESTED_TOPICS_REL_PATH,
-    },
-    {
-      absPath: LEGACY_SUGGESTED_TOPICS_KNOWLEDGE_PATH,
-      relPath: LEGACY_SUGGESTED_TOPICS_KNOWLEDGE_REL_PATH,
     },
   ];
 

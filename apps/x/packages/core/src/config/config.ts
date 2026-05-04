@@ -27,6 +27,7 @@ function resolveWorkDir(): string {
         expandedPath = path.resolve(expandedPath);
         // Verify the path exists
         if (fs.existsSync(expandedPath)) {
+          console.log(`[Config] Using vault path: ${expandedPath}`);
           return expandedPath;
         } else {
           console.warn(
@@ -42,7 +43,9 @@ function resolveWorkDir(): string {
   // Fallback to environment variable or default
   const configured = process.env.ROWBOAT_WORKDIR;
   if (!configured) {
-    return path.join(homedir(), ".rowboat");
+    const defaultPath = path.join(homedir(), ".rowboat");
+    console.log(`[Config] Using default vault path: ${defaultPath}`);
+    return defaultPath;
   }
 
   const expanded =
@@ -52,13 +55,30 @@ function resolveWorkDir(): string {
         ? path.join(homedir(), configured.slice(2))
         : configured;
 
-  return path.resolve(expanded);
+  const resolvedPath = path.resolve(expanded);
+  console.log(`[Config] Using env-configured vault path: ${resolvedPath}`);
+  return resolvedPath;
 }
 
 // Resolve app root relative to compiled file location (dist/...)
 // Allow override via ROWBOAT_WORKDIR env var for standalone pipeline usage.
 // Normalize to an absolute path so workspace boundary checks behave consistently.
-export const WorkDir = resolveWorkDir();
+// Export WorkDir as a live binding so it can be refreshed at runtime when vault changes
+export let WorkDir = resolveWorkDir();
+
+/**
+ * Refresh WorkDir value by re-resolving vault config and ensuring directories exist
+ */
+export function refreshWorkDir(): void {
+  WorkDir = resolveWorkDir();
+  try {
+    ensureDirs();
+    ensureDefaultConfigs();
+  } catch (err) {
+    console.error("[Config] Failed to ensure dirs after refresh:", err);
+  }
+  console.log(`[Config] WorkDir refreshed: ${WorkDir}`);
+}
 
 /**
  * Save the selected vault path to config.

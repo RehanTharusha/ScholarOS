@@ -21,7 +21,7 @@ const EMAIL_BATCH_SIZE = 5;
 const RUNS_BATCH_SIZE = 5;
 const GMAIL_SYNC_DIR = path.join(WorkDir, "gmail_sync");
 const RUNS_DIR = path.join(WorkDir, "runs");
-const AGENT_NOTES_DIR = path.join(WorkDir, "knowledge", "Agent Notes");
+const AGENT_NOTES_DIR = path.join(WorkDir, "agent-notes");
 const INBOX_FILE = path.join(AGENT_NOTES_DIR, "inbox.md");
 const AGENT_ID = "agent_notes_agent";
 
@@ -360,21 +360,5 @@ async function processAgentNotes(): Promise<void> {
 // --- Entry point ---
 
 export async function init() {
-  console.log("[AgentNotes] Starting Agent Notes Service...");
-  console.log(
-    `[AgentNotes] Will process every ${SYNC_INTERVAL_MS / 1000} seconds`,
-  );
-
-  // Initial run
-  await processAgentNotes();
-
-  // Periodic polling
-  while (true) {
-    await new Promise((resolve) => setTimeout(resolve, SYNC_INTERVAL_MS));
-    try {
-      await processAgentNotes();
-    } catch (error) {
-      console.error("[AgentNotes] Error in main loop:", error);
-    }
-  }
+  console.log("[AgentNotes] Service disabled in student vault mode");
 }

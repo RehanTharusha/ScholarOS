@@ -53,76 +53,10 @@ import { getRaw as getNoteCreationRaw } from "../knowledge/note_creation.js";
 import { getRaw as getLabelingAgentRaw } from "../knowledge/note_tagging_agent.js";
 import { getRaw as getNoteTaggingAgentRaw } from "../knowledge/note_tagging_agent.js";
 import { getRaw as getInlineTaskAgentRaw } from "../knowledge/inline_task_agent.js";
-import { getRaw as getAgentNotesAgentRaw } from "../knowledge/agent_notes_agent.js";
 import { shouldDisableTools } from "../config/config.js";
 
-const AGENT_NOTES_DIR = path.join(WorkDir, "knowledge", "Agent Notes");
-
 function loadAgentNotesContext(): string | null {
-  const sections: string[] = [];
-
-  const userFile = path.join(AGENT_NOTES_DIR, "user.md");
-  const prefsFile = path.join(AGENT_NOTES_DIR, "preferences.md");
-
-  try {
-    if (fs.existsSync(userFile)) {
-      const content = fs.readFileSync(userFile, "utf-8").trim();
-      if (content) {
-        sections.push(
-          `## About the User\nThese are notes you took about the user in previous chats.\n\n${content}`,
-        );
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-
-  try {
-    if (fs.existsSync(prefsFile)) {
-      const content = fs.readFileSync(prefsFile, "utf-8").trim();
-      if (content) {
-        sections.push(
-          `## User Preferences\nThese are notes you took on their general preferences.\n\n${content}`,
-        );
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-
-  // List other Agent Notes files for on-demand access
-  const otherFiles: string[] = [];
-  const skipFiles = new Set(["user.md", "preferences.md", "inbox.md"]);
-  try {
-    if (fs.existsSync(AGENT_NOTES_DIR)) {
-      function listMdFiles(dir: string, prefix: string) {
-        for (const entry of fs.readdirSync(dir)) {
-          const fullPath = path.join(dir, entry);
-          const stat = fs.statSync(fullPath);
-          if (stat.isDirectory()) {
-            listMdFiles(fullPath, `${prefix}${entry}/`);
-          } else if (
-            entry.endsWith(".md") &&
-            !skipFiles.has(`${prefix}${entry}`)
-          ) {
-            otherFiles.push(`${prefix}${entry}`);
-          }
-        }
-      }
-      listMdFiles(AGENT_NOTES_DIR, "");
-    }
-  } catch {
-    /* ignore */
-  }
-
-  if (otherFiles.length > 0) {
-    sections.push(
-      `## More Specific Preferences\nFor more specific preferences, you can read these files using workspace-readFile. Only read them when relevant to the current task.\n\n${otherFiles.map((f) => `- knowledge/Agent Notes/${f}`).join("\n")}`,
-    );
-  }
-
-  if (sections.length === 0) return null;
-  return `# Agent Memory\n\n${sections.join("\n\n")}`;
+  return null;
 }
 
 export interface IAgentRuntime {
@@ -537,33 +471,6 @@ export async function loadAgent(id: string): Promise<z.infer<typeof Agent>> {
       if (end !== -1) {
         const fm = inlineTaskAgentRaw.slice(3, end).trim();
         const content = inlineTaskAgentRaw.slice(end + 4).trim();
-        const yaml = parse(fm);
-        const parsed = Agent.omit({ name: true, instructions: true }).parse(
-          yaml,
-        );
-        agent = {
-          ...agent,
-          ...parsed,
-          instructions: content,
-        };
-      }
-    }
-
-    return agent;
-  }
-
-  if (id === "agent_notes_agent") {
-    const agentNotesAgentRaw = getAgentNotesAgentRaw();
-    let agent: z.infer<typeof Agent> = {
-      name: id,
-      instructions: agentNotesAgentRaw,
-    };
-
-    if (agentNotesAgentRaw.startsWith("---")) {
-      const end = agentNotesAgentRaw.indexOf("\n---", 3);
-      if (end !== -1) {
-        const fm = agentNotesAgentRaw.slice(3, end).trim();
-        const content = agentNotesAgentRaw.slice(end + 4).trim();
         const yaml = parse(fm);
         const parsed = Agent.omit({ name: true, instructions: true }).parse(
           yaml,
