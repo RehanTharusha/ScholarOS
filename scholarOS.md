@@ -69,9 +69,18 @@ Because it's plain Markdown, the wiki is also a git repository. You get version 
 
 When you need to present, ScholarOS can turn a directory of wiki pages into a natively editable `.pptx` file. The agent analyzes your notes, proposes a slide-by-slide narrative strategy, and then builds the deck using DrawingML — not images, not PDFs. The output is a real PowerPoint file you can edit in any presentation tool.
 
-### 🃏 Flashcard Scheduling with FSRS
+### 🃏 Intelligent Flashcard System with FSRS
 
-When new concepts are added to the wiki, ScholarOS can automatically generate flashcards scheduled with the FSRS v6 algorithm — the current state of the art in spaced repetition. Cards are stored in a local SQLite database or sidecar files, keeping your Markdown notes clean. Review the cards directly from your vault or export them to Anki.
+When new concepts are added to the wiki, ScholarOS automatically generates flashcards scheduled with the FSRS v6 algorithm — the current state of the art in spaced repetition. Cards are stored in per-course JSON files (`knowledge/courses/<course-name>/flashcards.json`), keeping your Markdown notes clean while maintaining tight links with your concepts.
+
+Each flashcard includes structured metadata:
+
+- **Tags:** definition, application, comparison, synthesis
+- **Source references:** links to the concept pages and ingested materials that generated the card
+- **Notes:** context, examples, and mnemonic aids
+- **Interconnections:** cards link directly to related wiki concepts
+
+Review cards directly from your vault, or export them to Anki for mobile study.
 
 ### 📄 PDF Annotation, Directly into the Wiki
 
@@ -80,6 +89,51 @@ Highlight passages in any PDF using the built-in annotation library. Highlighted
 ### 📋 Semester Task Management
 
 A high-performance kanban board — built with virtual scrolling so it handles hundreds of tasks without slowing down — lets you track assignments, deadlines, and project milestones across courses. Tasks link to relevant wiki pages, so your to-do list is connected to your knowledge base.
+
+### 🔄 Live Learning Tracks
+
+Keep study material automatically updated with _Tracks_ — live note blocks that refresh on a schedule or when triggered. Use this to maintain dynamic content without manual editing:
+
+- **Scheduled tracking:** "Show research papers on quantum computing, updated weekly"
+- **Problem set tracking:** "Track new problems from the problem set"
+- **Resource collections:** "Keep a list of relevant YouTube lectures, refresh daily"
+- **Reading lists:** "Update the assigned readings for next week"
+
+Track blocks live inside your concept pages and refresh on your schedule. Your notes stay fresh without constant manual maintenance.
+
+### 🌐 Embedded Browser with Web Integration
+
+Browse the web directly within ScholarOS while working on your notes. The embedded browser:
+
+- Opens websites without leaving the app
+- Indexes live pages for reference and annotation
+- Interacts with web content directly within your workflow
+- Integrates results back into your wiki
+
+Perfect for comparing multiple sources, reading current research, or exploring supplementary materials while taking notes.
+
+### 📝 Real-Time Document Collaboration
+
+Work on documents directly in ScholarOS using BlockNote, a Notion-style block editor with collaborative features:
+
+- Create and edit study notes with rich formatting
+- Collaborate in real-time on shared documents (via Yjs)
+- Organize notes with blocks, embeds, and links
+- Sync edits directly into the wiki
+
+Use this when crafting concept summaries, writing study guides, or collaborating with study partners.
+
+### 🎬 Interactive App Navigation
+
+Control the ScholarOS UI programmatically to navigate your knowledge base:
+
+- Open specific concept pages, course indexes, or assignment lists
+- Switch between graph view, list view, and search
+- Filter notes by course, date, or source
+- Manage and switch between saved views
+- Create custom reading lists and study paths
+
+Combine with the agent's guidance for efficient knowledge exploration.
 
 ---
 
@@ -98,14 +152,16 @@ A high-performance kanban board — built with virtual scrolling so it handles h
 ├── /knowledge            # LLM-generated and maintained Markdown (the wiki)
 │   ├── /courses          # Per-course folders containing all course materials
 │   │   ├── /Biology 101
-│   │   │   ├── index.md          # Course overview page
-│   │   │   ├── /concepts        # Subject matter pages for this course
+│   │   │   ├── index.md              # Course overview page
+│   │   │   ├── flashcards.json       # Course flashcards with FSRS metadata
+│   │   │   ├── /concepts             # Subject matter pages for this course
 │   │   │   │   ├── Photosynthesis.md
 │   │   │   │   └── Cell Respiration.md
-│   │   │   ├── /lectures        # Lecture notes and slides
-│   │   │   └── /assignments     # Assignments and grading
+│   │   │   ├── /lectures             # Lecture notes and slides
+│   │   │   └── /assignments          # Assignments and grading
 │   │   └── /CS 201
 │   │       ├── index.md
+│   │       ├── flashcards.json
 │   │       └── /concepts
 │   ├── /papers           # Academic papers, research articles (cross-course)
 │   ├── /syntheses        # Comparison tables, cross-source summaries
@@ -176,7 +232,36 @@ The agent will suggest new sources to find and new questions to investigate.
 
 ---
 
-## Agent Rules (`CLAUDE.md`)
+## Skills & Extensibility
+
+ScholarOS is built on a modular **skill system**. Each major workflow loads a specialized skill that provides structured guidance and tool access. Skills include:
+
+| Skill                  | Purpose                                                                  |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `create-presentations` | Generate native `.pptx` slide decks from concept pages                   |
+| `doc-collab`           | Create and edit documents with BlockNote collaborative editor            |
+| `app-navigation`       | Control the UI: open views, filter notes, manage saved searches          |
+| `browser-control`      | Interact with the embedded browser: navigate sites, index pages          |
+| `tracks`               | Create and manage live learning blocks that refresh on schedule          |
+| `composio-integration` | Connect third-party services (GitHub, Gmail, Slack, etc.)                |
+| `mcp-integration`      | Access web search, file scraping, audio tools via Model Context Protocol |
+
+You don't memorize command syntax — when you ask for a feature, the agent loads the appropriate skill and handles the workflow.
+
+---
+
+## Persistent User Memory
+
+ScholarOS learns from every conversation. The system maintains a persistent profile of:
+
+- Your study preferences (bullet points vs. prose, formal vs. casual tone, preferred explanation style)
+- Your learning patterns (morning vs. evening study, preferred subjects, pace of learning)
+- Relationships and context (study group members, your role in group projects, instructor names)
+- Workflow patterns and shortcuts (which tools you use most, typical task sequences)
+
+The agent proactively saves observations from your interactions—no opt-in needed. This profile compounds over time, so every session gets slightly smarter about how to serve you.
+
+---
 
 The `CLAUDE.md` file in `/meta` is the schema that governs how the agent operates on your vault. Default rules:
 
