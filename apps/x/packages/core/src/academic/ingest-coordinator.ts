@@ -119,13 +119,24 @@ export class IngestCoordinator {
 
     // Use LLM to suggest concepts from all extracted PDFs
     for (const result of extractResults.filter((r) => r.success)) {
+      const chunks = result.metadata.chunks ?? [];
+      const chunkPreview =
+        chunks.length > 0
+          ? chunks
+              .slice(0, 4)
+              .map((chunk, index) => `Chunk ${index + 1}:\n${chunk}`)
+              .join("\n\n")
+          : result.metadata.extractedText.substring(0, 1200);
+
       const conceptPrompt = `
 You are analyzing academic material for concept extraction.
 
 Material: ${result.metadata.title || result.metadata.filename}
 Authors: ${(result.metadata.authors || []).join(", ")}
-Content preview (first 500 chars):
-${result.metadata.extractedText.substring(0, 500)}
+Content preview:
+${chunkPreview}
+
+Chunk count: ${chunks.length}
 
 Suggest 3-5 key concepts to create wiki pages for, along with:
 - Title

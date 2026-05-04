@@ -580,6 +580,10 @@ type WikiLinkMatch = {
 
 type SelectionHighlightRange = { from: number; to: number } | null;
 
+type MarkdownStorage = {
+  getMarkdown?: () => string;
+};
+
 // Plugin key for the selection highlight
 const selectionHighlightKey = new PluginKey("selectionHighlight");
 
@@ -688,7 +692,6 @@ export const MarkdownEditor = forwardRef<
   } | null>(null);
   const [selectionHighlight, setSelectionHighlight] =
     useState<SelectionHighlightRange>(null);
-  const selectionHighlightRef = useRef<SelectionHighlightRange>(null);
   const [wikiCommandValue, setWikiCommandValue] = useState<string>("");
   const onPrimaryHeadingCommitRef = useRef(onPrimaryHeadingCommit);
   const wikiKeyStateRef = useRef<{
@@ -725,14 +728,10 @@ export const MarkdownEditor = forwardRef<
   }>({ open: false, options: [], value: "" });
   const handleSelectAtMentionRef = useRef<(value: string) => void>(() => {});
 
-  // Keep ref in sync with state for the plugin to access
-  selectionHighlightRef.current = selectionHighlight;
-
   // Memoize the selection highlight extension
   const selectionHighlightExtension = useMemo(
-    () =>
-      createSelectionHighlightExtension(() => selectionHighlightRef.current),
-    [],
+    () => createSelectionHighlightExtension(() => selectionHighlight),
+    [selectionHighlight],
   );
 
   useEffect(() => {
@@ -847,8 +846,6 @@ export const MarkdownEditor = forwardRef<
         IframeBlockExtension,
         ChartBlockExtension,
         TableBlockExtension,
-        CalendarBlockExtension,
-        EmailBlockExtension,
         TranscriptBlockExtension,
         MermaidBlockExtension,
         WikiLink.configure({
@@ -1160,7 +1157,7 @@ export const MarkdownEditor = forwardRef<
       left: pmRect ? pmRect.left - wrapperRect.left : 0,
       width: pmRect ? pmRect.width : wrapperRect.width,
     });
-  }, [editor]);
+  }, [editor, setActiveRowboatMention, setRowboatAnchorTop]);
 
   // Detect @ trigger for autocomplete popover (similar to [[ detection)
   const updateAtMentionState = useCallback(() => {
@@ -1231,7 +1228,7 @@ export const MarkdownEditor = forwardRef<
       left: coords.left - wrapperRect.left,
       top: coords.bottom - wrapperRect.top,
     });
-  }, [editor]);
+  }, [editor, setActiveAtMention, setAtAnchorPosition]);
 
   useEffect(() => {
     if (!editor || !wikiLinks) return;
@@ -1448,9 +1445,10 @@ export const MarkdownEditor = forwardRef<
         setRowboatAnchorTop(null);
 
         // Get editor content for the agent
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const editorContent =
-          (editor.storage as any).markdown?.getMarkdown?.() ?? "";
+          (
+            editor.storage as { markdown?: MarkdownStorage }
+          ).markdown?.getMarkdown?.() ?? "";
 
         // Helper to find the processing block
         const findProcessingBlock = (): number | null => {
@@ -1610,7 +1608,7 @@ export const MarkdownEditor = forwardRef<
     setRowboatBlockEdit(null);
     rowboatBlockEditRef.current = null;
     setRowboatAnchorTop(null);
-  }, [editor, rowboatBlockEdit]);
+  }, [editor, rowboatBlockEdit, setRowboatAnchorTop, setRowboatBlockEdit]);
 
   const handleScroll = useCallback(() => {
     updateWikiLinkState();
@@ -1628,28 +1626,17 @@ export const MarkdownEditor = forwardRef<
     return options;
   }, [showWikiPopover, canCreate, createCandidate, visibleFiles]);
 
+  const wikiCommandValueForPopover = showWikiPopover
+    ? wikiCommandValue || wikiOptions[0] || ""
+    : "";
+
   useEffect(() => {
     wikiKeyStateRef.current = {
       open: showWikiPopover,
       options: wikiOptions,
-      value: wikiCommandValue,
+      value: wikiCommandValueForPopover,
     };
-  }, [showWikiPopover, wikiOptions, wikiCommandValue]);
-
-  // Keep cmdk selection in sync with available options
-  useEffect(() => {
-    if (!showWikiPopover) {
-      setWikiCommandValue("");
-      return;
-    }
-    if (wikiOptions.length === 0) {
-      setWikiCommandValue("");
-      return;
-    }
-    setWikiCommandValue((prev) =>
-      wikiOptions.includes(prev) ? prev : wikiOptions[0],
-    );
-  }, [showWikiPopover, wikiOptions]);
+  }, [showWikiPopover, wikiOptions, wikiCommandValueForPopover]);
 
   // @ mention autocomplete options
   const atMentionOptions = useMemo(
@@ -1680,28 +1667,17 @@ export const MarkdownEditor = forwardRef<
     activeAtMention && atAnchorPosition && filteredAtOptions.length > 0,
   );
 
+  const atCommandValueForPopover = showAtPopover
+    ? atCommandValue || atOptionValues[0] || ""
+    : "";
+
   useEffect(() => {
     atKeyStateRef.current = {
       open: showAtPopover,
       options: atOptionValues,
-      value: atCommandValue,
+      value: atCommandValueForPopover,
     };
-  }, [showAtPopover, atOptionValues, atCommandValue]);
-
-  // Keep @ cmdk selection in sync
-  useEffect(() => {
-    if (!showAtPopover) {
-      setAtCommandValue("");
-      return;
-    }
-    if (atOptionValues.length === 0) {
-      setAtCommandValue("");
-      return;
-    }
-    setAtCommandValue((prev) =>
-      atOptionValues.includes(prev) ? prev : atOptionValues[0],
-    );
-  }, [showAtPopover, atOptionValues]);
+  }, [showAtPopover, atOptionValues, atCommandValueForPopover]);
 
   // @ mention selection handler
   const handleSelectAtMention = useCallback(
@@ -1724,7 +1700,13 @@ export const MarkdownEditor = forwardRef<
       setAtAnchorPosition(null);
       setAtCommandValue("");
     },
-    [editor, activeAtMention],
+    [
+      editor,
+      activeAtMention,
+      setActiveAtMention,
+      setAtAnchorPosition,
+      setAtCommandValue,
+    ],
   );
 
   useEffect(() => {
@@ -1796,7 +1778,7 @@ export const MarkdownEditor = forwardRef<
             >
               <Command
                 shouldFilter={false}
-                value={wikiCommandValue}
+                value={wikiCommandValueForPopover}
                 onValueChange={setWikiCommandValue}
               >
                 <CommandList>
@@ -1854,7 +1836,7 @@ export const MarkdownEditor = forwardRef<
           >
             <Command
               shouldFilter={false}
-              value={atCommandValue}
+              value={atCommandValueForPopover}
               onValueChange={setAtCommandValue}
             >
               <CommandList>

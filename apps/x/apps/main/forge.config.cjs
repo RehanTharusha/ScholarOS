@@ -171,20 +171,39 @@ module.exports = {
       fs.mkdirSync(rendererDest, { recursive: true });
       fs.cpSync(rendererSrc, rendererDest, { recursive: true });
 
-      // Copy pdf.worker.mjs to renderer dist in staging
+      // Copy pdf worker assets into staging for local PDF parsing.
       console.log("Copying pdf.worker.mjs...");
-      const pdfWorkerSrc = path.join(
-        __dirname,
-        "../renderer/node_modules/react-pdf/dist/pdf.worker.min.mjs",
+      const pdfParseWorker = (() => {
+        try {
+          return path.join(
+            path.dirname(require.resolve("pdf-parse/package.json")),
+            "dist/worker/pdf.worker.mjs",
+          );
+        } catch (error) {
+          console.warn("Failed to resolve pdf-parse worker:", error.message);
+          return null;
+        }
+      })();
+      const pdfWorkerCandidates = [
+        pdfParseWorker,
+        path.join(
+          __dirname,
+          "../renderer/node_modules/react-pdf/dist/pdf.worker.min.mjs",
+        ),
+        path.join(__dirname, "../renderer/dist/pdf.worker.min.mjs"),
+      ].filter(Boolean);
+      const pdfWorkerSrc = pdfWorkerCandidates.find((candidate) =>
+        fs.existsSync(candidate),
       );
       const pdfWorkerDest = path.join(rendererDest, "pdf.worker.min.mjs");
-      if (fs.existsSync(pdfWorkerSrc)) {
+      if (pdfWorkerSrc) {
         fs.copyFileSync(pdfWorkerSrc, pdfWorkerDest);
-        // Also copy a worker into the package root as `pdf.worker.mjs` because
-        // bundled main.cjs expects `./pdf.worker.mjs` at the package root.
         const packageRootPdf = path.join(packageDir, "pdf.worker.mjs");
+        const packageDistPdf = path.join(packageDir, "dist", "pdf.worker.mjs");
         try {
           fs.copyFileSync(pdfWorkerSrc, packageRootPdf);
+          fs.mkdirSync(path.dirname(packageDistPdf), { recursive: true });
+          fs.copyFileSync(pdfWorkerSrc, packageDistPdf);
         } catch (e) {
           console.warn("Failed to copy pdf worker to package root:", e.message);
         }

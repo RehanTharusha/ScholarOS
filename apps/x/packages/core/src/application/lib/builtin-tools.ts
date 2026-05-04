@@ -1,11 +1,12 @@
 import { z, ZodType } from "zod";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { createReadStream } from "fs";
+import { createReadStream, existsSync } from "fs";
 import { createInterface } from "readline";
 import { execSync } from "child_process";
-import { homedir } from "os";
+import { homedir, tmpdir } from "os";
 import { glob } from "glob";
+import { fileURLToPath, pathToFileURL } from "url";
 import { executeCommand, executeCommandAbortable } from "./command-executor.js";
 import { resolveSkill, availableSkills } from "../assistant/skills/index.js";
 import { executeTool, listServers, listTools } from "../../mcp/mcp.js";
@@ -89,6 +90,206 @@ const LLMPARSE_MIME_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".bmp": "image/bmp",
   ".tiff": "image/tiff",
+};
+
+const builtinToolsDir = path.dirname(fileURLToPath(import.meta.url));
+
+const resolvePdfWorkerSrc = (): string | undefined => {
+  const candidates = [
+    path.join(builtinToolsDir, "pdf.worker.mjs"),
+    path.join(builtinToolsDir, "pdf.worker.min.mjs"),
+    path.join(process.cwd(), "pdf.worker.mjs"),
+    path.join(process.cwd(), "dist", "pdf.worker.mjs"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return pathToFileURL(candidate).href;
+    }
+  }
+
+  return undefined;
+};
+
+const PDF_CHUNK_TARGET = 1400;
+const PDF_CHUNK_OVERLAP = 180;
+
+const splitPdfTextIntoChunks = (text: string): string[] => {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  const chunks: string[] = [];
+  let current = "";
+
+  const pushCurrent = () => {
+    const cleaned = current.trim();
+    if (cleaned) {
+      chunks.push(cleaned);
+    }
+    current = "";
+  };
+
+  for (const paragraph of paragraphs) {
+    if (!current) {
+      current = paragraph;
+      continue;
+    }
+
+    if (current.length + paragraph.length + 2 <= PDF_CHUNK_TARGET) {
+      current += `\n\n${paragraph}`;
+      continue;
+    }
+
+    pushCurrent();
+
+    if (paragraph.length <= PDF_CHUNK_TARGET) {
+      current = paragraph;
+      continue;
+    }
+
+    const sentences = paragraph.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [paragraph];
+    let sentenceBuffer = "";
+
+    for (const sentence of sentences) {
+      const trimmedSentence = sentence.trim();
+      if (!trimmedSentence) continue;
+
+      if (!sentenceBuffer) {
+        sentenceBuffer = trimmedSentence;
+        continue;
+      }
+
+      if (
+        sentenceBuffer.length + trimmedSentence.length + 1 <=
+        PDF_CHUNK_TARGET
+      ) {
+        sentenceBuffer += ` ${trimmedSentence}`;
+      } else {
+        chunks.push(sentenceBuffer);
+        const overlapTail = sentenceBuffer
+          .slice(Math.max(0, sentenceBuffer.length - PDF_CHUNK_OVERLAP))
+          .trim();
+        sentenceBuffer = overlapTail
+          ? `${overlapTail} ${trimmedSentence}`
+          : trimmedSentence;
+      }
+    }
+
+    current = sentenceBuffer;
+  }
+
+  pushCurrent();
+
+  return chunks;
+};
+
+const shellQuote = (value: string): string =>
+  `'${value.replace(/'/g, `'"'"'`)}'`;
+
+const commandExists = (command: string): boolean => {
+  try {
+    execSync(`command -v ${shellQuote(command)}`, {
+      stdio: "pipe",
+      shell: "/bin/sh",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const runShellCommand = (command: string): string | undefined => {
+  try {
+    return execSync(command, {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: "/bin/sh",
+      maxBuffer: 20 * 1024 * 1024,
+    }).toString("utf8");
+  } catch {
+    return undefined;
+  }
+};
+
+const isLowTextPdf = (text: string, pages: number): boolean => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const threshold = Math.max(400, pages * 120);
+  return normalized.length < threshold;
+};
+
+const extractPdfTextWithPdftotext = async (
+  filePath: string,
+): Promise<string | undefined> => {
+  if (!commandExists("pdftotext")) {
+    return undefined;
+  }
+
+  const output = runShellCommand(
+    `pdftotext -layout -enc UTF-8 -q ${shellQuote(filePath)} -`,
+  );
+
+  const cleaned = output?.trim();
+  return cleaned ? cleaned : undefined;
+};
+
+const extractPdfTextWithOcrmypdf = async (
+  filePath: string,
+): Promise<{ text: string; pages: number } | undefined> => {
+  if (!commandExists("ocrmypdf")) {
+    return undefined;
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-pdf-"));
+  const outputPdf = path.join(tempDir, "ocr.pdf");
+
+  try {
+    const result = runShellCommand(
+      `ocrmypdf --skip-text --quiet --output-type pdf ${shellQuote(filePath)} ${shellQuote(outputPdf)}`,
+    );
+
+    if (result === undefined) {
+      return undefined;
+    }
+
+    const outputExists = await fs
+      .access(outputPdf)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!outputExists) {
+      return undefined;
+    }
+
+    const ocrBuffer = await fs.readFile(outputPdf);
+    const pdfWorkerSrc = resolvePdfWorkerSrc();
+    if (pdfWorkerSrc) {
+      PDFParse.setWorker(pdfWorkerSrc);
+    }
+
+    const parser = new PDFParse({ data: new Uint8Array(ocrBuffer) });
+    try {
+      const textResult = await parser.getText();
+      const cleaned = textResult.text.replace(/\s+/g, " ").trim();
+      if (!cleaned) {
+        return undefined;
+      }
+
+      return {
+        text: textResult.text,
+        pages: textResult.total,
+      };
+    } finally {
+      await parser.destroy();
+    }
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 };
 
 export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
@@ -824,19 +1025,90 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         if (ext === ".pdf") {
+          const pdfWorkerSrc = resolvePdfWorkerSrc();
+          if (pdfWorkerSrc) {
+            PDFParse.setWorker(pdfWorkerSrc);
+          }
+
           const parser = new PDFParse({ data: new Uint8Array(buffer) });
           try {
-            const textResult = await parser.getText();
-            const infoResult = await parser.getInfo();
+            const [textResult, infoResult] = await Promise.all([
+              parser.getText(),
+              parser.getInfo().catch(() => undefined),
+            ]);
+
+            if (!isLowTextPdf(textResult.text, textResult.total)) {
+              const chunks = splitPdfTextIntoChunks(textResult.text);
+              return {
+                success: true,
+                fileName,
+                format: "pdf",
+                content: textResult.text,
+                chunks,
+                metadata: {
+                  pages: textResult.total,
+                  title: infoResult?.info?.Title || undefined,
+                  author: infoResult?.info?.Author || undefined,
+                  chunkCount: chunks.length,
+                  chunkTarget: PDF_CHUNK_TARGET,
+                },
+              };
+            }
+
+            const pdftotext = await extractPdfTextWithPdftotext(filePath);
+            if (pdftotext && !isLowTextPdf(pdftotext, textResult.total)) {
+              const chunks = splitPdfTextIntoChunks(pdftotext);
+              return {
+                success: true,
+                fileName,
+                format: "pdf",
+                content: pdftotext,
+                chunks,
+                metadata: {
+                  pages: textResult.total,
+                  title: infoResult?.info?.Title || undefined,
+                  author: infoResult?.info?.Author || undefined,
+                  chunkCount: chunks.length,
+                  chunkTarget: PDF_CHUNK_TARGET,
+                },
+              };
+            }
+
+            const ocrResult = await extractPdfTextWithOcrmypdf(filePath);
+            if (ocrResult) {
+              const chunks = splitPdfTextIntoChunks(ocrResult.text);
+              return {
+                success: true,
+                fileName,
+                format: "pdf",
+                content: ocrResult.text,
+                chunks,
+                metadata: {
+                  pages: ocrResult.pages || textResult.total,
+                  title: infoResult?.info?.Title || undefined,
+                  author: infoResult?.info?.Author || undefined,
+                  fallback: "ocrmypdf",
+                  chunkCount: chunks.length,
+                  chunkTarget: PDF_CHUNK_TARGET,
+                },
+              };
+            }
+
+            const chunks = splitPdfTextIntoChunks(textResult.text);
+
             return {
               success: true,
               fileName,
               format: "pdf",
               content: textResult.text,
+              chunks,
               metadata: {
                 pages: textResult.total,
-                title: infoResult.info?.Title || undefined,
-                author: infoResult.info?.Author || undefined,
+                title: infoResult?.info?.Title || undefined,
+                author: infoResult?.info?.Author || undefined,
+                fallback: "low-text",
+                chunkCount: chunks.length,
+                chunkTarget: PDF_CHUNK_TARGET,
               },
             };
           } finally {
@@ -905,7 +1177,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
 
   LLMParse: {
     description:
-      "Send a file to the configured LLM as a multimodal attachment and ask it to extract content as markdown. Best for scanned PDFs, images with text, complex layouts, or any format where local parsing falls short. Supports documents (PDF, Word, Excel, PowerPoint, CSV, TXT, HTML) and images (PNG, JPG, GIF, WebP, SVG, BMP, TIFF).",
+      "Disabled by default. Use parseFile with local fallbacks for PDF ingestion. Enable only with ENABLE_LLM_PARSE=1 for rare, explicit multimodal extraction needs.",
     inputSchema: z.object({
       path: z
         .string()
@@ -928,6 +1200,14 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       prompt?: string;
     }) => {
       try {
+        if (process.env.ENABLE_LLM_PARSE !== "1") {
+          return {
+            success: false,
+            error:
+              "LLMParse is disabled. Use parseFile or set ENABLE_LLM_PARSE=1.",
+          };
+        }
+
         const fileName = path.basename(filePath);
         const ext = path.extname(filePath).toLowerCase();
         const mimeType = LLMPARSE_MIME_TYPES[ext];

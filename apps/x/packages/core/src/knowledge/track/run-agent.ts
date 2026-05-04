@@ -1,7 +1,7 @@
-import z from 'zod';
-import { Agent, ToolAttachment } from '@x/shared/dist/agent.js';
-import { BuiltinTools } from '../../application/lib/builtin-tools.js';
-import { WorkDir } from '../../config/config.js';
+import z from "zod";
+import { Agent, ToolAttachment } from "@x/shared/dist/agent.js";
+import { BuiltinTools } from "../../application/lib/builtin-tools.js";
+import { WorkDir } from "../../config/config.js";
 
 const TRACK_RUN_INSTRUCTIONS = `You are a track block runner — a background agent that keeps a live section of a user's personal knowledge note up to date.
 
@@ -301,16 +301,16 @@ Avoid: "I updated the track.", "Done!", "Here is the update:". The summary is a 
 `;
 
 export function buildTrackRunAgent(): z.infer<typeof Agent> {
-    const tools: Record<string, z.infer<typeof ToolAttachment>> = {};
-    for (const name of Object.keys(BuiltinTools)) {
-        if (name === 'executeCommand') continue;
-        tools[name] = { type: 'builtin', name };
-    }
+  const tools: Record<string, z.infer<typeof ToolAttachment>> = {};
+  for (const name of Object.keys(BuiltinTools)) {
+    if (name === "executeCommand") continue;
+    tools[name] = { type: "builtin", name };
+  }
 
-    return {
-        name: 'track-run',
-        description: 'Background agent that updates track block content',
-        instructions: TRACK_RUN_INSTRUCTIONS,
-        tools,
-    };
+  return {
+    name: "track-run",
+    description: "Background agent that updates track block content",
+    instructions: TRACK_RUN_INSTRUCTIONS,
+    tools,
+  };
 }

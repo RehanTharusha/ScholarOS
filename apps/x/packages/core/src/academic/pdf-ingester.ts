@@ -4,8 +4,13 @@
  */
 
 import { promises as fs } from "fs";
+import { existsSync } from "fs";
+import { execSync } from "child_process";
 import path from "path";
+import { tmpdir } from "os";
 import { PDFParse } from "pdf-parse";
+import { fileURLToPath, pathToFileURL } from "url";
+import { PdfEmbeddingStore, embedPdfChunks } from "./pdf-embeddings.js";
 
 interface LlmAgent {
   generate(prompt: string): Promise<{ text: string }>;
@@ -28,8 +33,202 @@ export interface PDFMetadata {
   doi?: string;
   url?: string;
   extractedText: string;
+  chunks?: string[];
   pageCount: number;
   fileSize: number;
+}
+
+const PDF_CHUNK_TARGET = 1400;
+const PDF_CHUNK_OVERLAP = 180;
+
+const pdfIngesterDir = path.dirname(fileURLToPath(import.meta.url));
+
+function resolvePdfWorkerSrc(): string | undefined {
+  const candidates = [
+    path.join(pdfIngesterDir, "pdf.worker.mjs"),
+    path.join(pdfIngesterDir, "pdf.worker.min.mjs"),
+    path.join(process.cwd(), "pdf.worker.mjs"),
+    path.join(process.cwd(), "dist", "pdf.worker.mjs"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return pathToFileURL(candidate).href;
+    }
+  }
+
+  return undefined;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function commandExists(command: string): boolean {
+  try {
+    execSync(`command -v ${shellQuote(command)}`, {
+      stdio: "pipe",
+      shell: "/bin/sh",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function runShellCommand(command: string): string | undefined {
+  try {
+    return execSync(command, {
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: "/bin/sh",
+      maxBuffer: 20 * 1024 * 1024,
+    }).toString("utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function isLowTextPdf(text: string, pages: number): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const threshold = Math.max(400, pages * 120);
+  return normalized.length < threshold;
+}
+
+function splitPdfTextIntoChunks(text: string): string[] {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  const chunks: string[] = [];
+  let current = "";
+
+  const pushCurrent = () => {
+    const cleaned = current.trim();
+    if (cleaned) {
+      chunks.push(cleaned);
+    }
+    current = "";
+  };
+
+  for (const paragraph of paragraphs) {
+    if (!current) {
+      current = paragraph;
+      continue;
+    }
+
+    if (current.length + paragraph.length + 2 <= PDF_CHUNK_TARGET) {
+      current += `\n\n${paragraph}`;
+      continue;
+    }
+
+    pushCurrent();
+
+    if (paragraph.length <= PDF_CHUNK_TARGET) {
+      current = paragraph;
+      continue;
+    }
+
+    const sentences = paragraph.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [paragraph];
+    let sentenceBuffer = "";
+
+    for (const sentence of sentences) {
+      const trimmedSentence = sentence.trim();
+      if (!trimmedSentence) continue;
+
+      if (!sentenceBuffer) {
+        sentenceBuffer = trimmedSentence;
+        continue;
+      }
+
+      if (
+        sentenceBuffer.length + trimmedSentence.length + 1 <=
+        PDF_CHUNK_TARGET
+      ) {
+        sentenceBuffer += ` ${trimmedSentence}`;
+      } else {
+        chunks.push(sentenceBuffer);
+        const overlapTail = sentenceBuffer
+          .slice(Math.max(0, sentenceBuffer.length - PDF_CHUNK_OVERLAP))
+          .trim();
+        sentenceBuffer = overlapTail
+          ? `${overlapTail} ${trimmedSentence}`
+          : trimmedSentence;
+      }
+    }
+
+    current = sentenceBuffer;
+  }
+
+  pushCurrent();
+  return chunks;
+}
+
+async function extractWithPdftotext(
+  filepath: string,
+): Promise<string | undefined> {
+  if (!commandExists("pdftotext")) {
+    return undefined;
+  }
+
+  const output = runShellCommand(
+    `pdftotext -layout -enc UTF-8 -q ${shellQuote(filepath)} -`,
+  );
+
+  const cleaned = output?.trim();
+  return cleaned ? cleaned : undefined;
+}
+
+async function extractWithOcrmypdf(
+  filepath: string,
+): Promise<string | undefined> {
+  if (!commandExists("ocrmypdf")) {
+    return undefined;
+  }
+
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-pdf-"));
+  const outputPdf = path.join(tempDir, "ocr.pdf");
+
+  try {
+    const result = runShellCommand(
+      `ocrmypdf --skip-text --quiet --output-type pdf ${shellQuote(filepath)} ${shellQuote(outputPdf)}`,
+    );
+
+    if (result === undefined) {
+      return undefined;
+    }
+
+    const outputExists = await fs
+      .access(outputPdf)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!outputExists) {
+      return undefined;
+    }
+
+    const buffer = await fs.readFile(outputPdf);
+    const pdfWorkerSrc = resolvePdfWorkerSrc();
+    if (pdfWorkerSrc) {
+      PDFParse.setWorker(pdfWorkerSrc);
+    }
+
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    try {
+      const textResult = await parser.getText();
+      const cleaned = textResult.text.replace(/\s+/g, " ").trim();
+      return cleaned ? textResult.text : undefined;
+    } finally {
+      await parser.destroy();
+    }
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 export interface IngestOptions {
@@ -46,6 +245,10 @@ export interface IngestResult {
   metadata: PDFMetadata;
   wikiPagesCreated?: string[];
   cardsGenerated?: number;
+  embeddingIndexPath?: string;
+  embeddedChunks?: number;
+  embeddingProvider?: string;
+  embeddingModel?: string;
   errors?: string[];
 }
 
@@ -55,6 +258,7 @@ export interface IngestResult {
 export class PDFIngester {
   private pdfExtractor: PDFExtractor;
   private metadataParser: MetadataParser;
+  private embeddingStore: PdfEmbeddingStore;
 
   constructor(
     private vaultPath: string,
@@ -62,6 +266,7 @@ export class PDFIngester {
   ) {
     this.pdfExtractor = new PDFExtractor();
     this.metadataParser = new MetadataParser();
+    this.embeddingStore = new PdfEmbeddingStore(vaultPath);
   }
 
   /**
@@ -72,14 +277,12 @@ export class PDFIngester {
     options: IngestOptions,
   ): Promise<IngestResult> {
     try {
-      void options;
-      // Extract PDF content and metadata
       const pdfContent = await this.pdfExtractor.extract(filepath);
 
-      // Parse metadata from PDF
       const metadata = await this.metadataParser.parse(pdfContent, filepath);
 
-      // Use LLM to extract key concepts and suggestions
+      const embeddingSummary = await this.persistEmbeddings(metadata, options);
+
       const suggestions = await this.generateIngestSuggestions(
         metadata,
         options,
@@ -89,6 +292,7 @@ export class PDFIngester {
         success: true,
         filepath,
         metadata,
+        ...embeddingSummary,
         ...suggestions,
       };
     } catch (error) {
@@ -115,6 +319,56 @@ export class PDFIngester {
     options: IngestOptions,
   ): Promise<IngestResult[]> {
     return Promise.all(filepaths.map((fp) => this.ingestPDF(fp, options)));
+  }
+
+  private async persistEmbeddings(
+    metadata: PDFMetadata,
+    options: IngestOptions,
+  ): Promise<
+    | {
+        embeddingIndexPath: string;
+        embeddedChunks: number;
+        embeddingProvider?: string;
+        embeddingModel?: string;
+      }
+    | undefined
+  > {
+    if (!options.courseId.trim()) {
+      return undefined;
+    }
+
+    const chunks =
+      metadata.chunks ?? splitPdfTextIntoChunks(metadata.extractedText);
+    if (chunks.length === 0) {
+      return undefined;
+    }
+
+    try {
+      const embeddings = await embedPdfChunks(chunks);
+      const embeddingIndexPath = await this.embeddingStore.upsertDocument(
+        options.courseId,
+        {
+          filepath: metadata.filepath,
+          filename: metadata.filename,
+          title: metadata.title,
+          pageCount: metadata.pageCount,
+          updatedAt: new Date().toISOString(),
+          embeddingProvider: embeddings.embeddingProvider,
+          embeddingModel: embeddings.embeddingModel,
+          chunks: embeddings.embeddings,
+        },
+      );
+
+      return {
+        embeddingIndexPath,
+        embeddedChunks: embeddings.embeddings.length,
+        embeddingProvider: embeddings.embeddingProvider,
+        embeddingModel: embeddings.embeddingModel,
+      };
+    } catch (error) {
+      console.warn("Failed to persist PDF embeddings:", error);
+      return undefined;
+    }
   }
 
   /**
@@ -159,22 +413,40 @@ class PDFExtractor {
   }> {
     const fileBuffer = await fs.readFile(filepath);
 
+    const pdfWorkerSrc = resolvePdfWorkerSrc();
+    if (pdfWorkerSrc) {
+      PDFParse.setWorker(pdfWorkerSrc);
+    }
+
     const parser = new PDFParse({ data: new Uint8Array(fileBuffer) });
-    const textResult = await parser.getText();
-    const infoResult = await parser.getInfo();
-    await parser.destroy();
+    try {
+      const [textResult, infoResult] = await Promise.all([
+        parser.getText(),
+        parser.getInfo().catch(() => undefined),
+      ]);
 
-    const data = {
-      text: textResult.text,
-      numpages: textResult.total,
-      info: infoResult.info,
-    } as PdfParseResult;
+      let text = textResult.text;
+      if (isLowTextPdf(textResult.text, textResult.total)) {
+        text = (await extractWithPdftotext(filepath)) ?? text;
+      }
+      if (isLowTextPdf(text, textResult.total)) {
+        text = (await extractWithOcrmypdf(filepath)) ?? text;
+      }
 
-    return {
-      text: data.text,
-      pageCount: data.numpages,
-      metadata: data.info ?? {},
-    };
+      const data = {
+        text,
+        numpages: textResult.total,
+        info: infoResult?.info,
+      } as PdfParseResult;
+
+      return {
+        text: data.text,
+        pageCount: data.numpages,
+        metadata: data.info ?? {},
+      };
+    } finally {
+      await parser.destroy();
+    }
   }
 }
 
@@ -239,6 +511,7 @@ class MetadataParser {
       publication_year,
       doi,
       extractedText: pdfContent.text,
+      chunks: splitPdfTextIntoChunks(pdfContent.text),
       pageCount: pdfContent.pageCount,
       fileSize: fileStats.size,
     };

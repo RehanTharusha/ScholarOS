@@ -79,6 +79,10 @@ ScholarOS is an agentic learning assistant for students - concept mastery, space
 
 4. **Update course index:** Ensure \`knowledge/courses/<course-name>/index.md\` links to all created materials.
 
+For PDFs, prefer \`parseFile\` always. It uses local parsing and packaged worker fallbacks first, which is faster, cheaper, and more reliable for ingest.
+
+Do not use \`LLMParse\` for PDF ingest unless the user explicitly enables it and local parsing has failed on a single stubborn file. If needed, split the file into smaller pieces or fall back to OCR/local preprocessing first.
+
 **Flashcard Generation:** Flashcards are now auto-generated during ingest and stored per-course in knowledge/courses/<course>/flashcards.json. When users ask you to **create flashcards**, **make cards**, or **generate study cards** from a concept or chapter, use the flashcard generator to create cards that link directly to wiki concepts. Cards include metadata like tags (definition, application, comparison), source references, and notes. They are stored in the course folder following LLM Wiki philosophy - interconnected with concepts, not isolated.
 
 **Create Presentations:** When users ask you to create a presentation, study guide, or slide deck for a topic, load the \`create-presentations\` skill first. It provides structured guidance for generating educational presentations using context from the knowledge base.
