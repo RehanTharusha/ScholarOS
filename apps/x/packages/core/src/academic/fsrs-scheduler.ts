@@ -6,6 +6,20 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { FlashCard } from "@x/shared/dist/academic.js";
 
+type RawFlashcard = {
+  id?: unknown;
+  front?: unknown;
+  back?: unknown;
+  question?: unknown;
+  answer?: unknown;
+  conceptId?: unknown;
+  conceptTitle?: unknown;
+  courseId?: unknown;
+  courseName?: unknown;
+  difficulty?: unknown;
+  concepts?: unknown;
+};
+
 export class CardStorage {
   constructor(private knowledgeBaseDir: string) {}
 
@@ -45,7 +59,8 @@ export class CardStorage {
     try {
       const filePath = this.getCourseFlashcardPath(courseId);
       const raw = await fs.readFile(filePath, "utf8");
-      const cards = JSON.parse(raw) as FlashCard[];
+      const parsed = JSON.parse(raw) as unknown;
+      const cards = this.normalizeCards(parsed, courseId);
       return cards.filter((card) => card.courseId === courseId);
     } catch {
       return [];
@@ -73,7 +88,8 @@ export class CardStorage {
         );
         try {
           const raw = await fs.readFile(flashcardPath, "utf8");
-          const cards = JSON.parse(raw) as FlashCard[];
+          const parsed = JSON.parse(raw) as unknown;
+          const cards = this.normalizeCards(parsed, folder.name);
           allCards.push(...cards);
         } catch {
           // Skip if no flashcards.json for this course
@@ -134,5 +150,76 @@ export class CardStorage {
     } catch {
       return [];
     }
+  }
+
+  private normalizeCards(raw: unknown, fallbackCourseId: string): FlashCard[] {
+    const rawCards = this.extractRawCards(raw);
+    if (!rawCards) return [];
+
+    const result: FlashCard[] = [];
+
+    rawCards.forEach((card, index) => {
+      if (!card || typeof card !== "object") return;
+
+      const record = card as RawFlashcard;
+      const front =
+        this.getString(record.front) ?? this.getString(record.question);
+      const back = this.getString(record.back) ?? this.getString(record.answer);
+      if (!front || !back) return;
+
+      const courseId = this.getString(record.courseId) ?? fallbackCourseId;
+      const conceptId =
+        this.getString(record.conceptId) ??
+        this.firstStringFromArray(record.concepts) ??
+        "general";
+      const conceptTitle = this.getString(record.conceptTitle) ?? conceptId;
+      const courseName = this.getString(record.courseName) ?? courseId;
+      const difficulty = this.getDifficulty(record.difficulty);
+
+      result.push({
+        id: this.getString(record.id) ?? `${courseId}-card-${index}`,
+        front,
+        back,
+        conceptId,
+        conceptTitle,
+        courseId,
+        courseName,
+        ...(difficulty ? { difficulty } : {}),
+      });
+    });
+
+    return result;
+  }
+
+  private extractRawCards(raw: unknown): RawFlashcard[] | null {
+    if (Array.isArray(raw)) return raw as RawFlashcard[];
+    if (!raw || typeof raw !== "object") return null;
+    const record = raw as { cards?: unknown };
+    if (Array.isArray(record.cards)) return record.cards as RawFlashcard[];
+    return null;
+  }
+
+  private getString(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim().length > 0
+      ? value
+      : undefined;
+  }
+
+  private firstStringFromArray(value: unknown): string | undefined {
+    if (!Array.isArray(value)) return undefined;
+    for (const item of value) {
+      const str = this.getString(item);
+      if (str) return str;
+    }
+    return undefined;
+  }
+
+  private getDifficulty(
+    value: unknown,
+  ): "easy" | "normal" | "hard" | undefined {
+    if (value === "easy" || value === "normal" || value === "hard") {
+      return value;
+    }
+    return undefined;
   }
 }

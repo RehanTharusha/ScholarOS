@@ -10,6 +10,7 @@ import path from "path";
 import { tmpdir } from "os";
 import { PDFParse } from "pdf-parse";
 import { fileURLToPath, pathToFileURL } from "url";
+import { createRequire } from "module";
 import { PdfEmbeddingStore, embedPdfChunks } from "./pdf-embeddings.js";
 
 interface LlmAgent {
@@ -42,13 +43,62 @@ const PDF_CHUNK_TARGET = 1400;
 const PDF_CHUNK_OVERLAP = 180;
 
 const pdfIngesterDir = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+
+function resolvePdfParseWorker(): string | undefined {
+  try {
+    const workerEntry = require.resolve("pdf-parse/worker");
+    const candidate = path.resolve(
+      path.dirname(workerEntry),
+      "..",
+      "pdf.worker.mjs",
+    );
+    if (existsSync(candidate)) {
+      return pathToFileURL(candidate).href;
+    }
+  } catch {
+    // Ignore unresolved worker entry.
+  }
+
+  return undefined;
+}
+
+function resolvePdfWorkerFromNodeModules(): string | undefined {
+  const pdfParseWorker = resolvePdfParseWorker();
+  if (pdfParseWorker) {
+    return pdfParseWorker;
+  }
+
+  const exportCandidates = [
+    "pdf-parse/dist/worker/pdf.worker.mjs",
+    "pdfjs-dist/legacy/build/pdf.worker.mjs",
+    "pdfjs-dist/build/pdf.worker.mjs",
+    "react-pdf/dist/pdf.worker.min.mjs",
+  ];
+
+  for (const candidate of exportCandidates) {
+    try {
+      const resolved = require.resolve(candidate);
+      if (existsSync(resolved)) {
+        return pathToFileURL(resolved).href;
+      }
+    } catch {
+      // Ignore unresolved candidates.
+    }
+  }
+
+  return undefined;
+}
 
 function resolvePdfWorkerSrc(): string | undefined {
+  const cwd = process.cwd();
   const candidates = [
     path.join(pdfIngesterDir, "pdf.worker.mjs"),
     path.join(pdfIngesterDir, "pdf.worker.min.mjs"),
-    path.join(process.cwd(), "pdf.worker.mjs"),
-    path.join(process.cwd(), "dist", "pdf.worker.mjs"),
+    path.join(cwd, "pdf.worker.mjs"),
+    path.join(cwd, "dist", "pdf.worker.mjs"),
+    path.join(cwd, "..", "pdf.worker.mjs"),
+    path.join(cwd, "..", "dist", "pdf.worker.mjs"),
   ];
 
   for (const candidate of candidates) {
@@ -57,7 +107,7 @@ function resolvePdfWorkerSrc(): string | undefined {
     }
   }
 
-  return undefined;
+  return resolvePdfWorkerFromNodeModules();
 }
 
 function shellQuote(value: string): string {

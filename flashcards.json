@@ -1,0 +1,29 @@
+[
+  {
+    "id": "mc-fc-001",
+    "question": "What is the definition of economics?",
+    "answer": "Economics is the study of how society manages its scarce resources. It studies how people allocate their limited resources to their alternative uses to produce and consume goods and services to satisfy their endless wants.",
+    "tags": ["definition"],
+    "source": "Week 1: Introduction to Microeconomics",
+    "concepts": ["Scarcity"],
+    "notes": "Economics is a social science that studies economic behaviour and phenomena."
+  },
+  {
+    "id": "mc-fc-002",
+    "question": "What is scarcity?",
+    "answer": "Scarcity refers to the limited nature of society's resources in relation to unlimited human wants. Resources have alternative uses, requiring choices to be made about what to produce, how to produce, and for whom to produce.",
+    "tags": ["definition"],
+    "source": "Week 1: Introduction to Microeconomics",
+    "concepts": ["Scarcity"],
+    "notes": "Scarcity is the fundamental economic problem that gives rise to all economic decisions."
+  },
+  {
+    "id": "mc-fc-003",
+    "question": "What is opportunity cost?",
+    "answer": "Opportunity cost is the value of the next best alternative that is foregone when making a choice.",
+    "tags": ["definition"],
+    "source": "Week 1: Introduction to Microeconomics",
+    "concepts": ["Opportunity-Cost", "Production-Possibilities-Frontier"],
+    "notes": "On a PPF, moving from point A to B involves giving up some of one good to gain more of another."
+  }
+]
