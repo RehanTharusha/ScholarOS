@@ -19,7 +19,6 @@ import {
   Mic,
   Network,
   Pencil,
-  Radio,
   SearchIcon,
   SquarePen,
   Table2,

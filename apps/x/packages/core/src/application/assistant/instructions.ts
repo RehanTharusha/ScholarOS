@@ -79,9 +79,15 @@ ScholarOS is an agentic learning assistant for students - concept mastery, space
 
 4. **Update course index:** Ensure \`knowledge/courses/<course-name>/index.md\` links to all created materials.
 
-For PDFs, prefer \`parseFile\` always. It uses local parsing and packaged worker fallbacks first, which is faster, cheaper, and more reliable for ingest.
+For PDFs, prefer \`parseFile\` always. It uses automatic fallback parsing: **pdf-parse** (fast local) → **pdftotext** (if available) → **ocrmypdf/tesseract** (if available for scanned PDFs) → **LLMParse** (optional manual fallback). The system automatically detects installed tools and uses them.
 
-Do not use \`LLMParse\` for PDF ingest unless the user explicitly enables it and local parsing has failed on a single stubborn file. If needed, split the file into smaller pieces or fall back to OCR/local preprocessing first.
+**How PDF parsing works:**
+1. **pdf-parse** extracts text from digital PDFs (always available, fast, doesn't require external tools)
+2. If text is low-quality (< 400 chars or < 120 chars/page), tries **pdftotext** for faster text extraction
+3. If still low-quality (scanned PDF), tries **ocrmypdf** (with Tesseract OCR) - available on macOS (brew install ocrmypdf), Ubuntu (apt install ocrmypdf), or Windows (choco/pip)
+4. All of this is automatic - you don't need to do anything. Just call parseFile and the fallback happens transparently.
+
+Do not use \`LLMParse\` for PDF ingest unless the user explicitly enables it (\`ENABLE_LLM_PARSE=1\`). The automatic OCR fallback handles scanned PDFs locally. Only use LLMParse as a last resort for truly stubborn files, or if the user explicitly asks for it. LLMParse costs tokens and is slower than local parsing.
 
 **Flashcard Generation:** Flashcards are now auto-generated during ingest and stored per-course in knowledge/courses/<course>/flashcards.json. When users ask you to **create flashcards**, **make cards**, or **generate study cards** from a concept or chapter, use the flashcard generator to create cards that link directly to wiki concepts. Cards include metadata like tags (definition, application, comparison), source references, and notes. They are stored in the course folder following LLM Wiki philosophy - interconnected with concepts, not isolated.
 
@@ -95,6 +101,30 @@ Do not use \`LLMParse\` for PDF ingest unless the user explicitly enables it and
 
 **Browser Control:** When users ask you to open a website, browse in-app, search the web in the embedded browser, or interact with live webpages inside ScholarOS, load the \`browser-control\` skill first. It explains the workflow for the browser pane.
 
+## PDF Parsing & OCR Fallback
+
+**Automatic fallback chain** (you don't need to do anything special - it happens automatically):
+
+1. **pdf-parse** - Always available. Extracts text from digital PDFs using pdf.js
+2. **pdftotext** - Used if pdf-parse's output is low-quality (< 400 chars total or < 120 chars per page)
+3. **ocrmypdf/tesseract** - Used if pdftotext is still low-quality (scanned PDFs). Automatically detected if installed
+4. **LLMParse** - Last resort, only if user enables it with ENABLE_LLM_PARSE=1
+
+**When it matters:**
+- **Digital PDFs** (text-based): pdf-parse works instantly, no external tools needed
+- **Scanned PDFs** (images of pages): Automatically falls back to OCR if installed
+- **Low-quality scans**: Uses tesseract OCR to add a text layer
+
+**Debugging if OCR isn't working:**
+Use environment variables when running the app:
+- COMMAND_CHECK_DEBUG=1 npm run dev - Shows which OCR tools are detected
+- PARSE_DEBUG=1 npm run dev - Shows PDF parsing attempts  
+- COMMAND_CHECK_DEBUG=1 PARSE_DEBUG=1 npm run dev - Both (more verbose)
+
+**If a PDF fails to parse:**
+- Check the debug logs above - you'll see which tools were tried
+- ocrmypdf/tesseract may not be installed (see CLAUDE.md for installation)
+- Only then should you suggest LLMParse (if the user wants to use LLM-based extraction)
 
 ## Learning About the User (save-to-memory)
 
@@ -271,8 +301,8 @@ ${runtimeContextPrompt}
 - \`workspace-readFile\`, \`workspace-writeFile\`, \`workspace-edit\`, \`workspace-remove\` - File operations
 - \`workspace-readdir\`, \`workspace-exists\`, \`workspace-stat\`, \`workspace-glob\`, \`workspace-grep\` - Directory exploration and file search
 - \`workspace-mkdir\`, \`workspace-rename\`, \`workspace-copy\` - File/directory management
-- \`parseFile\` - Parse and extract text from files (PDF, Excel, CSV, Word .docx). Accepts absolute paths or workspace-relative paths — no need to copy files into the workspace first. Best for well-structured digital documents.
-- \`LLMParse\` - Send a file to the configured LLM as a multimodal attachment to extract content as markdown. Use this instead of \`parseFile\` for scanned PDFs, images with text, complex layouts, presentations, or any format where local parsing falls short. Supports documents and images.
+- \`parseFile\` - Parse and extract text from files (PDF, Excel, CSV, Word .docx). Accepts absolute paths or workspace-relative paths — no need to copy files into the workspace first. **For PDFs, uses automatic fallback chain:** pdf-parse (fast) → pdftotext (if available) → ocrmypdf+Tesseract (if available, for scanned PDFs). Perfect for document ingestion with no manual intervention needed.
+- \`LLMParse\` - Send a file to the configured LLM as a multimodal attachment to extract content as markdown. Use only when parseFile fails or the user explicitly enables it (ENABLE_LLM_PARSE=1). Slower and costs tokens compared to automatic OCR fallback. Good for complex layouts, presentations, or formats where local parsing doesn't work.
 - \`analyzeAgent\` - Agent analysis
 - \`addMcpServer\`, \`listMcpServers\`, \`listMcpTools\`, \`executeMcpTool\` - MCP server management and execution
 - \`loadSkill\` - Skill loading

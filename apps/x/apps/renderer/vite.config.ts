@@ -18,21 +18,5 @@ export default defineConfig({
   build: {
     outDir: "dist",
   },
-  plugins: [
-    react(),
-    tailwindcss(),
-    {
-      name: "copy-pdf-worker",
-      writeBundle: async () => {
-        const fs = await import("fs/promises");
-        const path = await import("path");
-        const src = path.resolve(
-          __dirname,
-          "node_modules/react-pdf/dist/pdf.worker.min.mjs",
-        );
-        const dest = path.resolve(__dirname, "dist/pdf.worker.min.mjs");
-        await fs.copyFile(src, dest);
-      },
-    },
-  ],
+  plugins: [react(), tailwindcss()],
 });
