@@ -11,6 +11,7 @@ import { tmpdir } from "os";
 import { PDFParse } from "pdf-parse";
 import { fileURLToPath, pathToFileURL } from "url";
 import { PdfEmbeddingStore, embedPdfChunks } from "./pdf-embeddings.js";
+import { getPdfWorkerPath } from "../application/lib/pdf-worker-resolver.js";
 
 interface LlmAgent {
   generate(prompt: string): Promise<{ text: string }>;
@@ -41,24 +42,8 @@ export interface PDFMetadata {
 const PDF_CHUNK_TARGET = 1400;
 const PDF_CHUNK_OVERLAP = 180;
 
-const pdfIngesterDir = path.dirname(fileURLToPath(import.meta.url));
-
-function resolvePdfWorkerSrc(): string | undefined {
-  const candidates = [
-    path.join(pdfIngesterDir, "pdf.worker.mjs"),
-    path.join(pdfIngesterDir, "pdf.worker.min.mjs"),
-    path.join(process.cwd(), "pdf.worker.mjs"),
-    path.join(process.cwd(), "dist", "pdf.worker.mjs"),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return pathToFileURL(candidate).href;
-    }
-  }
-
-  return undefined;
-}
+// Robust PDF worker resolution is now handled by getPdfWorkerPath()
+// See ../application/lib/pdf-worker-resolver.ts for detailed resolution strategy
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
@@ -213,7 +198,7 @@ async function extractWithOcrmypdf(
     }
 
     const buffer = await fs.readFile(outputPdf);
-    const pdfWorkerSrc = resolvePdfWorkerSrc();
+    const pdfWorkerSrc = getPdfWorkerPath();
     if (pdfWorkerSrc) {
       PDFParse.setWorker(pdfWorkerSrc);
     }
@@ -413,7 +398,7 @@ class PDFExtractor {
   }> {
     const fileBuffer = await fs.readFile(filepath);
 
-    const pdfWorkerSrc = resolvePdfWorkerSrc();
+    const pdfWorkerSrc = getPdfWorkerPath();
     if (pdfWorkerSrc) {
       PDFParse.setWorker(pdfWorkerSrc);
     }

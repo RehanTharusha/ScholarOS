@@ -51,6 +51,7 @@ import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
 import PapaParse from "papaparse";
 import mammothModule from "mammoth";
+import { getPdfWorkerPath } from "./pdf-worker-resolver.js";
 
 // Use the imported modules directly
 const Papa = (PapaParse as any).default || PapaParse;
@@ -92,24 +93,8 @@ const LLMPARSE_MIME_TYPES: Record<string, string> = {
   ".tiff": "image/tiff",
 };
 
-const builtinToolsDir = path.dirname(fileURLToPath(import.meta.url));
-
-const resolvePdfWorkerSrc = (): string | undefined => {
-  const candidates = [
-    path.join(builtinToolsDir, "pdf.worker.mjs"),
-    path.join(builtinToolsDir, "pdf.worker.min.mjs"),
-    path.join(process.cwd(), "pdf.worker.mjs"),
-    path.join(process.cwd(), "dist", "pdf.worker.mjs"),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return pathToFileURL(candidate).href;
-    }
-  }
-
-  return undefined;
-};
+// Robust PDF worker resolution is now handled by getPdfWorkerPath()
+// See pdf-worker-resolver.ts for detailed resolution strategy
 
 const PDF_CHUNK_TARGET = 1400;
 const PDF_CHUNK_OVERLAP = 180;
@@ -267,7 +252,7 @@ const extractPdfTextWithOcrmypdf = async (
     }
 
     const ocrBuffer = await fs.readFile(outputPdf);
-    const pdfWorkerSrc = resolvePdfWorkerSrc();
+    const pdfWorkerSrc = getPdfWorkerPath();
     if (pdfWorkerSrc) {
       PDFParse.setWorker(pdfWorkerSrc);
     }
@@ -1025,7 +1010,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         if (ext === ".pdf") {
-          const pdfWorkerSrc = resolvePdfWorkerSrc();
+          const pdfWorkerSrc = getPdfWorkerPath();
           if (pdfWorkerSrc) {
             PDFParse.setWorker(pdfWorkerSrc);
           }

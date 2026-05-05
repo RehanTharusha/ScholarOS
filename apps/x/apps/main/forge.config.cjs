@@ -172,41 +172,71 @@ module.exports = {
       fs.cpSync(rendererSrc, rendererDest, { recursive: true });
 
       // Copy pdf worker assets into staging for local PDF parsing.
+      // This is critical for the PDF parser to work in packaged builds.
       console.log("Copying pdf.worker.mjs...");
-      const pdfParseWorker = (() => {
-        try {
-          return path.join(
-            path.dirname(require.resolve("pdf-parse/package.json")),
-            "dist/worker/pdf.worker.mjs",
-          );
-        } catch (error) {
-          console.warn("Failed to resolve pdf-parse worker:", error.message);
-          return null;
-        }
-      })();
+      
       const pdfWorkerCandidates = [
-        pdfParseWorker,
+        // Primary: pdfjs-dist (now a direct dependency in core package)
+        (() => {
+          try {
+            return path.join(
+              path.dirname(require.resolve("pdfjs-dist/package.json")),
+              "build/pdf.worker.mjs",
+            );
+          } catch (e) {
+            return null;
+          }
+        })(),
+        // Secondary: pdf-parse's bundled worker
+        (() => {
+          try {
+            return path.join(
+              path.dirname(require.resolve("pdf-parse/package.json")),
+              "dist/worker/pdf.worker.mjs",
+            );
+          } catch (e) {
+            return null;
+          }
+        })(),
+        // Fallback: react-pdf worker
         path.join(
           __dirname,
           "../renderer/node_modules/react-pdf/dist/pdf.worker.min.mjs",
         ),
+        // Fallback: already built by renderer
         path.join(__dirname, "../renderer/dist/pdf.worker.min.mjs"),
       ].filter(Boolean);
-      const pdfWorkerSrc = pdfWorkerCandidates.find((candidate) =>
-        fs.existsSync(candidate),
-      );
-      const pdfWorkerDest = path.join(rendererDest, "pdf.worker.min.mjs");
-      if (pdfWorkerSrc) {
-        fs.copyFileSync(pdfWorkerSrc, pdfWorkerDest);
-        const packageRootPdf = path.join(packageDir, "pdf.worker.mjs");
-        const packageDistPdf = path.join(packageDir, "dist", "pdf.worker.mjs");
-        try {
-          fs.copyFileSync(pdfWorkerSrc, packageRootPdf);
-          fs.mkdirSync(path.dirname(packageDistPdf), { recursive: true });
-          fs.copyFileSync(pdfWorkerSrc, packageDistPdf);
-        } catch (e) {
-          console.warn("Failed to copy pdf worker to package root:", e.message);
+      
+      const pdfWorkerSrc = pdfWorkerCandidates.find((candidate) => {
+        const exists = fs.existsSync(candidate);
+        if (exists) {
+          console.log(`  Found worker at: ${candidate}`);
         }
+        return exists;
+      });
+      
+      if (pdfWorkerSrc) {
+        // Copy to renderer/dist for development
+        const pdfWorkerDest = path.join(rendererDest, "pdf.worker.min.mjs");
+        fs.copyFileSync(pdfWorkerSrc, pdfWorkerDest);
+        console.log(`  ✓ Copied to renderer/dist`);
+        
+        // Copy to .package root for main process to find
+        const packageRootPdf = path.join(packageDir, "pdf.worker.mjs");
+        fs.copyFileSync(pdfWorkerSrc, packageRootPdf);
+        console.log(`  ✓ Copied to .package root`);
+        
+        // Copy to .package/dist for bundled main process
+        const packageDistPdf = path.join(packageDir, "dist", "pdf.worker.mjs");
+        fs.mkdirSync(path.dirname(packageDistPdf), { recursive: true });
+        fs.copyFileSync(pdfWorkerSrc, packageDistPdf);
+        console.log(`  ✓ Copied to .package/dist`);
+      } else {
+        console.error(
+          "❌ WARNING: Could not find PDF worker file. PDF parsing will fail in packaged build!",
+          "Searched locations:",
+          pdfWorkerCandidates,
+        );
       }
 
       console.log("Copying ingestion assets...");
