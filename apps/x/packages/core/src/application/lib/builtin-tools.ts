@@ -7,7 +7,6 @@ import { execSync } from "child_process";
 import { homedir, tmpdir } from "os";
 import { glob } from "glob";
 import { fileURLToPath, pathToFileURL } from "url";
-import { createRequire } from "module";
 import { executeCommand, executeCommandAbortable } from "./command-executor.js";
 import { resolveSkill, availableSkills } from "../assistant/skills/index.js";
 import { executeTool, listServers, listTools } from "../../mcp/mcp.js";
@@ -52,6 +51,7 @@ import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
 import PapaParse from "papaparse";
 import mammothModule from "mammoth";
+import { getPdfWorkerPath } from "./pdf-worker-resolver.js";
 
 // Use the imported modules directly
 const Papa = (PapaParse as any).default || PapaParse;
@@ -93,73 +93,8 @@ const LLMPARSE_MIME_TYPES: Record<string, string> = {
   ".tiff": "image/tiff",
 };
 
-const builtinToolsDir = path.dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-
-const resolvePdfParseWorker = (): string | undefined => {
-  try {
-    const workerEntry = require.resolve("pdf-parse/worker");
-    const candidate = path.resolve(
-      path.dirname(workerEntry),
-      "..",
-      "pdf.worker.mjs",
-    );
-    if (existsSync(candidate)) {
-      return pathToFileURL(candidate).href;
-    }
-  } catch {
-    // Ignore unresolved worker entry.
-  }
-
-  return undefined;
-};
-
-const resolvePdfWorkerFromNodeModules = (): string | undefined => {
-  const pdfParseWorker = resolvePdfParseWorker();
-  if (pdfParseWorker) {
-    return pdfParseWorker;
-  }
-
-  const exportCandidates = [
-    "pdf-parse/dist/worker/pdf.worker.mjs",
-    "pdfjs-dist/legacy/build/pdf.worker.mjs",
-    "pdfjs-dist/build/pdf.worker.mjs",
-    "react-pdf/dist/pdf.worker.min.mjs",
-  ];
-
-  for (const candidate of exportCandidates) {
-    try {
-      const resolved = require.resolve(candidate);
-      if (existsSync(resolved)) {
-        return pathToFileURL(resolved).href;
-      }
-    } catch {
-      // Ignore unresolved candidates.
-    }
-  }
-
-  return undefined;
-};
-
-const resolvePdfWorkerSrc = (): string | undefined => {
-  const cwd = process.cwd();
-  const candidates = [
-    path.join(builtinToolsDir, "pdf.worker.mjs"),
-    path.join(builtinToolsDir, "pdf.worker.min.mjs"),
-    path.join(cwd, "pdf.worker.mjs"),
-    path.join(cwd, "dist", "pdf.worker.mjs"),
-    path.join(cwd, "..", "pdf.worker.mjs"),
-    path.join(cwd, "..", "dist", "pdf.worker.mjs"),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return pathToFileURL(candidate).href;
-    }
-  }
-
-  return resolvePdfWorkerFromNodeModules();
-};
+// Robust PDF worker resolution is now handled by getPdfWorkerPath()
+// See pdf-worker-resolver.ts for detailed resolution strategy
 
 const PDF_CHUNK_TARGET = 1400;
 const PDF_CHUNK_OVERLAP = 180;
@@ -317,7 +252,7 @@ const extractPdfTextWithOcrmypdf = async (
     }
 
     const ocrBuffer = await fs.readFile(outputPdf);
-    const pdfWorkerSrc = resolvePdfWorkerSrc();
+    const pdfWorkerSrc = getPdfWorkerPath();
     if (pdfWorkerSrc) {
       PDFParse.setWorker(pdfWorkerSrc);
     }
@@ -1075,7 +1010,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         if (ext === ".pdf") {
-          const pdfWorkerSrc = resolvePdfWorkerSrc();
+          const pdfWorkerSrc = getPdfWorkerPath();
           if (pdfWorkerSrc) {
             PDFParse.setWorker(pdfWorkerSrc);
           }
