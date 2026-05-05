@@ -1,3 +1,7 @@
+## pdf viewing
+
+currently viewing pdfs in the app only shows us the raw pdf data like the stuff with the random symbols and characters. choose the best course of action to implement a proper pdf viewer, ideally one with editing capabilities like the basic ones you see on chromium browsers. this way users can not only view their pdfs but also make annotations, highlight text, and add comments if they want to.
+
 # important note before moving forward with the next few tasks
 
 everything needs to be stored in md files, jsons and csvs within courses folders. ofcourse while keeping things smooth, lean and token efficient. my main point if that i dont want to use some complex database system for storing data.
@@ -26,8 +30,25 @@ we have the kanban style assignment board already implemented. there is currentl
 
 the agent chat doenst autoscroll when the chats are being streamed to the user, this needs fixing. once pause if the user uses the scroll wheel to scroll up (which obviously they would do if they want to read previous messages) the autoscroll should pause, and then if they scroll back down to the bottom it should resume. this is a common feature in chat applications and it would make the user experience much better.
 
-## remove emails and meetings features
+## ingest window panel
 
-the rowboat app had alot of meetings and emails integrations, this is not necesary for the student use case. start with removing the deeply integrated stuff and then the visual elements too.
+keep the functionality but redesign the UI to be more user friendly and visually appealing.
+simplified and minimal while removing any duplicate or unnecessary elements. also make sure to keep it consistent with the overall design of the app. maybe even add some animations or transitions to make it more engaging for the user.
 
-##
+## flashcards feature improvement
+
+just under the "previous wrong correct next" buttons, in the empty space below, add the following feature.
+
+i want a centered button that says "view all questions", which when pressed, below that opens a scrollable list of all the questions in the flashcard deck, along with the user's previous answers and whether they got them right or wrong. this way, users can easily review all the questions and their performance on them, which can help them identify areas where they need to improve and focus their studying efforts.
+
+i want to emphasize the right and wrong can just be temporary data that is stored in memory and not saved to any file.
+
+I also want this section to be
+
+QuestionQuestionQuestionQuestion
+XXXXXXXXXXX (nice subtle animation to indicate clicking on this animation reveals the answer)
+
+QuestionQuestionQuestionQuestion
+XXXXXXXXXXX (question answer question answer question)
+
+you get the idea

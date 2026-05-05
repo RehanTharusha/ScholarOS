@@ -109,6 +109,7 @@ import { FileCardProvider } from "@/contexts/file-card-context";
 import { FlashcardReview } from "@/components/flashcards/flashcard-review";
 
 import { CourseDashboard } from "@/components/academic/course-dashboard";
+import { AcademicCalendar } from "@/components/academic/calendar-view";
 import { KanbanAcademic } from "@/components/academic/kanban-academic";
 import { IngestWindow } from "@/components/ingest-window";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
@@ -202,6 +203,7 @@ const SUGGESTED_TOPICS_TAB_PATH = "__rowboat_suggested_topics__";
 const BASES_DEFAULT_TAB_PATH = "__rowboat_bases_default__";
 const FLASHCARDS_TAB_PATH = "__scholar_flashcards__";
 const DASHBOARD_TAB_PATH = "__scholar_dashboard__";
+const CALENDAR_TAB_PATH = "__scholar_calendar__";
 const KANBAN_TAB_PATH = "__scholar_assignment_board__";
 const INGEST_TAB_PATH = "__scholar_ingest__";
 
@@ -358,6 +360,7 @@ const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
 const isFlashcardsTabPath = (path: string) => path === FLASHCARDS_TAB_PATH;
 const isDashboardTabPath = (path: string) => path === DASHBOARD_TAB_PATH;
+const isCalendarTabPath = (path: string) => path === CALENDAR_TAB_PATH;
 const isKanbanTabPath = (path: string) => path === KANBAN_TAB_PATH;
 const isBaseFilePath = (path: string) =>
   path.endsWith(".base") || path === BASES_DEFAULT_TAB_PATH;
@@ -1080,6 +1083,7 @@ function App() {
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
     if (isFlashcardsTabPath(tab.path)) return "Flashcards";
     if (isDashboardTabPath(tab.path)) return "Dashboard";
+    if (isCalendarTabPath(tab.path)) return "Calendar";
     if (isKanbanTabPath(tab.path)) return "Assignment Board";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
     if (tab.path.endsWith(".base"))
@@ -3706,6 +3710,10 @@ function App() {
     void navigateToView({ type: "file", path: DASHBOARD_TAB_PATH });
   }, [navigateToView]);
 
+  const openCalendar = useCallback(() => {
+    void navigateToView({ type: "file", path: CALENDAR_TAB_PATH });
+  }, [navigateToView]);
+
   const openKanban = useCallback(() => {
     void navigateToView({ type: "file", path: KANBAN_TAB_PATH });
   }, [navigateToView]);
@@ -4311,6 +4319,18 @@ function App() {
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "file", path: BASES_DEFAULT_TAB_PATH });
+      },
+      openCalendar: () => {
+        if (
+          !selectedPath &&
+          !isGraphOpen &&
+          !isSuggestedTopicsOpen &&
+          !selectedBackgroundTask
+        ) {
+          setIsChatSidebarOpen(false);
+          setIsRightPaneMaximized(false);
+        }
+        void navigateToView({ type: "file", path: CALENDAR_TAB_PATH });
       },
       expandAll: () => setExpandedPaths(new Set(collectDirPaths(tree))),
       collapseAll: () => setExpandedPaths(new Set()),
@@ -5229,6 +5249,8 @@ function App() {
                 <FlashcardReview />
               ) : selectedPath === DASHBOARD_TAB_PATH ? (
                 <CourseDashboard />
+              ) : selectedPath === CALENDAR_TAB_PATH ? (
+                <AcademicCalendar />
               ) : selectedPath === KANBAN_TAB_PATH ? (
                 <KanbanAcademic />
               ) : selectedPath === INGEST_TAB_PATH ? (

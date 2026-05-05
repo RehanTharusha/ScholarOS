@@ -16,6 +16,7 @@ import {
   Globe,
   AlertTriangle,
   HelpCircle,
+  Calendar,
   Mic,
   Network,
   Pencil,
@@ -115,6 +116,7 @@ type KnowledgeActions = {
   createFolder: (parentPath?: string) => void;
   openGraph: () => void;
   openBases: () => void;
+  openCalendar?: () => void;
   expandAll: () => void;
   collapseAll: () => void;
   rename: (path: string, newName: string, isDir: boolean) => Promise<void>;
@@ -1122,6 +1124,15 @@ function KnowledgeSection({
     },
     { icon: Network, label: "Graph View", action: () => actions.openGraph() },
     { icon: Table2, label: "Bases", action: () => actions.openBases() },
+    ...(actions.openCalendar
+      ? [
+          {
+            icon: Calendar,
+            label: "Calendar",
+            action: () => actions.openCalendar!(),
+          },
+        ]
+      : []),
   ];
 
   return (
