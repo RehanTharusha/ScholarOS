@@ -25,47 +25,6 @@ function toAssignmentStatus(status: KanbanStatus): Assignment["status"] {
   return status;
 }
 
-function createSeedAssignments(): Assignment[] {
-  const now = new Date();
-  const plusDays = (days: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() + days);
-    return d.toISOString();
-  };
-
-  return [
-    {
-      id: "phys-pset-4",
-      courseId: "PHYS220",
-      title: "Problem Set 4",
-      description: "Mechanics and conservation laws.",
-      dueDate: plusDays(3),
-      status: "not-started",
-      priority: "high",
-      wikiLinks: ["knowledge/courses/Physics 220.md"],
-    },
-    {
-      id: "hist-outline",
-      courseId: "HIST140",
-      title: "Primary Source Outline",
-      description: "Prepare source matrix and thesis candidates.",
-      dueDate: plusDays(5),
-      status: "not-started",
-      priority: "medium",
-      wikiLinks: ["knowledge/courses/History 140.md"],
-    },
-    {
-      id: "bio-review",
-      courseId: "BIO101",
-      title: "Lecture 6 Review",
-      dueDate: plusDays(-1),
-      status: "graded",
-      priority: "low",
-      wikiLinks: ["knowledge/courses/Biology 101/concepts/Calvin Cycle.md"],
-    },
-  ];
-}
-
 export class TaskManager {
   constructor(
     private storageDir: string,
@@ -86,11 +45,7 @@ export class TaskManager {
           : [],
       };
     } catch {
-      const seeded: StoredAcademicData = {
-        assignments: createSeedAssignments(),
-      };
-      await this.writeStore(seeded);
-      return seeded;
+      return { assignments: [] };
     }
   }
 
@@ -103,6 +58,19 @@ export class TaskManager {
     const store = await this.readStore();
     if (!courseId) return store.assignments;
     return store.assignments.filter((item) => item.courseId === courseId);
+  }
+
+  async createAssignment(
+    assignment: Omit<Assignment, "id">,
+  ): Promise<Assignment> {
+    const store = await this.readStore();
+    const newAssignment: Assignment = {
+      ...assignment,
+      id: `${assignment.courseId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+    store.assignments.push(newAssignment);
+    await this.writeStore(store);
+    return newAssignment;
   }
 
   async updateKanbanStatus(
@@ -125,6 +93,35 @@ export class TaskManager {
 
     await this.writeStore(store);
     return updated;
+  }
+
+  async updateAssignment(
+    assignmentId: string,
+    updates: Partial<Assignment>,
+  ): Promise<Assignment | null> {
+    const store = await this.readStore();
+    let updated: Assignment | null = null;
+
+    store.assignments = store.assignments.map((assignment) => {
+      if (assignment.id !== assignmentId) return assignment;
+      updated = { ...assignment, ...updates };
+      return updated;
+    });
+
+    if (!updated) return null;
+    await this.writeStore(store);
+    return updated;
+  }
+
+  async deleteAssignment(assignmentId: string): Promise<boolean> {
+    const store = await this.readStore();
+    const before = store.assignments.length;
+    store.assignments = store.assignments.filter(
+      (a) => a.id !== assignmentId,
+    );
+    if (store.assignments.length === before) return false;
+    await this.writeStore(store);
+    return true;
   }
 
   async dashboardSummary(

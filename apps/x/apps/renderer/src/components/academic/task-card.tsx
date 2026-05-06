@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Link2 } from "lucide-react";
+import { ArrowRightLeft } from "lucide-react";
 import type { Assignment } from "@x/shared/dist/academic.js";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export function TaskCard({
   const status = mapAssignmentStatus(assignment.status);
 
   return (
-    <article className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+    <article className="rounded-2xl border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-foreground">
@@ -53,6 +53,7 @@ export function TaskCard({
             size="icon-sm"
             onClick={() => onMove(assignment.id, -1)}
             disabled={status === "not-started"}
+            title="Move left"
           >
             <ArrowRightLeft className="size-3.5 rotate-180" />
           </Button>
@@ -61,18 +62,12 @@ export function TaskCard({
             size="icon-sm"
             onClick={() => onMove(assignment.id, 1)}
             disabled={status === "done"}
+            title="Move right"
           >
             <ArrowRightLeft className="size-3.5" />
           </Button>
         </div>
       </div>
-
-      {assignment.wikiLinks && assignment.wikiLinks.length > 0 ? (
-        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-          <Link2 className="size-3.5" />
-          <span className="truncate">{assignment.wikiLinks[0]}</span>
-        </div>
-      ) : null}
     </article>
   );
 }

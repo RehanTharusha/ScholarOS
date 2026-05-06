@@ -180,10 +180,7 @@ import {
   TaskManager,
   type KanbanStatus,
 } from "@x/core/dist/academic/task-manager.js";
-import type {
-  FlashCard,
-  AcademicDashboardSummary,
-} from "@x/shared/dist/academic.js";
+import type { FlashCard } from "@x/shared/dist/academic.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
 import { getRendererUrl } from "./app-url.js";
 
@@ -744,16 +741,28 @@ export function setupIpcHandlers() {
 
       return { success: true, assignment: next };
     },
-    "academic:dashboard:summary": async (_event, args) => {
-      const courseId = args.courseId || "scholaros-demo";
-      let cards = await flashcardStorage.loadCards(courseId);
-      if (cards.length === 0) {
-        await flashcardStorage.saveCards(cards);
-      }
-
-      const summary: AcademicDashboardSummary =
-        await taskManager.dashboardSummary(cards, args.courseId);
-      return summary;
+    "academic:assignments:create": async (_event, args) => {
+      const assignment = await taskManager.createAssignment({
+        title: args.title,
+        courseId: args.courseId,
+        description: args.description ?? "",
+        dueDate: args.dueDate,
+        status: args.status ?? "not-started",
+        priority: args.priority ?? "medium",
+        wikiLinks: args.wikiLinks ?? [],
+      });
+      return { success: true, assignment };
+    },
+    "academic:assignments:delete": async (_event, args) => {
+      const ok = await taskManager.deleteAssignment(args.assignmentId);
+      return { success: ok, error: ok ? undefined : "Assignment not found" };
+    },
+    "today:refresh": async () => {
+      const { refreshDailyNote } = await import(
+        "@x/core/dist/knowledge/ensure_daily_note.js"
+      );
+      await refreshDailyNote();
+      return { success: true };
     },
     "mcp:listTools": async (_event, args) => {
       return mcpCore.listTools(args.serverName, args.cursor);

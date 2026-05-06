@@ -1,16 +1,6 @@
-## pdf viewing
-
-currently viewing pdfs in the app only shows us the raw pdf data like the stuff with the random symbols and characters. choose the best course of action to implement a proper pdf viewer, ideally one with editing capabilities like the basic ones you see on chromium browsers. this way users can not only view their pdfs but also make annotations, highlight text, and add comments if they want to.
-
 # important note before moving forward with the next few tasks
 
 everything needs to be stored in md files, jsons and csvs within courses folders. ofcourse while keeping things smooth, lean and token efficient. my main point if that i dont want to use some complex database system for storing data.
-
-## a calendar component
-
-I want to add a calendar component to my application that allows users to view and manage their events and appointments. The calendar should support features like adding, editing, and deleting events, as well as displaying them in a monthly, weekly, or daily view.
-
-using the markdown and connections philosophy of the app, I can create a markdown file to keep track of the tasks and features I want to implement. This way, I can easily link to relevant resources, code snippets, and documentation as I work on integrating the pdf viewer and calendar component into my application. Also letting the agent create connections to the tasks that need to be done, therefore viewing a task i can back track to the resources and code snippets that are relevant to that task, making it easier to stay organized and efficient in my development process.
 
 ## rowboat has a feature called today.md
 

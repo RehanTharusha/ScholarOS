@@ -108,7 +108,6 @@ import { VersionHistoryPanel } from "@/components/version-history-panel";
 import { FileCardProvider } from "@/contexts/file-card-context";
 import { FlashcardReview } from "@/components/flashcards/flashcard-review";
 
-import { CourseDashboard } from "@/components/academic/course-dashboard";
 import { AcademicCalendar } from "@/components/academic/calendar-view";
 import { KanbanAcademic } from "@/components/academic/kanban-academic";
 import { IngestWindow } from "@/components/ingest-window";
@@ -203,7 +202,6 @@ const GRAPH_TAB_PATH = "__rowboat_graph_view__";
 const SUGGESTED_TOPICS_TAB_PATH = "__rowboat_suggested_topics__";
 const BASES_DEFAULT_TAB_PATH = "__rowboat_bases_default__";
 const FLASHCARDS_TAB_PATH = "__scholar_flashcards__";
-const DASHBOARD_TAB_PATH = "__scholar_dashboard__";
 const CALENDAR_TAB_PATH = "__scholar_calendar__";
 const KANBAN_TAB_PATH = "__scholar_assignment_board__";
 const INGEST_TAB_PATH = "__scholar_ingest__";
@@ -360,7 +358,6 @@ const isGraphTabPath = (path: string) => path === GRAPH_TAB_PATH;
 const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
 const isFlashcardsTabPath = (path: string) => path === FLASHCARDS_TAB_PATH;
-const isDashboardTabPath = (path: string) => path === DASHBOARD_TAB_PATH;
 const isCalendarTabPath = (path: string) => path === CALENDAR_TAB_PATH;
 const isKanbanTabPath = (path: string) => path === KANBAN_TAB_PATH;
 const isBaseFilePath = (path: string) =>
@@ -588,7 +585,6 @@ function ContentHeader({
   canNavigateForward,
   collapsedLeftPaddingPx,
   onOpenFlashcards,
-  onOpenDashboard,
   onOpenKanban,
 }: {
   children: React.ReactNode;
@@ -598,7 +594,6 @@ function ContentHeader({
   canNavigateForward?: boolean;
   collapsedLeftPaddingPx?: number;
   onOpenFlashcards?: () => void;
-  onOpenDashboard?: () => void;
   onOpenKanban?: () => void;
 }) {
   const { state } = useSidebar();
@@ -649,17 +644,6 @@ function ContentHeader({
             className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background/80 px-3 text-xs text-foreground transition-colors hover:bg-accent/60"
           >
             Flashcards
-          </button>
-        </div>
-      ) : null}
-      {onOpenDashboard ? (
-        <div className="titlebar-no-drag flex items-center pl-2">
-          <button
-            type="button"
-            onClick={onOpenDashboard}
-            className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background/80 px-3 text-xs text-foreground transition-colors hover:bg-accent/60"
-          >
-            Dashboard
           </button>
         </div>
       ) : null}
@@ -1083,7 +1067,6 @@ function App() {
     if (isGraphTabPath(tab.path)) return "Graph View";
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
     if (isFlashcardsTabPath(tab.path)) return "Flashcards";
-    if (isDashboardTabPath(tab.path)) return "Dashboard";
     if (isCalendarTabPath(tab.path)) return "Calendar";
     if (isKanbanTabPath(tab.path)) return "Assignment Board";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
@@ -1495,14 +1478,6 @@ function App() {
       return;
     }
     if (isFlashcardsTabPath(selectedPath)) {
-      setFileContent("");
-      setEditorContent("");
-      editorContentRef.current = "";
-      initialContentRef.current = "";
-      setLastSaved(null);
-      return;
-    }
-    if (isDashboardTabPath(selectedPath)) {
       setFileContent("");
       setEditorContent("");
       editorContentRef.current = "";
@@ -3713,10 +3688,6 @@ function App() {
     void navigateToView({ type: "file", path: FLASHCARDS_TAB_PATH });
   }, [navigateToView]);
 
-  const openDashboard = useCallback(() => {
-    void navigateToView({ type: "file", path: DASHBOARD_TAB_PATH });
-  }, [navigateToView]);
-
   const openCalendar = useCallback(() => {
     void navigateToView({ type: "file", path: CALENDAR_TAB_PATH });
   }, [navigateToView]);
@@ -5078,7 +5049,6 @@ function App() {
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
                 onOpenFlashcards={openFlashcards}
-                onOpenDashboard={openDashboard}
                 onOpenKanban={openKanban}
               >
                 {(selectedPath || isGraphOpen || isSuggestedTopicsOpen) &&
@@ -5096,8 +5066,7 @@ function App() {
                         isSuggestedTopicsOpen ||
                         (selectedPath != null &&
                           (isBaseFilePath(selectedPath) ||
-                            isFlashcardsTabPath(selectedPath) ||
-                            isDashboardTabPath(selectedPath))))
+                            isFlashcardsTabPath(selectedPath))))
                     }
                   />
                 ) : (
@@ -5254,8 +5223,6 @@ function App() {
                 <BrowserPane onClose={handleCloseBrowser} />
               ) : selectedPath === FLASHCARDS_TAB_PATH ? (
                 <FlashcardReview />
-              ) : selectedPath === DASHBOARD_TAB_PATH ? (
-                <CourseDashboard />
               ) : selectedPath === CALENDAR_TAB_PATH ? (
                 <AcademicCalendar />
               ) : selectedPath === KANBAN_TAB_PATH ? (

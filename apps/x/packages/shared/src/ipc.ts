@@ -414,16 +414,35 @@ const ipcSchemas = {
       error: z.string().optional(),
     }),
   },
-  "academic:dashboard:summary": {
+  "academic:assignments:create": {
     req: z.object({
-      courseId: z.string().optional(),
+      courseId: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+      dueDate: z.string(),
+      status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+      priority: z.enum(["low", "medium", "high"]).optional(),
+      wikiLinks: z.array(z.string()).optional(),
     }),
     res: z.object({
-      coursesCount: z.number(),
-      dueToday: z.number(),
-      dueThisWeek: z.number(),
-      completedAssignments: z.number(),
-      totalAssignments: z.number(),
+      success: z.boolean(),
+      assignment: z.custom<Assignment>().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "academic:assignments:delete": {
+    req: z.object({
+      assignmentId: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      error: z.string().optional(),
+    }),
+  },
+  "today:refresh": {
+    req: z.null(),
+    res: z.object({
+      success: z.boolean(),
     }),
   },
   "onboarding:getStatus": {

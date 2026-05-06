@@ -244,11 +244,11 @@ export function shouldDisableTools(): boolean {
   return false;
 }
 
-// Ensure default knowledge files exist
+// Generate today.md on startup with latest assignments
 import("../knowledge/ensure_daily_note.js")
   .then((m) => m.ensureDailyNote())
   .catch((err) => {
-    console.error("[DailyNote] Failed to ensure daily note:", err);
+    console.error("[DailyNote] Failed to generate today.md:", err);
   });
 
 // Initialize version history repo (async, fire-and-forget on startup)

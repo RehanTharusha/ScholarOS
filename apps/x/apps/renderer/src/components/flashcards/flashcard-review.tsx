@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BookOpen, Check, ChevronsUpDown, RefreshCw, X } from "lucide-react";
+import { BookOpen, Check, ChevronsUpDown, Eye, EyeOff, RefreshCw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +44,9 @@ export function FlashcardReview() {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [flipped, setFlipped] = React.useState(false);
   const [courseSelectorOpen, setCourseSelectorOpen] = React.useState(false);
+  const [results, setResults] = React.useState<Map<string, "correct" | "wrong">>(new Map());
+  const [showAllQuestions, setShowAllQuestions] = React.useState(false);
+  const [revealedAnswers, setRevealedAnswers] = React.useState<Set<string>>(new Set());
 
   const loadCourses = React.useCallback(async () => {
     setCoursesLoading(true);
@@ -67,6 +70,9 @@ export function FlashcardReview() {
   const loadCards = React.useCallback(async () => {
     setLoading(true);
     setError(null);
+    setResults(new Map());
+    setRevealedAnswers(new Set());
+    setShowAllQuestions(false);
     try {
       const result = (await window.ipc.invoke("academic:flashcards:list", {
         courseIds: selectedCourses,
@@ -110,18 +116,33 @@ export function FlashcardReview() {
   };
 
   const markCorrect = () => {
-    // Just move to next card
+    if (activeCard) {
+      setResults((prev) => new Map(prev).set(activeCard.id, "correct"));
+    }
     nextCard();
   };
 
   const markWrong = () => {
-    // Show answer if not flipped, then move to next card
+    if (activeCard) {
+      setResults((prev) => new Map(prev).set(activeCard.id, "wrong"));
+    }
     if (!flipped) {
       setFlipped(true);
-      // Stay on current card to show answer
     } else {
       nextCard();
     }
+  };
+
+  const toggleAnswerReveal = (cardId: string) => {
+    setRevealedAnswers((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
   };
 
   const toggleCourse = (courseId: string) => {
@@ -318,7 +339,6 @@ export function FlashcardReview() {
                   flipped ? "rotate-y-180" : ""
                 }`}
               >
-                {/* Front */}
                 <div className="absolute inset-0 flex flex-col justify-center rounded-2xl border border-border bg-card p-8 backface-hidden">
                   <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground mb-4">
                     Question
@@ -331,7 +351,6 @@ export function FlashcardReview() {
                   </p>
                 </div>
 
-                {/* Back */}
                 <div className="absolute inset-0 flex flex-col justify-center rounded-2xl border border-border bg-card p-8 backface-hidden rotate-y-180">
                   <div className="text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground mb-4">
                     Answer
@@ -360,6 +379,72 @@ export function FlashcardReview() {
                 Next
               </Button>
             </div>
+
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => setShowAllQuestions((v) => !v)}
+                className="gap-2"
+              >
+                {showAllQuestions ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+                {showAllQuestions ? "Hide all questions" : "View all questions"}
+              </Button>
+            </div>
+
+            {showAllQuestions ? (
+              <div className="mt-4 max-h-[400px] overflow-y-auto space-y-3 rounded-2xl border border-border bg-card p-4 animate-in fade-in slide-in-from-bottom-3 duration-200">
+                {cards.map((card) => {
+                  const result = results.get(card.id);
+                  const revealed = revealedAnswers.has(card.id);
+                  return (
+                    <div
+                      key={card.id}
+                      className="rounded-xl border border-border bg-muted/20 p-4"
+                    >
+                      <p className="text-sm font-medium text-foreground">
+                        {card.front}
+                      </p>
+                      {result ? (
+                        <span
+                          className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${
+                            result === "correct"
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {result === "correct" ? "✓ Correct" : "✗ Wrong"}
+                        </span>
+                      ) : null}
+                      <div
+                        className="mt-2 cursor-pointer select-none"
+                        onClick={() => toggleAnswerReveal(card.id)}
+                      >
+                        {revealed ? (
+                          <p className="text-sm text-muted-foreground transition-all duration-300">
+                            {card.back}
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-0.5 overflow-hidden">
+                            {card.back
+                              .split("")
+                              .map((_, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-block h-2 w-2 rounded-sm bg-muted-foreground/20 transition-all duration-200 hover:bg-muted-foreground/40"
+                                />
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         )}
       </div>

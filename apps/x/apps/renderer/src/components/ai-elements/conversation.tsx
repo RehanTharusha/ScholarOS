@@ -46,13 +46,16 @@ export const Conversation = ({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const spacerRef = useRef<HTMLDivElement | null>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const isAtBottomRef = useRef(true);
 
   const updateBottomState = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
-    setIsAtBottom(distanceFromBottom <= BOTTOM_THRESHOLD_PX);
+    const atBottom = distanceFromBottom <= BOTTOM_THRESHOLD_PX;
+    setIsAtBottom(atBottom);
+    isAtBottomRef.current = atBottom;
   }, []);
 
   const applyAnchorLayout = useCallback(
@@ -134,6 +137,12 @@ export const Conversation = ({
       }
       rafId = requestAnimationFrame(() => {
         applyAnchorLayout(false);
+        if (isAtBottomRef.current) {
+          const c = scrollRef.current;
+          if (c) {
+            c.scrollTop = c.scrollHeight;
+          }
+        }
       });
     };
 
