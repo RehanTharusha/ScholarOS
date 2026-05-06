@@ -320,11 +320,16 @@ function ChatInputInner({
       }
       let available = false;
       try {
-        const raw = await window.ipc.invoke("workspace:readFile", {
+        const { exists } = await window.ipc.invoke("workspace:exists", {
           path: "config/exa-search.json",
         });
-        const config = JSON.parse(raw.data);
-        if (config.apiKey) available = true;
+        if (exists) {
+          const raw = await window.ipc.invoke("workspace:readFile", {
+            path: "config/exa-search.json",
+          });
+          const config = JSON.parse(raw.data);
+          if (config.apiKey) available = true;
+        }
       } catch {
         /* not configured */
       }

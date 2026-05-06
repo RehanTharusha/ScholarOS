@@ -112,6 +112,7 @@ import { CourseDashboard } from "@/components/academic/course-dashboard";
 import { AcademicCalendar } from "@/components/academic/calendar-view";
 import { KanbanAcademic } from "@/components/academic/kanban-academic";
 import { IngestWindow } from "@/components/ingest-window";
+import { PdfViewer } from "@/components/pdf-viewer";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
@@ -1591,8 +1592,10 @@ function App() {
             return;
           }
         }
+        const isBinary = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|rtf|png|jpe?g|gif|svg|webp)$/i.test(pathToLoad);
         const result = await window.ipc.invoke("workspace:readFile", {
           path: pathToLoad,
+          encoding: isBinary ? "base64" : undefined,
         });
         if (
           cancelled ||
@@ -1601,34 +1604,38 @@ function App() {
         )
           return;
         setFileContent(result.data);
-        const { raw: fm, body } = splitFrontmatter(result.data);
-        frontmatterByPathRef.current.set(pathToLoad, fm);
-        const normalizeForCompare = (s: string) =>
-          s
-            .split("\n")
-            .map((line) => line.trimEnd())
-            .join("\n")
-            .trim();
-        const isSameEditorFile = editorPathRef.current === pathToLoad;
-        const knownBaseline = initialContentByPathRef.current.get(pathToLoad);
-        const hasKnownBaseline = knownBaseline !== undefined;
-        const hasUnsavedEdits =
-          hasKnownBaseline &&
-          normalizeForCompare(editorContentRef.current) !==
-            normalizeForCompare(knownBaseline);
-        const shouldPreserveActiveDraft = isSameEditorFile && hasUnsavedEdits;
-        if (!shouldPreserveActiveDraft) {
-          setEditorContent(body);
-          if (pathToLoad.endsWith(".md")) {
-            setEditorCacheForPath(pathToLoad, body);
+        if (!isBinary) {
+          const { raw: fm, body } = splitFrontmatter(result.data);
+          frontmatterByPathRef.current.set(pathToLoad, fm);
+          const normalizeForCompare = (s: string) =>
+            s
+              .split("\n")
+              .map((line) => line.trimEnd())
+              .join("\n")
+              .trim();
+          const isSameEditorFile = editorPathRef.current === pathToLoad;
+          const knownBaseline = initialContentByPathRef.current.get(pathToLoad);
+          const hasKnownBaseline = knownBaseline !== undefined;
+          const hasUnsavedEdits =
+            hasKnownBaseline &&
+            normalizeForCompare(editorContentRef.current) !==
+              normalizeForCompare(knownBaseline);
+          const shouldPreserveActiveDraft = isSameEditorFile && hasUnsavedEdits;
+          if (!shouldPreserveActiveDraft) {
+            setEditorContent(body);
+            if (pathToLoad.endsWith(".md")) {
+              setEditorCacheForPath(pathToLoad, body);
+            }
+            editorContentRef.current = body;
+            editorPathRef.current = pathToLoad;
+            initialContentByPathRef.current.set(pathToLoad, body);
+            initialContentRef.current = body;
+            setLastSaved(null);
+          } else {
+            // Still update the editor's path so subsequent autosaves write to the correct file.
+            editorPathRef.current = pathToLoad;
           }
-          editorContentRef.current = body;
-          editorPathRef.current = pathToLoad;
-          initialContentByPathRef.current.set(pathToLoad, body);
-          initialContentRef.current = body;
-          setLastSaved(null);
         } else {
-          // Still update the editor's path so subsequent autosaves write to the correct file.
           editorPathRef.current = pathToLoad;
         }
       } catch (err) {
@@ -5456,6 +5463,8 @@ function App() {
                       />
                     )}
                   </div>
+                ) : selectedPath.endsWith(".pdf") && fileContent ? (
+                  <PdfViewer base64Data={fileContent} />
                 ) : (
                   <div className="flex-1 overflow-auto p-4">
                     <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">

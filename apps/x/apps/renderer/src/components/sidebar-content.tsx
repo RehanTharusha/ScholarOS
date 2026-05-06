@@ -810,6 +810,10 @@ export function SidebarContentPanel({
 
 async function transcribeWithDeepgram(audioBlob: Blob): Promise<string | null> {
   try {
+    const { exists } = await window.ipc.invoke("workspace:exists", {
+      path: "config/deepgram.json",
+    });
+    if (!exists) return null;
     const configResult = await window.ipc.invoke("workspace:readFile", {
       path: "config/deepgram.json",
       encoding: "utf8",
@@ -858,18 +862,25 @@ function VoiceNoteButton({
   }, [onNoteCreated]);
 
   React.useEffect(() => {
-    window.ipc
-      .invoke("workspace:readFile", {
-        path: "config/deepgram.json",
-        encoding: "utf8",
-      })
-      .then((result: { data: string }) => {
+    (async () => {
+      try {
+        const { exists } = await window.ipc.invoke("workspace:exists", {
+          path: "config/deepgram.json",
+        });
+        if (!exists) {
+          setHasDeepgramKey(false);
+          return;
+        }
+        const result = await window.ipc.invoke("workspace:readFile", {
+          path: "config/deepgram.json",
+          encoding: "utf8",
+        });
         const { apiKey } = JSON.parse(result.data) as { apiKey: string };
         setHasDeepgramKey(!!apiKey);
-      })
-      .catch(() => {
+      } catch {
         setHasDeepgramKey(false);
-      });
+      }
+    })();
   }, []);
 
   const startRecording = async () => {
