@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Coding Agent Context
 
-This file provides context for AI coding agents working on the Rowboat monorepo.
+This file provides context for AI coding agents working on the ScholarOS project.
 
 ## Quick Reference Commands
 
@@ -14,20 +14,9 @@ cd apps/x/apps/main && npm run package   # Production build (.app)
 cd apps/x/apps/main && npm run make      # Create DMG distributable
 ```
 
-## Monorepo Structure
+## Project Structure
 
-```
-rowboat/
-├── apps/
-│   ├── x/                 # Electron desktop app (focus of this doc)
-│   ├── rowboat/           # Next.js web dashboard
-│   ├── rowboatx/          # Next.js frontend
-│   ├── cli/               # CLI tool
-│   ├── python-sdk/        # Python SDK
-│   └── docs/              # Documentation site
-├── CLAUDE.md              # This file
-└── README.md              # User-facing readme
-```
+The entire codebase is the **Electron desktop app** in `apps/x/`. No other apps exist.
 
 ## Electron App Architecture (`apps/x`)
 
