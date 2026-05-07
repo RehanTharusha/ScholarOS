@@ -1,12 +1,11 @@
 import { z, ZodType } from "zod";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { createReadStream, existsSync } from "fs";
+import { createReadStream } from "fs";
 import { createInterface } from "readline";
 import { execSync } from "child_process";
 import { homedir, tmpdir } from "os";
 import { glob } from "glob";
-import { fileURLToPath, pathToFileURL } from "url";
 import { executeCommand, executeCommandAbortable } from "./command-executor.js";
 import { resolveSkill, availableSkills } from "../assistant/skills/index.js";
 import { executeTool, listServers, listTools } from "../../mcp/mcp.js";
@@ -180,21 +179,33 @@ const shellQuote = (value: string): string =>
 
 const commandExists = (command: string): boolean => {
   try {
-    execSync(`command -v ${shellQuote(command)}`, {
-      stdio: "pipe",
-      shell: "/bin/sh",
-    });
+    if (process.platform === "win32") {
+      execSync(`where ${shellQuote(command)}`, {
+        stdio: "pipe",
+        shell: "cmd.exe",
+      });
+    } else {
+      execSync(`command -v ${shellQuote(command)}`, {
+        stdio: "pipe",
+        shell: "/bin/sh",
+      });
+    }
     return true;
   } catch {
     return false;
   }
 };
 
+const getSystemShell = (): string =>
+  process.platform === "win32"
+    ? (process.env.ComSpec || "cmd.exe")
+    : "/bin/sh";
+
 const runShellCommand = (command: string): string | undefined => {
   try {
     return execSync(command, {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: "/bin/sh",
+      shell: getSystemShell(),
       maxBuffer: 20 * 1024 * 1024,
     }).toString("utf8");
   } catch {
@@ -274,6 +285,100 @@ const extractPdfTextWithOcrmypdf = async (
     }
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
+  }
+};
+
+const extractPptxText = async (buffer: Buffer): Promise<string> => {
+  try {
+    const { default: JSZip } = await import("jszip");
+    const zip = await JSZip.loadAsync(buffer);
+
+    const slideFiles = Object.keys(zip.files)
+      .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+      .sort((a, b) => {
+        const na = parseInt(a.match(/\d+/)?.[0] || "0", 10);
+        const nb = parseInt(b.match(/\d+/)?.[0] || "0", 10);
+        return na - nb;
+      });
+
+    if (slideFiles.length === 0) return "";
+
+    const slides: string[] = [];
+    for (const slideFile of slideFiles) {
+      const content = await zip.files[slideFile].async("string");
+      const textMatches = content.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) || [];
+      const slideText = textMatches
+        .map((tag) => tag.replace(/<[^>]*>/g, ""))
+        .join("")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (slideText) {
+        slides.push(slideText);
+      }
+    }
+
+    return slides.join("\n\n---\n\n");
+  } catch {
+    return "";
+  }
+};
+
+const extractTextFromImage = async (
+  buffer: Buffer,
+): Promise<string | undefined> => {
+  try {
+    const Tesseract = (await import("tesseract.js")).default;
+    const worker = await Tesseract.createWorker("eng");
+    try {
+      const { data } = await worker.recognize(buffer);
+      const text = data.text?.trim();
+      return text || undefined;
+    } finally {
+      await worker.terminate();
+    }
+  } catch {
+    return undefined;
+  }
+};
+
+const extractPdfTextWithTesseractJs = async (
+  filePath: string,
+): Promise<{ text: string; pages: number } | undefined> => {
+  if (!commandExists("pdftoppm")) return undefined;
+
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
+  try {
+    runShellCommand(
+      `pdftoppm -png -r 300 ${shellQuote(filePath)} ${path.join(tempDir, "page")}`,
+    );
+
+    const entries = await fs.readdir(tempDir);
+    const imageFiles = entries
+      .filter((f) => f.endsWith(".png"))
+      .sort();
+
+    if (imageFiles.length === 0) return undefined;
+
+    const Tesseract = (await import("tesseract.js")).default;
+    const worker = await Tesseract.createWorker("eng");
+    try {
+      const pageTexts: string[] = [];
+      for (const imgFile of imageFiles) {
+        const imgBuffer = await fs.readFile(path.join(tempDir, imgFile));
+        const { data } = await worker.recognize(imgBuffer);
+        if (data.text?.trim()) {
+          pageTexts.push(data.text.trim());
+        }
+      }
+      const combined = pageTexts.join("\n\n");
+      return combined ? { text: combined, pages: imageFiles.length } : undefined;
+    } finally {
+      await worker.terminate();
+    }
+  } catch {
+    return undefined;
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 };
 
@@ -978,7 +1083,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
 
   parseFile: {
     description:
-      "Parse and extract text content from files (PDF, Excel, CSV, Word .docx). Auto-detects format from file extension.",
+      "Parse and extract text content from files (PDF, PPTX, DOCX, XLSX, CSV, PNG, JPG). Auto-detects format from file extension. PDFs use automatic fallback chain: pdf-parse → pdftotext → ocrmypdf → pdftoppm+tesseract.js. Images use tesseract.js OCR.",
     inputSchema: z.object({
       path: z
         .string()
@@ -991,7 +1096,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       try {
         const fileName = path.basename(filePath);
         const ext = path.extname(filePath).toLowerCase();
-        const supportedExts = [".pdf", ".xlsx", ".xls", ".csv", ".docx"];
+        const supportedExts = [".pdf", ".pptx", ".xlsx", ".xls", ".csv", ".docx", ".png", ".jpg", ".jpeg"];
 
         if (!supportedExts.includes(ext)) {
           return {
@@ -1079,6 +1184,26 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
               };
             }
 
+            const jsOcrResult = await extractPdfTextWithTesseractJs(filePath);
+            if (jsOcrResult) {
+              const chunks = splitPdfTextIntoChunks(jsOcrResult.text);
+              return {
+                success: true,
+                fileName,
+                format: "pdf",
+                content: jsOcrResult.text,
+                chunks,
+                metadata: {
+                  pages: jsOcrResult.pages || textResult.total,
+                  title: infoResult?.info?.Title || undefined,
+                  author: infoResult?.info?.Author || undefined,
+                  fallback: "tesseract.js",
+                  chunkCount: chunks.length,
+                  chunkTarget: PDF_CHUNK_TARGET,
+                },
+              };
+            }
+
             const chunks = splitPdfTextIntoChunks(textResult.text);
 
             return {
@@ -1140,6 +1265,16 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
           };
         }
 
+        if (ext === ".pptx") {
+          const content = await extractPptxText(buffer);
+          return {
+            success: true,
+            fileName,
+            format: "pptx",
+            content,
+          };
+        }
+
         if (ext === ".docx") {
           const docResult = await mammoth.extractRawText({ buffer });
           return {
@@ -1147,6 +1282,19 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
             fileName,
             format: "docx",
             content: docResult.value,
+          };
+        }
+
+        if ([".png", ".jpg", ".jpeg"].includes(ext)) {
+          const content = await extractTextFromImage(buffer);
+          return {
+            success: true,
+            fileName,
+            format: ext === ".png" ? "png" : "jpeg",
+            content: content || "",
+            metadata: content
+              ? undefined
+              : { note: "tesseract.js could not extract text from this image" },
           };
         }
 

@@ -4,12 +4,10 @@
  */
 
 import { promises as fs } from "fs";
-import { existsSync } from "fs";
 import { execSync } from "child_process";
 import path from "path";
 import { tmpdir } from "os";
 import { PDFParse } from "pdf-parse";
-import { fileURLToPath, pathToFileURL } from "url";
 import { PdfEmbeddingStore, embedPdfChunks } from "./pdf-embeddings.js";
 import { getPdfWorkerPath } from "../application/lib/pdf-worker-resolver.js";
 
@@ -49,12 +47,25 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+function getSystemShell(): string {
+  return process.platform === "win32"
+    ? (process.env.ComSpec || "cmd.exe")
+    : "/bin/sh";
+}
+
 function commandExists(command: string): boolean {
   try {
-    execSync(`command -v ${shellQuote(command)}`, {
-      stdio: "pipe",
-      shell: "/bin/sh",
-    });
+    if (process.platform === "win32") {
+      execSync(`where ${shellQuote(command)}`, {
+        stdio: "pipe",
+        shell: "cmd.exe",
+      });
+    } else {
+      execSync(`command -v ${shellQuote(command)}`, {
+        stdio: "pipe",
+        shell: "/bin/sh",
+      });
+    }
     return true;
   } catch {
     return false;
@@ -65,7 +76,7 @@ function runShellCommand(command: string): string | undefined {
   try {
     return execSync(command, {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: "/bin/sh",
+      shell: getSystemShell(),
       maxBuffer: 20 * 1024 * 1024,
     }).toString("utf8");
   } catch {
@@ -213,6 +224,44 @@ async function extractWithOcrmypdf(
     }
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function extractPdfTextWithTesseractJs(
+  filepath: string,
+): Promise<string | undefined> {
+  if (!commandExists("pdftoppm")) return undefined;
+
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
+  try {
+    runShellCommand(
+      `pdftoppm -png -r 300 ${shellQuote(filepath)} ${path.join(tempDir, "page")}`,
+    );
+
+    const entries = await fs.readdir(tempDir);
+    const imageFiles = entries.filter((f) => f.endsWith(".png")).sort();
+
+    if (imageFiles.length === 0) return undefined;
+
+    const Tesseract = (await import("tesseract.js")).default;
+    const worker = await Tesseract.createWorker("eng");
+    try {
+      const pageTexts: string[] = [];
+      for (const imgFile of imageFiles) {
+        const imgBuffer = await fs.readFile(path.join(tempDir, imgFile));
+        const { data } = await worker.recognize(imgBuffer);
+        if (data.text?.trim()) {
+          pageTexts.push(data.text.trim());
+        }
+      }
+      return pageTexts.join("\n\n") || undefined;
+    } finally {
+      await worker.terminate();
+    }
+  } catch {
+    return undefined;
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -416,6 +465,9 @@ class PDFExtractor {
       }
       if (isLowTextPdf(text, textResult.total)) {
         text = (await extractWithOcrmypdf(filepath)) ?? text;
+      }
+      if (isLowTextPdf(text, textResult.total)) {
+        text = (await extractPdfTextWithTesseractJs(filepath)) ?? text;
       }
 
       const data = {
