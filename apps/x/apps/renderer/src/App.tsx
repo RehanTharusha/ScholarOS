@@ -3688,10 +3688,6 @@ function App() {
     void navigateToView({ type: "file", path: FLASHCARDS_TAB_PATH });
   }, [navigateToView]);
 
-  const openCalendar = useCallback(() => {
-    void navigateToView({ type: "file", path: CALENDAR_TAB_PATH });
-  }, [navigateToView]);
-
   const openKanban = useCallback(() => {
     void navigateToView({ type: "file", path: KANBAN_TAB_PATH });
   }, [navigateToView]);

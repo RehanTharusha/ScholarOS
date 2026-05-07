@@ -78,9 +78,10 @@ export function KanbanAcademic() {
         if (!response.success || !response.assignment) {
           throw new Error(response.error || "Failed to move assignment");
         }
+        const updated = response.assignment;
         setAssignments((current) =>
           current.map((item) =>
-            item.id === response.assignment.id ? response.assignment : item,
+            item.id === updated.id ? updated : item,
           ),
         );
       } catch (err) {
@@ -322,11 +323,12 @@ function AddTaskDialog({
     setSaving(true);
     setError("");
     try {
+      const createStatus = status === "done" ? "graded" : status;
       const result = await window.ipc.invoke("academic:assignments:create", {
         title: title.trim(),
         courseId: courseId.trim(),
         dueDate: new Date(dueDate).toISOString(),
-        status,
+        status: createStatus,
         priority,
         description: description.trim(),
       });

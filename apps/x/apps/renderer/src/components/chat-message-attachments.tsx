@@ -130,7 +130,6 @@ export function ChatMessageAttachments({
             const Icon = getAttachmentIcon(getAttachmentIconKind(attachment));
             const attachmentName = getAttachmentDisplayName(attachment);
             const attachmentType = getAttachmentTypeLabel(attachment);
-            const isPdf = attachment.mimeType === "application/pdf";
             return (
               <span
                 key={`${attachment.path}-${index}`}
