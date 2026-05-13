@@ -517,6 +517,24 @@ function buildTree(entries: DirEntry[]): TreeNode[] {
   return sortNodes(roots);
 }
 
+// Top-level folders that are app plumbing, not user content.
+// Keep them out of sidebar view, but leave them in the full tree for views that
+// depend on their files (for example BasesView reads `bases/*.base`).
+const HIDDEN_SIDEBAR_ROOT_FOLDERS = new Set([
+  "agents",
+  "bases",
+  "config",
+  "events",
+  "logs",
+]);
+
+function getSidebarTree(tree: TreeNode[]): TreeNode[] {
+  return tree.filter(
+    (node) =>
+      !(node.kind === "dir" && HIDDEN_SIDEBAR_ROOT_FOLDERS.has(node.name)),
+  );
+}
+
 const collectDirPaths = (nodes: TreeNode[]): string[] =>
   nodes.flatMap((n) =>
     n.kind === "dir"
@@ -1567,7 +1585,10 @@ function App() {
             return;
           }
         }
-        const isBinary = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|rtf|png|jpe?g|gif|svg|webp)$/i.test(pathToLoad);
+        const isBinary =
+          /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|rtf|png|jpe?g|gif|svg|webp)$/i.test(
+            pathToLoad,
+          );
         const result = await window.ipc.invoke("workspace:readFile", {
           path: pathToLoad,
           encoding: isBinary ? "base64" : undefined,
@@ -4846,6 +4867,7 @@ function App() {
   const isRightPaneOnlyMode =
     isRightPaneContext && isChatSidebarOpen && isRightPaneMaximized;
   const shouldCollapseLeftPane = isRightPaneOnlyMode;
+  const sidebarTree = React.useMemo(() => getSidebarTree(tree), [tree]);
   const openMarkdownTabs = React.useMemo(() => {
     const markdownTabs = fileTabs.filter((tab) => tab.path.endsWith(".md"));
     if (selectedPath?.endsWith(".md")) {
@@ -4882,7 +4904,7 @@ function App() {
             }
           >
             <SidebarContentPanel
-              tree={tree}
+              tree={sidebarTree}
               selectedPath={selectedPath}
               expandedPaths={expandedPaths}
               onSelectFile={toggleExpand}
