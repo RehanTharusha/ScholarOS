@@ -28,7 +28,7 @@ import { UserMessageContent } from "./message.js";
 import { RowboatApiConfig } from "./rowboat-account.js";
 import { ZListToolkitsResponse } from "./composio.js";
 import { BrowserStateSchema } from "./browser-control.js";
-import { Assignment } from "./academic.js";
+import { Assignment, UpcomingTask } from "./academic.js";
 
 // ============================================================================
 // Runtime Validation Schemas (Single Source of Truth)
@@ -437,6 +437,80 @@ const ipcSchemas = {
     res: z.object({
       success: z.boolean(),
       error: z.string().optional(),
+    }),
+  },
+  "upcoming:tasks:list": {
+    req: z.object({
+      courseId: z.string().optional(),
+      status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+    }),
+    res: z.object({
+      tasks: z.array(z.custom<UpcomingTask>()),
+    }),
+  },
+  "upcoming:tasks:create": {
+    req: z.object({
+      courseId: z.string(),
+      title: z.string(),
+      description: z.string().optional(),
+      dueDate: z.string(),
+      status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+      priority: z.enum(["low", "medium", "high"]).optional(),
+      source: z.enum(["ingest", "manual", "agent"]),
+      sourceFile: z.string().optional(),
+      notes: z.string().optional(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      task: z.custom<UpcomingTask>().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "upcoming:tasks:update": {
+    req: z.object({
+      taskId: z.string(),
+      updates: z.object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        dueDate: z.string().optional(),
+        status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+        priority: z.enum(["low", "medium", "high"]).optional(),
+        notes: z.string().optional(),
+      }),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      task: z.custom<UpcomingTask>().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "upcoming:tasks:delete": {
+    req: z.object({
+      taskId: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      error: z.string().optional(),
+    }),
+  },
+  "upcoming:tasks:createFromIngest": {
+    req: z.object({
+      tasks: z.array(
+        z.object({
+          title: z.string(),
+          courseId: z.string(),
+          dueDate: z.string(),
+          description: z.string().optional(),
+          priority: z.enum(["low", "medium", "high"]).optional(),
+          sourceFile: z.string().optional(),
+          notes: z.string().optional(),
+        }),
+      ),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      count: z.number(),
+      errors: z.array(z.string()).optional(),
     }),
   },
   "today:refresh": {

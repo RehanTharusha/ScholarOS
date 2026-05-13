@@ -44,6 +44,7 @@ type CalendarEvent = {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  taskMdPath?: string;
 };
 
 type CalendarStore = {
@@ -278,13 +279,20 @@ function getCalendarEventTone(event: CalendarEvent) {
   return hues[hash % hues.length];
 }
 
-export function AcademicCalendar() {
+export function AcademicCalendar({
+  onNavigateToTask,
+}: {
+  onNavigateToTask?: (path: string) => void;
+}) {
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("month");
   const [anchorDate, setAnchorDate] = React.useState(() => new Date());
   const [selectedDate, setSelectedDate] = React.useState(() =>
     startOfDay(new Date()),
   );
   const [store, setStore] = React.useState<CalendarStore>(emptyStore);
+  const [upcomingEvents, setUpcomingEvents] = React.useState<CalendarEvent[]>(
+    [],
+  );
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -300,13 +308,34 @@ export function AcademicCalendar() {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.ipc.invoke("workspace:readFile", {
-        path: CALENDAR_FILE_PATH,
-        encoding: "utf8",
-      });
-      const raw = typeof result?.data === "string" ? result.data : result;
+      const [calResult, upcomingResult] = await Promise.all([
+        window.ipc.invoke("workspace:readFile", {
+          path: CALENDAR_FILE_PATH,
+          encoding: "utf8",
+        }),
+        window.ipc.invoke("upcoming:tasks:list", {}),
+      ]);
+
+      // Load calendar events
+      const raw = typeof calResult?.data === "string" ? calResult.data : calResult;
       const parsed = normalizeStore(JSON.parse(String(raw)));
       setStore({ version: 1, events: sortEvents(parsed.events) });
+
+      // Convert upcoming tasks to calendar events
+      const taskEvents: CalendarEvent[] = (
+        upcomingResult?.tasks ?? []
+      ).map((task: { id: string; title: string; courseId: string; dueDate: string; mdPath: string }) => ({
+        id: `upcoming-${task.id}`,
+        title: task.title,
+        courseId: task.courseId,
+        startAt: new Date(task.dueDate).toISOString(),
+        allDay: true,
+        notes: "Upcoming task — click to open details",
+        createdAt: "",
+        updatedAt: "",
+        taskMdPath: task.mdPath,
+      }));
+      setUpcomingEvents(taskEvents);
     } catch (err) {
       setStore(emptyStore);
       if (
@@ -337,7 +366,10 @@ export function AcademicCalendar() {
     }
   }, []);
 
-  const events = React.useMemo(() => sortEvents(store.events), [store.events]);
+  const events = React.useMemo(
+    () => sortEvents([...store.events, ...upcomingEvents]),
+    [store.events, upcomingEvents],
+  );
 
   const range = React.useMemo(() => {
     if (viewMode === "month") {
@@ -394,10 +426,14 @@ export function AcademicCalendar() {
   );
 
   const openEdit = React.useCallback((event: CalendarEvent) => {
+    if (event.taskMdPath && onNavigateToTask) {
+      onNavigateToTask(event.taskMdPath);
+      return;
+    }
     setEditingEventId(event.id);
     setDraft(mergeDraft(event));
     setEditorOpen(true);
-  }, []);
+  }, [onNavigateToTask]);
 
   const editingEvent = React.useMemo(
     () => events.find((event) => event.id === editingEventId) ?? null,

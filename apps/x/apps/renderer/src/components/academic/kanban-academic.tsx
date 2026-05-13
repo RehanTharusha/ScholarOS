@@ -43,8 +43,39 @@ export function KanbanAcademic() {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.ipc.invoke("academic:assignments:list", {});
-      setAssignments(result.assignments ?? []);
+      const [legacyResult, upcomingResult] = await Promise.all([
+        window.ipc.invoke("academic:assignments:list", {}),
+        window.ipc.invoke("upcoming:tasks:list", {}),
+      ]);
+
+      const legacyAssignments: Assignment[] = legacyResult.assignments ?? [];
+      const upcomingTasks: Assignment[] = (upcomingResult.tasks ?? []).map(
+        (t: { id: string; title: string; courseId: string; dueDate: string; status: string; priority?: string; description?: string }) => ({
+          id: `upcoming-${t.id}`,
+          courseId: t.courseId,
+          title: t.title,
+          description: t.description,
+          dueDate: t.dueDate,
+          status: t.status as Assignment["status"],
+          priority: t.priority as Assignment["priority"],
+        }),
+      );
+
+      // Dedup by courseId+title, prefer upcoming tasks
+      const seen = new Set<string>();
+      const merged: Assignment[] = [];
+      for (const t of upcomingTasks) {
+        const key = `${t.courseId}:${t.title}`;
+        seen.add(key);
+        merged.push(t);
+      }
+      for (const a of legacyAssignments) {
+        const key = `${a.courseId}:${a.title}`;
+        if (!seen.has(key)) {
+          merged.push(a);
+        }
+      }
+      setAssignments(merged);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load assignments",
@@ -71,19 +102,42 @@ export function KanbanAcademic() {
   const moveAssignment = React.useCallback(
     async (assignmentId: string, newStatus: KanbanStatus) => {
       try {
-        const response = await window.ipc.invoke(
-          "academic:assignments:updateStatus",
-          { assignmentId, status: newStatus },
-        );
-        if (!response.success || !response.assignment) {
-          throw new Error(response.error || "Failed to move assignment");
+        const statusMap: Record<string, Assignment["status"]> = {
+          "not-started": "not-started",
+          "in-progress": "in-progress",
+          done: "submitted",
+        };
+        if (assignmentId.startsWith("upcoming-")) {
+          const taskId = assignmentId.slice("upcoming-".length);
+          const response = await window.ipc.invoke("upcoming:tasks:update", {
+            taskId,
+            updates: { status: statusMap[newStatus] },
+          });
+          if (!response.success) {
+            throw new Error(response.error || "Failed to move task");
+          }
+          setAssignments((current) =>
+            current.map((item) =>
+              item.id === assignmentId
+                ? { ...item, status: statusMap[newStatus] }
+                : item,
+            ),
+          );
+        } else {
+          const response = await window.ipc.invoke(
+            "academic:assignments:updateStatus",
+            { assignmentId, status: newStatus },
+          );
+          if (!response.success || !response.assignment) {
+            throw new Error(response.error || "Failed to move assignment");
+          }
+          const updated = response.assignment;
+          setAssignments((current) =>
+            current.map((item) =>
+              item.id === updated.id ? updated : item,
+            ),
+          );
         }
-        const updated = response.assignment;
-        setAssignments((current) =>
-          current.map((item) =>
-            item.id === updated.id ? updated : item,
-          ),
-        );
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to move assignment",
@@ -323,14 +377,15 @@ function AddTaskDialog({
     setSaving(true);
     setError("");
     try {
-      const createStatus = status === "done" ? "graded" : status;
-      const result = await window.ipc.invoke("academic:assignments:create", {
+      const createStatus = status === "done" ? "submitted" : status;
+      const result = await window.ipc.invoke("upcoming:tasks:create", {
         title: title.trim(),
         courseId: courseId.trim(),
         dueDate: new Date(dueDate).toISOString(),
-        status: createStatus,
+        status: createStatus as "not-started" | "in-progress" | "submitted" | "graded",
         priority,
         description: description.trim(),
+        source: "manual",
       });
       if (!result.success) throw new Error(result.error || "Failed to create");
       onCreated();

@@ -5242,7 +5242,9 @@ function App() {
               ) : selectedPath === FLASHCARDS_TAB_PATH ? (
                 <FlashcardReview />
               ) : selectedPath === CALENDAR_TAB_PATH ? (
-                <AcademicCalendar />
+                <AcademicCalendar
+                  onNavigateToTask={(path) => navigateToFile(path)}
+                />
               ) : selectedPath === KANBAN_TAB_PATH ? (
                 <KanbanAcademic />
               ) : selectedPath === INGEST_TAB_PATH ? (

@@ -8,6 +8,12 @@ import { execSync } from "child_process";
 import path from "path";
 import { tmpdir } from "os";
 import { PDFParse } from "pdf-parse";
+import { generateText } from "ai";
+import { createProvider } from "../models/models.js";
+import {
+  getDefaultModelAndProvider,
+  resolveProviderConfig,
+} from "../models/defaults.js";
 import { PdfEmbeddingStore, embedPdfChunks } from "./pdf-embeddings.js";
 import { getPdfWorkerPath } from "../application/lib/pdf-worker-resolver.js";
 
@@ -86,8 +92,8 @@ function runShellCommand(command: string): string | undefined {
 
 function isLowTextPdf(text: string, pages: number): boolean {
   const normalized = text.replace(/\s+/g, " ").trim();
-  const threshold = Math.max(400, pages * 120);
-  return normalized.length < threshold;
+  if (normalized.length < 100) return true;
+  return normalized.length / Math.max(pages, 1) < 40;
 }
 
 function splitPdfTextIntoChunks(text: string): string[] {
@@ -227,41 +233,146 @@ async function extractWithOcrmypdf(
   }
 }
 
-async function extractPdfTextWithTesseractJs(
+async function tryExtractPdfPagesViaCli(
   filepath: string,
-): Promise<string | undefined> {
-  if (!commandExists("pdftoppm")) return undefined;
-
-  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
-  try {
+  tempDir: string,
+): Promise<string[]> {
+  if (commandExists("pdftoppm")) {
     runShellCommand(
       `pdftoppm -png -r 300 ${shellQuote(filepath)} ${path.join(tempDir, "page")}`,
     );
+    const entries = await fs.readdir(tempDir).catch(() => []);
+    const images = entries.filter((f) => f.endsWith(".png")).sort();
+    if (images.length > 0) return images.map((f) => path.join(tempDir, f));
+  }
 
-    const entries = await fs.readdir(tempDir);
-    const imageFiles = entries.filter((f) => f.endsWith(".png")).sort();
+  if (commandExists("gs")) {
+    runShellCommand(
+      `gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r300 -sOutputFile=${path.join(tempDir, "page-%d.png")} ${shellQuote(filepath)}`,
+    );
+    const entries = await fs.readdir(tempDir).catch(() => []);
+    const images = entries.filter((f) => f.endsWith(".png")).sort();
+    if (images.length > 0) return images.map((f) => path.join(tempDir, f));
+  }
 
-    if (imageFiles.length === 0) return undefined;
+  return [];
+}
+
+async function tryExtractPdfPagesViaCanvas(
+  filepath: string,
+): Promise<string | undefined> {
+  if (typeof OffscreenCanvas === "undefined") return undefined;
+
+  try {
+    const buffer = await fs.readFile(filepath);
+    const pdfjsLib = await import("pdfjs-dist");
+    const { getDocument, GlobalWorkerOptions } = pdfjsLib;
+
+    const pdfWorkerSrc = getPdfWorkerPath();
+    if (pdfWorkerSrc) {
+      GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+    }
+
+    const pdfDoc = await getDocument({ data: buffer.slice(0) }).promise;
 
     const Tesseract = (await import("tesseract.js")).default;
     const worker = await Tesseract.createWorker("eng");
+
     try {
       const pageTexts: string[] = [];
-      for (const imgFile of imageFiles) {
-        const imgBuffer = await fs.readFile(path.join(tempDir, imgFile));
-        const { data } = await worker.recognize(imgBuffer);
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 3.0 });
+        const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
+
+        await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport }).promise;
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (!imageData?.data?.length) continue;
+
+        const { data } = await worker.recognize(imageData);
         if (data.text?.trim()) {
           pageTexts.push(data.text.trim());
         }
       }
+
       return pageTexts.join("\n\n") || undefined;
     } finally {
       await worker.terminate();
     }
   } catch {
     return undefined;
+  }
+}
+
+async function extractPdfTextWithTesseractJs(
+  filepath: string,
+): Promise<string | undefined> {
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
+  try {
+    const cliImages = await tryExtractPdfPagesViaCli(filepath, tempDir);
+    if (cliImages.length > 0) {
+      const Tesseract = (await import("tesseract.js")).default;
+      const worker = await Tesseract.createWorker("eng");
+      try {
+        const pageTexts: string[] = [];
+        for (const imgPath of cliImages) {
+          const imgBuffer = await fs.readFile(imgPath);
+          const { data } = await worker.recognize(imgBuffer);
+          if (data.text?.trim()) {
+            pageTexts.push(data.text.trim());
+          }
+        }
+        return pageTexts.join("\n\n") || undefined;
+      } finally {
+        await worker.terminate();
+      }
+    }
+
+    const canvasResult = await tryExtractPdfPagesViaCanvas(filepath);
+    if (canvasResult) return canvasResult;
+
+    return undefined;
+  } catch {
+    return undefined;
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function extractWithLLM(
+  filepath: string,
+): Promise<string | undefined> {
+  try {
+    const buffer = await fs.readFile(filepath);
+    const base64 = buffer.toString("base64");
+    const { model: modelId, provider: providerName } =
+      await getDefaultModelAndProvider();
+    const providerConfig = await resolveProviderConfig(providerName);
+    const model = createProvider(providerConfig).languageModel(modelId);
+
+    const response = await generateText({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract all text content from this PDF. Return only the extracted text, no commentary.",
+            },
+            { type: "file", data: base64, mediaType: "application/pdf" },
+          ],
+        },
+      ],
+    });
+
+    const text = response.text?.trim();
+    return text || undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -468,6 +579,9 @@ class PDFExtractor {
       }
       if (isLowTextPdf(text, textResult.total)) {
         text = (await extractPdfTextWithTesseractJs(filepath)) ?? text;
+      }
+      if (isLowTextPdf(text, textResult.total)) {
+        text = (await extractWithLLM(filepath)) ?? text;
       }
 
       const data = {

@@ -215,8 +215,8 @@ const runShellCommand = (command: string): string | undefined => {
 
 const isLowTextPdf = (text: string, pages: number): boolean => {
   const normalized = text.replace(/\s+/g, " ").trim();
-  const threshold = Math.max(400, pages * 120);
-  return normalized.length < threshold;
+  if (normalized.length < 100) return true;
+  return normalized.length / Math.max(pages, 1) < 40;
 };
 
 const extractPdfTextWithPdftotext = async (
@@ -341,44 +341,185 @@ const extractTextFromImage = async (
   }
 };
 
-const extractPdfTextWithTesseractJs = async (
+async function tryExtractPdfPagesViaCli(
   filePath: string,
-): Promise<{ text: string; pages: number } | undefined> => {
-  if (!commandExists("pdftoppm")) return undefined;
-
-  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
-  try {
+  tempDir: string,
+): Promise<string[]> {
+  if (commandExists("pdftoppm")) {
     runShellCommand(
       `pdftoppm -png -r 300 ${shellQuote(filePath)} ${path.join(tempDir, "page")}`,
     );
+    const entries = await fs.readdir(tempDir).catch(() => []);
+    const images = entries.filter((f) => f.endsWith(".png")).sort();
+    if (images.length > 0) return images.map((f) => path.join(tempDir, f));
+  }
 
-    const entries = await fs.readdir(tempDir);
-    const imageFiles = entries
-      .filter((f) => f.endsWith(".png"))
-      .sort();
+  if (commandExists("gs")) {
+    runShellCommand(
+      `gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r300 -sOutputFile=${path.join(tempDir, "page-%d.png")} ${shellQuote(filePath)}`,
+    );
+    const entries = await fs.readdir(tempDir).catch(() => []);
+    const images = entries.filter((f) => f.endsWith(".png")).sort();
+    if (images.length > 0) return images.map((f) => path.join(tempDir, f));
+  }
 
-    if (imageFiles.length === 0) return undefined;
+  return [];
+}
+
+const PARSE_DEBUG = () => process.env.PARSE_DEBUG === "1";
+
+async function tryExtractPdfPagesViaCanvas(
+  filePath: string,
+): Promise<
+  { text: string; pages: number } | undefined
+> {
+  if (typeof OffscreenCanvas === "undefined") {
+    if (PARSE_DEBUG()) console.log("[parse] OffscreenCanvas not available");
+    return undefined;
+  }
+
+  try {
+    const buffer = await fs.readFile(filePath);
+    const pdfjsLib = await import("pdfjs-dist");
+    const { getDocument, GlobalWorkerOptions } = pdfjsLib;
+
+    const pdfWorkerSrc = getPdfWorkerPath();
+    if (pdfWorkerSrc) {
+      GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+    }
+
+    if (PARSE_DEBUG()) console.log("[parse] Rendering PDF pages via OffscreenCanvas...");
+    const pdfDoc = await getDocument({ data: buffer.slice(0) }).promise;
+    if (PARSE_DEBUG()) console.log(`[parse] PDF has ${pdfDoc.numPages} pages`);
 
     const Tesseract = (await import("tesseract.js")).default;
     const worker = await Tesseract.createWorker("eng");
+
     try {
       const pageTexts: string[] = [];
-      for (const imgFile of imageFiles) {
-        const imgBuffer = await fs.readFile(path.join(tempDir, imgFile));
-        const { data } = await worker.recognize(imgBuffer);
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 3.0 });
+        const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          if (PARSE_DEBUG()) console.log(`[parse] Page ${i}: no 2d context`);
+          continue;
+        }
+
+        await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport }).promise;
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (!imageData?.data?.length) {
+          if (PARSE_DEBUG()) console.log(`[parse] Page ${i}: empty render`);
+          continue;
+        }
+
+        if (PARSE_DEBUG()) console.log(`[parse] Page ${i}: OCR ${viewport.width}x${viewport.height}...`);
+        const { data } = await worker.recognize(imageData);
         if (data.text?.trim()) {
           pageTexts.push(data.text.trim());
+          if (PARSE_DEBUG()) console.log(`[parse] Page ${i}: ${data.text.trim().length} chars`);
+        } else if (PARSE_DEBUG()) {
+          console.log(`[parse] Page ${i}: no text extracted`);
         }
       }
+
       const combined = pageTexts.join("\n\n");
-      return combined ? { text: combined, pages: imageFiles.length } : undefined;
+      if (PARSE_DEBUG()) console.log(`[parse] Canvas OCR total: ${combined.length} chars from ${pageTexts.length} pages`);
+      return combined ? { text: combined, pages: pdfDoc.numPages } : undefined;
     } finally {
       await worker.terminate();
     }
+  } catch (err) {
+    if (PARSE_DEBUG()) console.log("[parse] Canvas render error:", err instanceof Error ? err.message : err);
+    return undefined;
+  }
+}
+
+async function ocrImagesWithTesseract(
+  imagePaths: string[],
+): Promise<{ text: string; pages: number } | undefined> {
+  const Tesseract = (await import("tesseract.js")).default;
+  const worker = await Tesseract.createWorker("eng");
+  try {
+    const pageTexts: string[] = [];
+    for (const imgPath of imagePaths) {
+      const imgBuffer = await fs.readFile(imgPath);
+      const { data } = await worker.recognize(imgBuffer);
+      if (data.text?.trim()) {
+        pageTexts.push(data.text.trim());
+      }
+    }
+    const combined = pageTexts.join("\n\n");
+    return combined ? { text: combined, pages: imagePaths.length } : undefined;
+  } finally {
+    await worker.terminate();
+  }
+}
+
+const extractPdfTextWithTesseractJs = async (
+  filePath: string,
+): Promise<{ text: string; pages: number } | undefined> => {
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
+  try {
+    const cliImages = await tryExtractPdfPagesViaCli(filePath, tempDir);
+    if (cliImages.length > 0) {
+      return await ocrImagesWithTesseract(cliImages);
+    }
+
+    const canvasResult = await tryExtractPdfPagesViaCanvas(filePath);
+    if (canvasResult) {
+      return canvasResult;
+    }
+
+    return undefined;
   } catch {
     return undefined;
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+};
+
+const extractTextWithLLM = async (
+  filePath: string,
+  mimeType: string,
+): Promise<string | undefined> => {
+  try {
+    let buffer: Buffer;
+    if (path.isAbsolute(filePath)) {
+      buffer = await fs.readFile(filePath);
+    } else {
+      const result = await workspace.readFile(filePath, "base64");
+      buffer = Buffer.from(result.data, "base64");
+    }
+
+    const base64 = buffer.toString("base64");
+    const { model: modelId, provider: providerName } =
+      await getDefaultModelAndProvider();
+    const providerConfig = await resolveProviderConfig(providerName);
+    const model = createProvider(providerConfig).languageModel(modelId);
+
+    const response = await generateText({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract all text content from this file. Return only the extracted text, no commentary.",
+            },
+            { type: "file", data: base64, mediaType: mimeType },
+          ],
+        },
+      ],
+    });
+
+    const text = response.text?.trim();
+    return text || undefined;
+  } catch {
+    return undefined;
   }
 };
 
@@ -1083,7 +1224,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
 
   parseFile: {
     description:
-      "Parse and extract text content from files (PDF, PPTX, DOCX, XLSX, CSV, PNG, JPG). Auto-detects format from file extension. PDFs use automatic fallback chain: pdf-parse → pdftotext → ocrmypdf → pdftoppm+tesseract.js. Images use tesseract.js OCR.",
+      "Parse and extract text content from files (PDF, PPTX, DOCX, XLSX, CSV, PNG, JPG). Auto-detects format from file extension. PDFs use automatic fallback chain: pdf-parse → pdftotext → ocrmypdf → pdftoppm+tesseract.js → LLM. Images use tesseract.js OCR → LLM.",
     inputSchema: z.object({
       path: z
         .string()
@@ -1204,6 +1345,27 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
               };
             }
 
+            const llmResult = await extractTextWithLLM(filePath, "application/pdf");
+            if (llmResult) {
+              const chunks = splitPdfTextIntoChunks(llmResult);
+              return {
+                success: true,
+                fileName,
+                format: "pdf",
+                content: llmResult,
+                chunks,
+                metadata: {
+                  pages: textResult.total,
+                  title: infoResult?.info?.Title || undefined,
+                  author: infoResult?.info?.Author || undefined,
+                  fallback: "llm",
+                  chunkCount: chunks.length,
+                  chunkTarget: PDF_CHUNK_TARGET,
+                },
+              };
+            }
+
+            const hasContent = textResult.text.replace(/\s+/g, " ").trim().length > 50;
             const chunks = splitPdfTextIntoChunks(textResult.text);
 
             return {
@@ -1216,7 +1378,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
                 pages: textResult.total,
                 title: infoResult?.info?.Title || undefined,
                 author: infoResult?.info?.Author || undefined,
-                fallback: "low-text",
+                fallback: hasContent ? "partial" : "low-text",
                 chunkCount: chunks.length,
                 chunkTarget: PDF_CHUNK_TARGET,
               },
@@ -1286,7 +1448,10 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         if ([".png", ".jpg", ".jpeg"].includes(ext)) {
-          const content = await extractTextFromImage(buffer);
+          let content = await extractTextFromImage(buffer);
+          if (!content) {
+            content = await extractTextWithLLM(filePath, LLMPARSE_MIME_TYPES[ext]);
+          }
           return {
             success: true,
             fileName,
@@ -1294,7 +1459,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
             content: content || "",
             metadata: content
               ? undefined
-              : { note: "tesseract.js could not extract text from this image" },
+              : { note: "Could not extract text from this image" },
           };
         }
 
@@ -2334,6 +2499,113 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         return {
           success: true,
           message: `Updated track ${trackId} in ${filePath}`,
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { success: false, error: msg };
+      }
+    },
+  },
+
+  "upcoming-task-create": {
+    description:
+      "Create an upcoming task entry (assignment, test, exam, deadline) when the user mentions a future-dated academic event. " +
+      "This writes to the centralized upcoming store (knowledge/upcoming.json) and creates a per-task markdown file (knowledge/tasks/<slug>.md) " +
+      "that the calendar, kanban board, and Today.md all read from. " +
+      "Call this when the user mentions an upcoming assignment, exam, test, quiz, project deadline, or any time-sensitive academic event with a date. " +
+      "Do NOT call this for general notes, concepts, or study materials without a specific due date.",
+    inputSchema: z.object({
+      title: z.string().describe("Task title (e.g., 'Microeconomics Midterm Exam')"),
+      courseId: z.string().describe("Course identifier (e.g., 'ECON101'). If user didn't specify, ask or use a reasonable abbreviation."),
+      dueDate: z.string().describe("Due date in ISO 8601 format (e.g., '2026-05-09T23:59:00Z'). Use the date the user provided."),
+      description: z.string().optional().describe("Optional description or details about the task"),
+      priority: z.enum(["low", "medium", "high"]).optional().describe("Priority level. Default medium."),
+      sourceFile: z.string().optional().describe("If detected during document ingest, the path of the source document"),
+    }),
+    execute: async ({
+      title,
+      courseId,
+      dueDate,
+      description,
+      priority,
+      sourceFile,
+    }: {
+      title: string;
+      courseId: string;
+      dueDate: string;
+      description?: string;
+      priority?: string;
+      sourceFile?: string;
+    }) => {
+      try {
+        const storePath = "knowledge/upcoming.json";
+        let store: { version: number; tasks: unknown[] };
+        try {
+          const existing = await workspace.readFile(storePath);
+          store = JSON.parse(existing.data);
+        } catch {
+          store = { version: 1, tasks: [] };
+        }
+
+        const now = new Date().toISOString();
+        const id = `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        const slugBase = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "task";
+        const slug = `${slugBase}-${Math.random().toString(36).slice(2, 6)}`;
+        const mdPath = `knowledge/tasks/${slug}.md`;
+
+        const task = {
+          id,
+          courseId,
+          title,
+          description: description ?? "",
+          dueDate,
+          status: "not-started",
+          priority: priority ?? "medium",
+          source: "agent",
+          sourceFile: sourceFile ?? "",
+          notes: "",
+          mdPath,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        store.tasks.push(task);
+        await workspace.writeFile(storePath, JSON.stringify(store, null, 2));
+
+        const frontmatter = [
+          "---",
+          `id: ${id}`,
+          `title: ${title}`,
+          `courseId: ${courseId}`,
+          `dueDate: ${dueDate}`,
+          `status: not-started`,
+          `priority: ${priority ?? "medium"}`,
+          `source: agent`,
+          sourceFile ? `sourceFile: ${sourceFile}` : null,
+          `createdAt: ${now}`,
+          `updatedAt: ${now}`,
+          "---",
+          "",
+        ].filter(Boolean).join("\n");
+
+        const body = [
+          `# ${title}`,
+          "",
+          `**Course:** ${courseId}`,
+          `**Due:** ${new Date(dueDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}`,
+          `**Status:** ⏳ Not started`,
+          "",
+          description ? `${description}` : "",
+          "",
+        ].filter(Boolean).join("\n");
+
+        await workspace.writeFile(mdPath, frontmatter + body);
+
+        return {
+          success: true,
+          taskId: id,
+          mdPath,
+          message: `Created upcoming task "${title}" for ${courseId}, due ${new Date(dueDate).toLocaleDateString()}. Task file: ${mdPath}`,
         };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

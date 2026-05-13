@@ -180,6 +180,7 @@ import {
   TaskManager,
   type KanbanStatus,
 } from "@x/core/dist/academic/task-manager.js";
+import { UpcomingStore } from "@x/core/dist/academic/upcoming-store.js";
 import type { FlashCard } from "@x/shared/dist/academic.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
 import { getRendererUrl } from "./app-url.js";
@@ -188,6 +189,7 @@ import { getRendererUrl } from "./app-url.js";
 // Cards live in knowledge/courses/<course>/flashcards.json
 let flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
 let taskManager = new TaskManager(path.join(WorkDir, "academic"));
+let upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
 
 // Minimal demo flashcards used for seeding demo content when none exist
 const demoCards: FlashCard[] = [
@@ -757,6 +759,41 @@ export function setupIpcHandlers() {
       const ok = await taskManager.deleteAssignment(args.assignmentId);
       return { success: ok, error: ok ? undefined : "Assignment not found" };
     },
+    "upcoming:tasks:list": async (_event, args) => {
+      const tasks = await upcomingStore.listTasks(args.courseId, args.status);
+      return { tasks };
+    },
+    "upcoming:tasks:create": async (_event, args) => {
+      try {
+        const task = await upcomingStore.createTask({
+          courseId: args.courseId,
+          title: args.title,
+          description: args.description,
+          dueDate: args.dueDate,
+          status: args.status,
+          priority: args.priority,
+          source: args.source,
+          sourceFile: args.sourceFile,
+          notes: args.notes,
+        });
+        return { success: true, task };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+    "upcoming:tasks:update": async (_event, args) => {
+      const task = await upcomingStore.updateTask(args.taskId, args.updates);
+      if (!task) return { success: false, error: "Task not found" };
+      return { success: true, task };
+    },
+    "upcoming:tasks:delete": async (_event, args) => {
+      const ok = await upcomingStore.deleteTask(args.taskId);
+      return { success: ok, error: ok ? undefined : "Task not found" };
+    },
+    "upcoming:tasks:createFromIngest": async (_event, args) => {
+      const { created, errors } = await upcomingStore.createFromIngest(args.tasks);
+      return { success: errors.length === 0, count: created, errors: errors.length > 0 ? errors : undefined };
+    },
     "today:refresh": async () => {
       const { refreshDailyNote } = await import(
         "@x/core/dist/knowledge/ensure_daily_note.js"
@@ -1249,6 +1286,7 @@ export function setupIpcHandlers() {
           try {
             flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
             taskManager = new TaskManager(path.join(WorkDir, "academic"));
+            upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
           } catch (err) {
             console.warn(
               "[Vault] Failed to recreate vault-scoped helpers:",

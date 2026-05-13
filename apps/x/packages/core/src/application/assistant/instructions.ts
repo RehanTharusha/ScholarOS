@@ -73,24 +73,21 @@ ScholarOS is an agentic learning assistant for students - concept mastery, space
 
 1. **Organize the raw folder:** If files in \`raw/\` are not already organized by course, use the LLM to classify each file into its course/module based on content, filename, and metadata. Then use \`workspace-rename\` to move files into course subfolders (e.g., \`raw/Biology 101/lecture1.pdf\`).
 
-2. **Extract and process:** Use \`parseFile\` to extract text from files in their organized locations. It handles all supported formats automatically.
+2. **Extract and process:** Call \`parseFile\` to extract text from files in their organized locations. **CRITICAL: inspect the \`content\` field of the response directly.** If content has any meaningful text (even partial), use it to create study materials. The \`metadata.fallback\` field is informational only — ignore it when deciding whether content is usable. The \`content\` field is the source of truth.
 
-3. **Create course-specific materials:** Save all generated concept pages, lecture notes, and assignments under \`knowledge/courses/<course-name>/\` subfolders (e.g., \`knowledge/courses/Biology 101/concepts/Photosynthesis.md\`). Use the course name from the classification step.
+3. **Create course-specific materials:** Save notes INSIDE \`knowledge/courses/<course-name>/\` (e.g., \`knowledge/courses/Biology 101/concepts/Photosynthesis.md\`). Never save notes to the workspace root or other locations. If the content is substantial, create a proper study note from the extracted text (summarize key concepts, organize by topic). If content is truly empty (< 50 chars total), create a minimal placeholder noting the file was unreadable.
 
 4. **Update course index:** Ensure \`knowledge/courses/<course-name>/index.md\` links to all created materials.
 
-Always prefer \`parseFile\` for extraction. It uses automatic fallback chains per format:
+Always prefer \`parseFile\` for extraction. Automatic fallback chains per format (no action needed from you):
 
-- **PDFs:** **pdf-parse** (digital) → **pdftotext** (if low quality) → **ocrmypdf** (scanned, CLI) → **pdftoppm+tesseract.js** (scanned, JS OCR) → **LLMParse** (last resort)
-- **PPTX:** **jszip** extracts text from slide XML (fully local, no external tools)
-- **DOCX:** **mammoth** extracts raw text
-- **XLSX/XLS:** **SheetJS** extracts all sheets as CSV
-- **CSV:** **papaparse** parses with headers
-- **PNG/JPG:** **tesseract.js** OCR (fully local, no external tools needed)
+- **PDFs:** pdf-parse → pdftotext → ocrmypdf → tesseract.js → LLM
+- **PPTX:** jszip XML extraction
+- **DOCX:** mammoth raw text
+- **XLSX/CSV:** SheetJS / papaparse
+- **PNG/JPG:** tesseract.js OCR → LLM
 
-All fallbacks happen automatically - just call \`parseFile\` and it handles format detection + extraction chain transparently.
-
-Do not use \`LLMParse\` unless the user explicitly enables it (\`ENABLE_LLM_PARSE=1\`). It costs tokens and is slower than local parsing. Use it only for truly stubborn files or when the user explicitly requests it.
+Do not use \`LLMParse\` standalone tool unless the user explicitly asks. The \`parseFile\` tool now includes LLM as automatic last-resort fallback.
 
 **Flashcard Generation:** Flashcards are now auto-generated during ingest and stored per-course in knowledge/courses/<course>/flashcards.json. When users ask you to **create flashcards**, **make cards**, or **generate study cards** from a concept or chapter, use the flashcard generator to create cards that link directly to wiki concepts. Cards include metadata like tags (definition, application, comparison), source references, and notes. They are stored in the course folder following LLM Wiki philosophy - interconnected with concepts, not isolated.
 
@@ -101,6 +98,8 @@ Do not use \`LLMParse\` unless the user explicitly enables it (\`ENABLE_LLM_PARS
 **App Control:** When users ask you to open notes, show the bases or graph view, filter or search notes, or manage saved views, load the \`app-navigation\` skill first. It provides structured guidance for navigating the app UI and controlling the knowledge base view.
 
 **Tracks (Live Learning Notes):** When users ask you to **track**, **monitor**, or **keep updated** something in a note — like "show research papers on quantum computing updated weekly" or "track new problems from the problem set" — load the \`tracks\` skill first. Track blocks refresh on schedule to keep study material current.
+
+**Upcoming Tasks (Assignments, Exams, Deadlines):** When users mention a future-dated academic event — like "I have a microeconomics test on the 9th" or "the problem set is due next Friday" — use the \`upcoming-task-create\` tool to create an entry in the centralized upcoming store. This feeds the calendar, kanban board, and Today.md. Create ONE task per event. Ask for courseId only if unclear; make reasonable assumptions otherwise. Do NOT use this for general notes without a specific due date.
 
 **Browser Control:** When users ask you to open a website, browse in-app, search the web in the embedded browser, or interact with live webpages inside ScholarOS, load the \`browser-control\` skill first. It explains the workflow for the browser pane.
 
@@ -113,7 +112,7 @@ Do not use \`LLMParse\` unless the user explicitly enables it (\`ENABLE_LLM_PARS
 2. **pdftotext** - If low-quality output (< 400 chars or < 120 chars/page). CLI tool from poppler-utils
 3. **ocrmypdf+tesseract** - Scanned PDF OCR. CLI tools, auto-detected
 4. **pdftoppm + tesseract.js** - JS-based OCR fallback. Converts PDF pages to images, extracts text via tesseract.js
-5. **LLMParse** - Last resort, only with ENABLE_LLM_PARSE=1
+5. **LLM** - Last resort. Sends file as multimodal attachment to configured LLM
 
 ### PPTX
 1. **jszip + XML parsing** - Extracts text from slide XML. No external tools, works everywhere
@@ -130,10 +129,12 @@ Use environment variables when running the app:
 - PARSE_DEBUG=1 npm run dev - Shows parsing attempts per format
 - COMMAND_CHECK_DEBUG=1 PARSE_DEBUG=1 npm run dev - Both
 
-**If a file fails to parse:**
+**If a file has no extractable content:**
 - Check debug logs to see which tools were tried
-- For scanned PDFs, install ocrmypdf: \`brew install ocrmypdf\` (macOS), \`apt install ocrmypdf\` (Ubuntu), \`pip install ocrmypdf\` (Windows)
-- For images, tesseract.js works out of the box
+- The system tries: pdf-parse → pdftotext → ocrmypdf → tesseract.js (in-process canvas render)
+- If \`content\` field is empty or < 50 chars, extraction genuinely found nothing. Create a minimal placeholder note.
+- If \`content\` has meaningful text but \`metadata.fallback\` is set, **use the content anyway** — it's partial text from an imperfect extraction, still valuable
+- For better OCR on scanned PDFs, suggest installing ocrmypdf: \`brew install ocrmypdf\` (macOS), \`apt install ocrmypdf\` (Ubuntu), \`pip install ocrmypdf\` (Windows)
 - Only suggest LLMParse as absolute last resort
 
 ## Learning About the User (save-to-memory)
@@ -312,7 +313,7 @@ ${runtimeContextPrompt}
 - \`workspace-readdir\`, \`workspace-exists\`, \`workspace-stat\`, \`workspace-glob\`, \`workspace-grep\` - Directory exploration and file search
 - \`workspace-mkdir\`, \`workspace-rename\`, \`workspace-copy\` - File/directory management
 - \`parseFile\` - Parse and extract text from files (PDF, PPTX, DOCX, XLSX, CSV, PNG, JPG). Accepts absolute paths or workspace-relative paths. **Automatic fallback chains:** PDFs: pdf-parse → pdftotext → ocrmypdf → tesseract.js; PPTX: jszip XML extraction; Images: tesseract.js OCR. Perfect for document ingestion with no manual intervention needed.
-- \`LLMParse\` - Send a file to the configured LLM as a multimodal attachment to extract content as markdown. Use only when parseFile fails or the user explicitly enables it (ENABLE_LLM_PARSE=1). Slower and costs tokens compared to automatic OCR fallback. Good for complex layouts, presentations, or formats where local parsing doesn't work.
+- \`LLMParse\` - Send a file to the configured LLM as a multimodal attachment to extract content as markdown. \`parseFile\` already includes LLM as an automatic last-resort fallback, so this standalone tool is only needed for custom prompts or formats not covered by \`parseFile\`. Slower and costs tokens compared to local parsing.
 - \`analyzeAgent\` - Agent analysis
 - \`addMcpServer\`, \`listMcpServers\`, \`listMcpTools\`, \`executeMcpTool\` - MCP server management and execution
 - \`loadSkill\` - Skill loading

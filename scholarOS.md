@@ -230,25 +230,7 @@ Periodically ask the agent to audit the vault:
 
 The agent will suggest new sources to find and new questions to investigate.
 
----
 
-## Skills & Extensibility
-
-ScholarOS is built on a modular **skill system**. Each major workflow loads a specialized skill that provides structured guidance and tool access. Skills include:
-
-| Skill                  | Purpose                                                                  |
-| ---------------------- | ------------------------------------------------------------------------ |
-| `create-presentations` | Generate native `.pptx` slide decks from concept pages                   |
-| `doc-collab`           | Create and edit documents with BlockNote collaborative editor            |
-| `app-navigation`       | Control the UI: open views, filter notes, manage saved searches          |
-| `browser-control`      | Interact with the embedded browser: navigate sites, index pages          |
-| `tracks`               | Create and manage live learning blocks that refresh on schedule          |
-| `composio-integration` | Connect third-party services (GitHub, Gmail, Slack, etc.)                |
-| `mcp-integration`      | Access web search, file scraping, audio tools via Model Context Protocol |
-
-You don't memorize command syntax — when you ask for a feature, the agent loads the appropriate skill and handles the workflow.
-
----
 
 ## Persistent User Memory
 
