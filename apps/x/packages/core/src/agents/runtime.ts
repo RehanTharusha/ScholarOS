@@ -43,7 +43,10 @@ import { resolveProviderConfig } from "../models/defaults.js";
 import { IAgentsRepo } from "./repo.js";
 import { IMonotonicallyIncreasingIdGenerator } from "../application/lib/id-gen.js";
 import { IBus } from "../application/lib/bus.js";
-import { IMessageQueue } from "../application/lib/message-queue.js";
+import {
+  type MiddlePaneContext,
+  IMessageQueue,
+} from "../application/lib/message-queue.js";
 import { IRunsRepo } from "../runs/repo.js";
 import { IRunsLock } from "../runs/lock.js";
 import { IAbortRegistry } from "../runs/abort-registry.js";
@@ -883,10 +886,7 @@ export async function* streamAgent({
   let voiceInput = false;
   let voiceOutput: "summary" | "full" | null = null;
   let searchEnabled = false;
-  let middlePaneContext:
-    | { kind: "note"; path: string; content: string }
-    | { kind: "browser"; url: string; title: string }
-    | null = null;
+  let middlePaneContext: MiddlePaneContext | null = null;
   while (true) {
     // Check abort at the top of each iteration
     signal.throwIfAborted();
@@ -1100,6 +1100,30 @@ export async function* streamAgent({
       if (!middlePaneContext) {
         loopLogger.log("injecting middle pane context (empty)");
         instructionsWithDateTime += `${middlePaneHeader}**Nothing relevant is open in the middle pane right now.** The user is not looking at any note or web page. If earlier in this conversation you referenced a note or browser page as "what the user is viewing", that is no longer accurate — do not refer to it as currently open. Answer the user's latest message on its own merits.`;
+      } else if (middlePaneContext.kind === "file") {
+        loopLogger.log(
+          "injecting middle pane context (file)",
+          middlePaneContext.path,
+        );
+        let extractedContent = middlePaneContext.content;
+        let parsedFormat =
+          path.extname(middlePaneContext.path).slice(1) || "file";
+        if (!extractedContent) {
+          const parsed = await BuiltinTools.parseFile.execute({
+            path: middlePaneContext.path,
+          });
+          if (parsed && parsed.success && typeof parsed.content === "string") {
+            extractedContent = parsed.content;
+            if (typeof parsed.format === "string" && parsed.format.length > 0) {
+              parsedFormat = parsed.format;
+            }
+          }
+        }
+        if (extractedContent) {
+          instructionsWithDateTime += `${middlePaneHeader}The user has a ${parsedFormat} file open. Its path and extracted text are provided below so you can reference it when relevant.\n\n**How to use this context:**\n- The user may or may not be talking about this file. Do NOT assume every message is about it.\n- Only reference or act on this file when the user's message clearly relates to it.\n- For unrelated questions, ignore this context entirely and answer normally.\n- Do not mention that you can see this file unless it is relevant to the answer.\n\n## Open file path\n${middlePaneContext.path}\n\n## Open file content\n\`\`\`\n${extractedContent}\n\`\`\``;
+        } else {
+          instructionsWithDateTime += `${middlePaneHeader}The user has a file open, but it could not be parsed into readable text. If the user's question depends on its contents, ask them to provide a clearer source or use the file tools to inspect it.`;
+        }
       } else if (middlePaneContext.kind === "note") {
         loopLogger.log(
           "injecting middle pane context (note)",

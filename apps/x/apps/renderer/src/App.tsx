@@ -967,6 +967,9 @@ function App() {
   );
   const chatScrollTopByTabRef = useRef(new Map<string, number>());
   const cavemanByTabRef = useRef(new Map<string, boolean>());
+  const initialChatContextByTabRef = useRef(
+    new Map<string, MiddlePaneContextPayload>(),
+  );
   const [toolOpenByTab, setToolOpenByTab] = useState<
     Record<string, Record<string, boolean>>
   >({});
@@ -2523,6 +2526,7 @@ function App() {
   }, [handleRunEvent]);
 
   type MiddlePaneContextPayload =
+    | { kind: "file"; path: string; content?: string }
     | { kind: "note"; path: string; content: string }
     | { kind: "browser"; url: string; title: string };
   const buildMiddlePaneContext = async (): Promise<
@@ -2549,11 +2553,17 @@ function App() {
       return undefined;
     }
 
-    // Note case: only markdown files are meaningfully readable as context.
+    // File case: preserve current file and let backend parse if needed.
     const path = selectedPathRef.current;
-    if (!path || !path.endsWith(".md")) return undefined;
-    const content = editorContentRef.current ?? "";
-    return { kind: "note", path, content };
+    if (!path) return undefined;
+    if (path.endsWith(".pdf")) {
+      return { kind: "file", path };
+    }
+    if (path.endsWith(".md")) {
+      const content = editorContentRef.current ?? "";
+      return { kind: "file", path, content };
+    }
+    return { kind: "file", path, content: fileContent || undefined };
   };
 
   const handlePromptSubmit = async (
@@ -2621,6 +2631,13 @@ function App() {
 
       let titleSource = userMessage;
       const hasMentions = (mentions?.length ?? 0) > 0;
+      const initialContext =
+        initialChatContextByTabRef.current.get(submitTabId);
+      const middlePaneContext =
+        initialContext ?? (await buildMiddlePaneContext());
+      if (initialContext) {
+        initialChatContextByTabRef.current.delete(submitTabId);
+      }
 
       if (hasAttachments || hasMentions) {
         type ContentPart =
@@ -2675,7 +2692,6 @@ function App() {
 
         // Shared IPC payload types can lag until package rebuilds; runtime validation still enforces schema.
         const attachmentPayload = contentParts as unknown as string;
-        const middlePaneContext = await buildMiddlePaneContext();
         await window.ipc.invoke("runs:createMessage", {
           runId: currentRunId,
           message: attachmentPayload,
@@ -3235,24 +3251,49 @@ function App() {
     ) => {
       // If there's already an empty "New chat" tab with same mode, switch to it
       const emptyTab = chatTabs.find((t) => !t.runId && t.mode === mode);
+      let newTabId: string | null = null;
       if (emptyTab) {
         if (emptyTab.id !== activeChatTabId) {
           setActiveChatTabId(emptyTab.id);
         }
       } else {
         // Create a new tab
-        const id = newChatTabId();
+        newTabId = newChatTabId();
         setChatTabs((prev) => [
           ...prev,
           {
-            id,
+            id: newTabId!,
             runId: null,
             mode,
             ...(terminalConfig ? { terminalConfig } : {}),
           },
         ]);
-        setActiveChatTabId(id);
+        setActiveChatTabId(newTabId);
       }
+
+      const targetTabId = emptyTab?.id ?? newTabId;
+      if (mode === "agent" && targetTabId && selectedPathRef.current) {
+        const currentPath = selectedPathRef.current;
+        if (currentPath.endsWith(".pdf")) {
+          initialChatContextByTabRef.current.set(targetTabId, {
+            kind: "file",
+            path: currentPath,
+          });
+        } else if (currentPath.endsWith(".md")) {
+          initialChatContextByTabRef.current.set(targetTabId, {
+            kind: "file",
+            path: currentPath,
+            content: editorContentRef.current ?? "",
+          });
+        } else if (fileContent) {
+          initialChatContextByTabRef.current.set(targetTabId, {
+            kind: "file",
+            path: currentPath,
+            content: fileContent,
+          });
+        }
+      }
+
       handleNewChat();
       // Left-pane "new chat" should always open full chat view.
       if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {

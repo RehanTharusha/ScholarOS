@@ -164,6 +164,11 @@ const ipcSchemas = {
       middlePaneContext: z
         .discriminatedUnion("kind", [
           z.object({
+            kind: z.literal("file"),
+            path: z.string(),
+            content: z.string().optional(),
+          }),
+          z.object({
             kind: z.literal("note"),
             path: z.string(),
             content: z.string(),
@@ -420,7 +425,9 @@ const ipcSchemas = {
       title: z.string(),
       description: z.string().optional(),
       dueDate: z.string(),
-      status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+      status: z
+        .enum(["not-started", "in-progress", "submitted", "graded"])
+        .optional(),
       priority: z.enum(["low", "medium", "high"]).optional(),
       wikiLinks: z.array(z.string()).optional(),
     }),
@@ -442,7 +449,9 @@ const ipcSchemas = {
   "upcoming:tasks:list": {
     req: z.object({
       courseId: z.string().optional(),
-      status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+      status: z
+        .enum(["not-started", "in-progress", "submitted", "graded"])
+        .optional(),
     }),
     res: z.object({
       tasks: z.array(z.custom<UpcomingTask>()),
@@ -454,7 +463,9 @@ const ipcSchemas = {
       title: z.string(),
       description: z.string().optional(),
       dueDate: z.string(),
-      status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+      status: z
+        .enum(["not-started", "in-progress", "submitted", "graded"])
+        .optional(),
       priority: z.enum(["low", "medium", "high"]).optional(),
       source: z.enum(["ingest", "manual", "agent"]),
       sourceFile: z.string().optional(),
@@ -473,7 +484,9 @@ const ipcSchemas = {
         title: z.string().optional(),
         description: z.string().optional(),
         dueDate: z.string().optional(),
-        status: z.enum(["not-started", "in-progress", "submitted", "graded"]).optional(),
+        status: z
+          .enum(["not-started", "in-progress", "submitted", "graded"])
+          .optional(),
         priority: z.enum(["low", "medium", "high"]).optional(),
         notes: z.string().optional(),
       }),
