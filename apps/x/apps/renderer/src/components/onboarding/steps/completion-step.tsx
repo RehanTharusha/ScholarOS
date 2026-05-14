@@ -13,7 +13,7 @@ export function CompletionStep({ state }: CompletionStepProps) {
 
   const ingestSteps = [
     { icon: "📥", label: "Drop your materials", description: "Add PDFs, slides, or notes to the /raw folder in your vault." },
-    { icon: "🤖", label: "Open the AI chat", description: "Point your AI agent (e.g. Claude Code) at the vault folder." },
+    { icon: "🤖", label: "Open your AI agent", description: "Point any AI coding agent (e.g. Claude Code, Cursor) at the vault folder." },
     { icon: "📚", label: "Say: "Ingest /raw"", description: "The agent reads each file and builds your wiki in /knowledge." },
   ]
 

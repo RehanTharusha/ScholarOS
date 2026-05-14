@@ -235,8 +235,8 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
   }, [modelsCatalog]);
 
   // Step flow:
-  // Direct path: 0 (welcome) → 2 (first ingest)
-  // BYOK path:   0 (welcome) → 1 (llm setup) → 2 (first ingest)
+  // Direct path: 0 (welcome) → 2 (start)
+  // BYOK path:   0 (welcome) → 1 (llm setup) → 2 (start)
   const handleNext = useCallback(() => {
     if (currentStep === 0) {
       if (onboardingPath === "byok") {
