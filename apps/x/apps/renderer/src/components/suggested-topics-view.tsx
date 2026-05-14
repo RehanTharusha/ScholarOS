@@ -52,11 +52,11 @@ function serializeTopics(topics: SuggestedTopicBlock[]): string {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Meetings: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-  Projects: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  People: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  Organizations: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
-  Topics: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  Concepts: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  Courses: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  Papers: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  Syntheses: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  Resources: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
 };
 
 function getCategoryColor(category?: string): string {
@@ -77,13 +77,20 @@ function TopicCard({ topic, onTrack, isRemoving }: TopicCardProps) {
         <h3 className="text-sm font-semibold leading-snug text-foreground">
           {topic.title}
         </h3>
-        {topic.category && (
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${getCategoryColor(topic.category)}`}
-          >
-            {topic.category}
-          </span>
-        )}
+        <div className="flex shrink-0 flex-wrap gap-1.5">
+          {topic.course && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {topic.course}
+            </span>
+          )}
+          {topic.category && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${getCategoryColor(topic.category)}`}
+            >
+              {topic.category}
+            </span>
+          )}
+        </div>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
         {topic.description}
@@ -236,8 +243,8 @@ export function SuggestedTopicsView({
           </h2>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Suggested notes surfaced from your knowledge graph. Track one to start
-          a tracking note.
+          Study leads surfaced from your knowledge base. Track one to
+          start a live research note.
         </p>
       </div>
       <div className="flex-1 overflow-y-auto p-6">

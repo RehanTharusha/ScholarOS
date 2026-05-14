@@ -12,7 +12,13 @@ export type TagType =
   | 'noise'
   | 'action'
   | 'status'
-  | 'source';
+  | 'source'
+  // ScholarOS academic note tag types
+  | 'academic-course'
+  | 'academic-note-type'
+  | 'academic-topic'
+  | 'academic-difficulty'
+  | 'academic-exam-phase';
 
 export type NoteEffect = 'create' | 'skip' | 'none';
 
@@ -109,6 +115,45 @@ const DEFAULT_TAG_DEFINITIONS: TagDefinition[] = [
   { tag: 'web-search', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Information from web search' },
   { tag: 'manual', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Manually entered by user' },
   { tag: 'import', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Imported from another system' },
+  { tag: 'lecture', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Created from a lecture recording or live lecture' },
+  { tag: 'paper', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Created from an academic paper' },
+  { tag: 'textbook', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Created from a textbook reading' },
+  { tag: 'study-group', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Created during study group session' },
+  { tag: 'office-hours', type: 'source', applicability: 'notes', noteEffect: 'none', description: 'Created during office hours' },
+
+  // ── Academic: Course (notes only, all none) ─────────────────────────
+  { tag: 'lecture-notes', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'Notes taken during or after a lecture' },
+  { tag: 'concept', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A standalone concept explanation page' },
+  { tag: 'assignment', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'An assignment or homework description' },
+  { tag: 'paper-summary', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A summary of an academic paper' },
+  { tag: 'synthesis', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A cross-source synthesis or comparison' },
+  { tag: 'resource', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A reference resource (book, video, tool)' },
+  { tag: 'exam-prep', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'Exam preparation notes or study guide' },
+  { tag: 'flashcard-set', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A set of flashcards for review' },
+
+  // ── Academic: Topic (notes only, all none) ──────────────────────────
+  { tag: 'definition', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A definition or terminology note' },
+  { tag: 'theorem', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A theorem or proposition' },
+  { tag: 'proof', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A proof or derivation' },
+  { tag: 'example', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'An illustrative example' },
+  { tag: 'formula', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A formula or equation' },
+  { tag: 'algorithm', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'An algorithm or procedure' },
+  { tag: 'model', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A theoretical model or framework' },
+  { tag: 'experiment', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'An experiment or study methodology' },
+  { tag: 'data', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A dataset or empirical findings' },
+  { tag: 'comparison', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A comparison between theories or methods' },
+
+  // ── Academic: Difficulty (notes only, all none) ─────────────────────
+  { tag: 'beginner', type: 'academic-difficulty', applicability: 'notes', noteEffect: 'none', description: 'Introductory level content' },
+  { tag: 'intermediate', type: 'academic-difficulty', applicability: 'notes', noteEffect: 'none', description: 'Moderate difficulty, requires some background' },
+  { tag: 'advanced', type: 'academic-difficulty', applicability: 'notes', noteEffect: 'none', description: 'Advanced or specialized content' },
+
+  // ── Academic: Exam Phase (notes only, all none) ─────────────────────
+  { tag: 'pre-semester', type: 'academic-exam-phase', applicability: 'notes', noteEffect: 'none', description: 'Before the semester starts' },
+  { tag: 'during-semester', type: 'academic-exam-phase', applicability: 'notes', noteEffect: 'none', description: 'During regular semester instruction' },
+  { tag: 'midterm-prep', type: 'academic-exam-phase', applicability: 'notes', noteEffect: 'none', description: 'Preparing for midterm exams' },
+  { tag: 'final-prep', type: 'academic-exam-phase', applicability: 'notes', noteEffect: 'none', description: 'Preparing for final exams' },
+  { tag: 'post-semester', type: 'academic-exam-phase', applicability: 'notes', noteEffect: 'none', description: 'After semester ends' },
 ];
 
 // ── Disk-backed config with mtime caching ──────────────────────────────────
@@ -151,6 +196,8 @@ export function getTagDefinitions(): TagDefinition[] {
 const TYPE_ORDER: TagType[] = [
   'relationship', 'relationship-sub', 'topic', 'email-type',
   'noise', 'action', 'status', 'source',
+  'academic-course', 'academic-note-type', 'academic-topic',
+  'academic-difficulty', 'academic-exam-phase',
 ];
 
 const TYPE_LABELS: Record<TagType, string> = {
@@ -162,6 +209,11 @@ const TYPE_LABELS: Record<TagType, string> = {
   'action': 'Action',
   'status': 'Status',
   'source': 'Source',
+  'academic-course': 'Academic — Course',
+  'academic-note-type': 'Academic — Note Type',
+  'academic-topic': 'Academic — Concept Type',
+  'academic-difficulty': 'Academic — Difficulty',
+  'academic-exam-phase': 'Academic — Exam Phase',
 };
 
 function renderTagGroups(tags: TagDefinition[]): string {

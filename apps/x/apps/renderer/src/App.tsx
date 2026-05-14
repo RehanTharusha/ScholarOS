@@ -111,6 +111,7 @@ import { FlashcardReview } from "@/components/flashcards/flashcard-review";
 import { AcademicCalendar } from "@/components/academic/calendar-view";
 import { KanbanAcademic } from "@/components/academic/kanban-academic";
 import { IngestWindow } from "@/components/ingest-window";
+import { NoteTaggingView } from "@/components/note-tagging-view";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
@@ -199,12 +200,13 @@ const TITLEBAR_TOGGLE_MARGIN_LEFT_PX = 12;
 const TITLEBAR_BUTTONS_COLLAPSED = 1;
 const TITLEBAR_BUTTON_GAPS_COLLAPSED = 0;
 const GRAPH_TAB_PATH = "__rowboat_graph_view__";
-const SUGGESTED_TOPICS_TAB_PATH = "__rowboat_suggested_topics__";
+const SUGGESTED_TOPICS_TAB_PATH = "__scholar_suggested_topics__";
 const BASES_DEFAULT_TAB_PATH = "__rowboat_bases_default__";
 const FLASHCARDS_TAB_PATH = "__scholar_flashcards__";
 const CALENDAR_TAB_PATH = "__scholar_calendar__";
 const KANBAN_TAB_PATH = "__scholar_assignment_board__";
 const INGEST_TAB_PATH = "__scholar_ingest__";
+const NOTE_TAGGING_TAB_PATH = "__scholar_note_tagging__";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -360,25 +362,30 @@ const isSuggestedTopicsTabPath = (path: string) =>
 const isFlashcardsTabPath = (path: string) => path === FLASHCARDS_TAB_PATH;
 const isCalendarTabPath = (path: string) => path === CALENDAR_TAB_PATH;
 const isKanbanTabPath = (path: string) => path === KANBAN_TAB_PATH;
+const isNoteTaggingTabPath = (path: string) => path === NOTE_TAGGING_TAB_PATH;
 const isBaseFilePath = (path: string) =>
   path.endsWith(".base") || path === BASES_DEFAULT_TAB_PATH;
 
-const getSuggestedTopicTargetFolder = (category?: string) => {
+const getSuggestedTopicTargetFolder = (category?: string, course?: string) => {
   const normalized = category?.trim().toLowerCase();
   switch (normalized) {
-    case "people":
-    case "person":
-      return "People";
-    case "organizations":
-    case "organization":
-      return "Organizations";
-    case "projects":
-    case "project":
-      return "Projects";
-    case "topics":
-    case "topic":
+    case "concepts":
+    case "concept":
+      return course ? `courses/${course}/concepts` : "courses";
+    case "courses":
+    case "course":
+      return "courses";
+    case "papers":
+    case "paper":
+      return "papers";
+    case "syntheses":
+    case "synthesis":
+      return "syntheses";
+    case "resources":
+    case "resource":
+      return "resources";
     default:
-      return "Topics";
+      return "courses";
   }
 };
 
@@ -386,29 +393,35 @@ const buildSuggestedTopicExplorePrompt = ({
   title,
   description,
   category,
+  course,
 }: {
   title: string;
   description: string;
   category?: string;
+  course?: string;
 }) => {
-  const folder = getSuggestedTopicTargetFolder(category);
-  const categoryLabel = category?.trim() || "Topics";
+  const folder = getSuggestedTopicTargetFolder(category, course);
+  const categoryLabel = category?.trim() || "Concepts";
+  const courseLine = course
+    ? `- Course: ${course}`
+    : "- Course not specified — search existing courses or ask me";
   return [
     "I am exploring a suggested topic card from the Suggested Topics panel.",
-    "This card may represent a person, organization, topic, or project.",
+    "This card may represent a concept, course, paper, synthesis, or resource to study.",
     "",
     "Card context:",
     `- Title: ${title}`,
     `- Category: ${categoryLabel}`,
+    courseLine,
     `- Description: ${description}`,
-    `- Target folder if we set this up: knowledge/${folder}/`,
+    `- Target folder: knowledge/${folder}/`,
     "",
     `Please start by telling me that you can set up a tracking note for "${title}" under knowledge/${folder}/.`,
     "Then briefly explain what that tracking note would monitor or refresh and ask me if you should set it up.",
     "Do not create or modify anything yet.",
     "Treat a clear confirmation from me as explicit approval to proceed.",
-    `If I confirm later, load the \`tracks\` skill first, check whether a matching note already exists under knowledge/${folder}/, and update it instead of creating a duplicate.`,
-    `If no matching note exists, create a new note under knowledge/${folder}/ with an appropriate filename.`,
+    "If I confirm later, load the `tracks` skill first, check whether a matching note already exists under the target folder, and update it instead of creating a duplicate.",
+    "If no matching note exists, create a new note under the target folder with an appropriate filename.",
     "Use a track block in that note rather than only writing static content, and keep any surrounding note scaffolding short and useful.",
     "Do not ask me to choose a note path unless there is a real ambiguity you cannot resolve from the card.",
   ].join("\n");
@@ -5083,6 +5096,9 @@ function App() {
               onOpenIngestWindow={() => {
                 void navigateToView({ type: "file", path: INGEST_TAB_PATH });
               }}
+              onOpenNoteTagging={() => {
+                void navigateToView({ type: "file", path: NOTE_TAGGING_TAB_PATH });
+              }}
             />
             <SidebarInset
               className={cn(
@@ -5293,6 +5309,8 @@ function App() {
                   onProcessIngest={handleIngestProcess}
                   isProcessing={isIngestProcessing}
                 />
+              ) : selectedPath === NOTE_TAGGING_TAB_PATH ? (
+                <NoteTaggingView />
               ) : isSuggestedTopicsOpen ? (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <SuggestedTopicsView

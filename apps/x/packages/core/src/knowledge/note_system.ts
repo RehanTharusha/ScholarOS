@@ -13,152 +13,229 @@ export interface NoteTypeDefinition {
 
 const DEFAULT_NOTE_TYPE_DEFINITIONS: NoteTypeDefinition[] = [
   {
-    type: "People",
-    folder: "People",
-    template: `# {Full Name}
+    type: "Course Concept",
+    folder: "courses",
+    template: `# {Concept Name}
 
-## Info
-**Role:** {role, or inferred role with qualifier, or leave blank if truly unknown}
-**Organization:** [[Organizations/{organization}]] or leave blank
-**Email:** {email or leave blank}
-**Aliases:** {comma-separated: first name, nicknames, email}
-**First met:** {YYYY-MM-DD}
-**Last update:** {YYYY-MM-DD}
+## Course
+**Course:** [[courses/{Course Name}/index.md|{Course Name}]]
+**Lecture:** [[courses/{Course Name}/lectures/{Lecture}.md]]
+**Tags:** {comma-separated: theorem, definition, example, proof, lemma, formula}
 
 ## Summary
-{2-3 sentences: Who they are, why you know them, what you're working on together.}
+{2-3 sentences: The core idea of this concept.}
 
-## Connected to
-- [[Organizations/{Organization}]] — works at
-- [[People/{Person}]] — {colleague, introduced by, reports to}
-- [[Projects/{Project}]] — {role}
+## Key Points
+- {Point 1 with [[linked concepts]]}
+- {Point 2}
 
-## Activity
-- **{YYYY-MM-DD}** ({meeting|email|voice memo}): {Summary with [[Folder/Name]] links}
+## Definitions
+- **{Term}**: {Definition}
 
-## Key facts
-{Substantive facts only. Leave empty if none.}
+## Formulas / Equations
+{For quantitative concepts}
 
-## Open items
-{Commitments and next steps only. Leave empty if none.}`,
+## Examples
+- {Example demonstrating the concept}
+
+## Related Concepts
+- [[courses/{Course}/concepts/{Related Concept}]] — {relationship}
+
+## Sources
+- {Lecture date, textbook chapter, paper reference}
+
+## Questions / Clarifications
+- {Things to ask about}
+
+## Last Update
+{YYYY-MM-DD}`,
     extractionGuide:
-      "Look for: name, role, organization, email, aliases, relationship context",
+      "Look for: concept name, course, related concepts, definitions, formulas, examples, lecture references",
   },
   {
-    type: "Organizations",
-    folder: "Organizations",
-    template: `# {Organization Name}
+    type: "Lecture Notes",
+    folder: "lectures",
+    template: `# {Lecture Title}
+
+## Meta
+**Course:** [[courses/{Course Name}/index.md|{Course Name}]]
+**Date:** {YYYY-MM-DD}
+**Instructor:** {Instructor Name}
+**Status:** {unprocessed|partial|complete|reviewed}
+
+## Topics Covered
+- {Topic 1}
+- {Topic 2}
+
+## Notes
+{Free-form lecture notes. Use headers and lists as needed.}
+
+## Key Takeaways
+- {Important insight or main point}
+
+## Action Items
+- [ ] {Review this concept}
+- [ ] {Do the reading}
+
+## Questions
+- {Concept you didn't understand}
+
+## References
+- {Reading assignment, textbook chapter, link to recording}
+
+## Created
+{YYYY-MM-DD}`,
+    extractionGuide:
+      "Look for: lecture title, course, date, instructor, topics covered, key points, action items",
+  },
+  {
+    type: "Assignment",
+    folder: "assignments",
+    template: `# {Assignment Title}
+
+## Meta
+**Course:** [[courses/{Course Name}/index.md|{Course Name}]]
+**Due:** {YYYY-MM-DD}
+**Status:** {pending|in-progress|submitted|graded}
+**Grade:** {if graded}
+
+## Description
+{What the assignment asks you to do.}
+
+## Requirements
+- {Requirement 1}
+- {Requirement 2}
+
+## Resources
+- {Textbook chapter, reference pages, templates}
+
+## Progress
+- [ ] {Step 1}
+- [ ] {Step 2}
+
+## Notes
+{Drafting space, ideas, outline.}
+
+## Submission
+{Submission method, link, or notes.}`,
+    extractionGuide:
+      "Look for: assignment name, course, due date, requirements, submission details",
+  },
+  {
+    type: "Paper Summary",
+    folder: "papers",
+    template: `# {Paper Title} ({Year})
+
+## Meta
+**Authors:** {Author names}
+**Venue:** {Conference or journal}
+**Tags:** {keywords}
+**Status:** {to-read|reading|summarized|reviewed}
+
+## Abstract
+{The paper's abstract in your own words.}
+
+## Key Contributions
+- {Contribution 1}
+- {Contribution 2}
+
+## Methodology
+{Brief description of methods used.}
+
+## Findings / Results
+- {Key result 1}
+- {Key result 2}
+
+## Related Work
+- [[courses/{Course}/concepts/{Concept}]] — {how it relates}
+
+## Critique
+{Your thoughts: strengths, weaknesses, questions.}
+
+## Connections
+- How this connects to other papers or course material.
+
+## Citation
+{Formatted citation for your bibliography.}`,
+    extractionGuide:
+      "Look for: paper title, authors, year, venue, abstract, contributions, methodology, results",
+  },
+  {
+    type: "Synthesis",
+    folder: "syntheses",
+    template: `# {Synthesis Title}
+
+## Sources Compared
+- [[papers/{Paper}]] — {emphasis}
+- [[courses/{Course}/concepts/{Concept}]] — {emphasis}
+
+## Comparison
+| Aspect | Source A | Source B | Notes |
+|--------|----------|----------|-------|
+| {Aspect 1} | | | |
+
+## Agreements
+- {Where sources agree}
+
+## Contradictions
+- {Where sources disagree}
+
+## Synthesis
+{Your integrated understanding combining multiple sources.}
+
+## Open Questions
+- {What remains unresolved}
+
+## Last Updated
+{YYYY-MM-DD}`,
+    extractionGuide:
+      "Look for: sources being compared, key dimensions of comparison, agreements, contradictions",
+  },
+  {
+    type: "Resource",
+    folder: "resources",
+    template: `# {Resource Title}
 
 ## Info
-**Type:** {company|team|institution|other}
-**Industry:** {industry or leave blank}
-**Relationship:** {customer|prospect|partner|competitor|vendor|other}
-**Domain:** {primary email domain}
-**Aliases:** {comma-separated: short names, abbreviations}
-**First met:** {YYYY-MM-DD}
-**Last update:** {YYYY-MM-DD}
+**Type:** {book|article|video|website|tool|other}
+**URL:** {link}
+**Tags:** {comma-separated keywords}
 
 ## Summary
-{2-3 sentences: What this org is, what your relationship is.}
+{1-2 sentences: What this resource covers.}
 
-## People
-- [[People/{Person}]] — {role}
+## Relevance
+{Why this is useful for your studies.}
 
-## Contacts
-{For transactional contacts who don't get their own notes}
+## Related To
+- [[courses/{Course}/index.md|{Course Name}]]
+- [[courses/{Course}/concepts/{Concept}]]
 
-## Projects
-- [[Projects/{Project}]] — {relationship}
-
-## Activity
-- **{YYYY-MM-DD}** ({meeting|email|voice memo}): {Summary with [[Folder/Name]] links}
-
-## Key facts
-{Substantive facts only. Leave empty if none.}
-
-## Open items
-{Commitments and next steps only. Leave empty if none.}`,
+## Notes
+{Your notes on the resource content.}`,
     extractionGuide:
-      "Look for: organization name, type, industry, relationship, domain, key people, projects",
+      "Look for: resource type, URL, topic, relevance to courses",
   },
   {
-    type: "Projects",
-    folder: "Projects",
-    template: `# {Project Name}
+    type: "Entity",
+    folder: "entities",
+    template: `# {Author / Institution Name}
+
+## Type
+{author|institution|research-group}
 
 ## Info
-**Type:** {deal|product|initiative|hiring|other}
-**Status:** {active|planning|on hold|completed|cancelled}
-**Started:** {YYYY-MM-DD or leave blank}
-**Last update:** {YYYY-MM-DD}
+**Field:** {area of expertise}
+**Affiliation:** {university or institution}
+**Notable Works:** {key papers or contributions}
 
-## Summary
-{2-3 sentences: What this project is, goal, current state.}
+## Related Concepts
+- [[courses/{Course}/concepts/{Concept}]] — {contribution}
 
-## People
-- [[People/{Person}]] — {role}
-
-## Organizations
-- [[Organizations/{Org}]] — {customer|partner|etc.}
-
-## Related
-- [[Topics/{Topic}]] — {relationship}
-- [[Projects/{Project}]] — {relationship}
-
-## Timeline
-**{YYYY-MM-DD}** ({meeting|email})
-{What happened.}
-
-## Decisions
-- **{YYYY-MM-DD}**: {Decision}. {Rationale}.
-
-## Open items
-{Commitments and next steps only. Leave empty if none.}
-
-## Key facts
-{Substantive facts only. Leave empty if none.}`,
+## Notes
+{Any additional context about this entity.}`,
     extractionGuide:
-      "Look for: project name, type, status, people involved, organizations, timeline, decisions",
-  },
-  {
-    type: "Topics",
-    folder: "Topics",
-    template: `# {Topic Name}
-
-## About
-{1-2 sentences: What this topic covers.}
-
-**Keywords:** {comma-separated}
-**Aliases:** {other ways this topic is referenced}
-**First mentioned:** {YYYY-MM-DD}
-**Last update:** {YYYY-MM-DD}
-
-## Related
-- [[People/{Person}]] — {relationship}
-- [[Organizations/{Org}]] — {relationship}
-- [[Projects/{Project}]] — {relationship}
-
-## Log
-**{YYYY-MM-DD}** ({meeting|email}: {title})
-{Summary with [[Folder/Name]] links}
-
-## Decisions
-- **{YYYY-MM-DD}**: {Decision}
-
-## Open items
-{Commitments and next steps only. Leave empty if none.}
-
-## Key facts
-{Substantive facts only. Leave empty if none.}`,
-    extractionGuide:
-      "Look for: topic name, keywords, related people/orgs/projects, decisions, key facts",
-  },
-  {
-    type: "Meetings",
-    folder: "Meetings",
-    template: "",
-    extractionGuide:
-      "Look for: meeting title, date, attendees, source (granola or fireflies), duration, topics discussed",
+      "Look for: name, field, affiliation, notable works, related concepts",
   },
 ];
 

@@ -71,6 +71,7 @@ export const SuggestedTopicBlockSchema = z.object({
   title: z.string(),
   description: z.string(),
   category: z.string().optional(),
+  course: z.string().optional(),
 });
 
 export type SuggestedTopicBlock = z.infer<typeof SuggestedTopicBlockSchema>;

@@ -77,7 +77,7 @@ export async function testModelConnection(
     timeoutMs?: number,
 ): Promise<{ success: boolean; error?: string }> {
     const isLocal = providerConfig.flavor === "ollama" || providerConfig.flavor === "openai-compatible";
-    const effectiveTimeout = timeoutMs ?? (isLocal ? 60000 : 8000);
+    const effectiveTimeout = timeoutMs ?? (isLocal ? 60000 : 30000);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
     try {

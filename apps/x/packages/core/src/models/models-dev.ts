@@ -3,8 +3,11 @@ import path from "node:path";
 import z from "zod";
 import { WorkDir } from "../config/config.js";
 
-const CACHE_PATH = path.join(WorkDir, "config", "models.dev.json");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function getCachePath(): string {
+  return path.join(WorkDir, "config", "models.dev.json");
+}
 
 /*
  "claude-opus-4-6": {
@@ -94,7 +97,7 @@ type CacheFile = {
 
 async function readCache(): Promise<CacheFile | null> {
   try {
-    const raw = await fs.readFile(CACHE_PATH, "utf8");
+    const raw = await fs.readFile(getCachePath(), "utf8");
     return JSON.parse(raw) as CacheFile;
   } catch {
     return null;
@@ -106,7 +109,7 @@ async function writeCache(data: unknown): Promise<void> {
     fetchedAt: new Date().toISOString(),
     data,
   };
-  await fs.writeFile(CACHE_PATH, JSON.stringify(payload, null, 2));
+  await fs.writeFile(getCachePath(), JSON.stringify(payload, null, 2));
 }
 
 async function fetchModelsDev(): Promise<unknown> {

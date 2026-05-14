@@ -18,7 +18,9 @@ const defaultConfig: z.infer<typeof ModelConfig> = {
 };
 
 export class FSModelConfigRepo implements IModelConfigRepo {
-  private readonly configPath = path.join(WorkDir, "config", "models.json");
+  private get configPath(): string {
+    return path.join(WorkDir, "config", "models.json");
+  }
 
   async ensureConfig(): Promise<void> {
     try {

@@ -30,6 +30,7 @@ import {
   Square,
   Trash2,
   Inbox,
+  Tags,
 } from "lucide-react";
 
 import {
@@ -185,6 +186,7 @@ type SidebarContentPanelProps = {
   onNewChat?: () => void;
   onOpenSearch?: () => void;
   onOpenIngestWindow?: () => void;
+  onOpenNoteTagging?: () => void;
   isBrowserOpen?: boolean;
   onToggleBrowser?: () => void;
   isSuggestedTopicsOpen?: boolean;
@@ -430,6 +432,7 @@ export function SidebarContentPanel({
   onNewChat,
   onOpenSearch,
   onOpenIngestWindow,
+  onOpenNoteTagging,
 
   isBrowserOpen = false,
   onToggleBrowser,
@@ -627,6 +630,16 @@ export function SidebarContentPanel({
             >
               <Inbox className="size-4" />
               <span>Ingest materials</span>
+            </button>
+          )}
+          {onOpenNoteTagging && (
+            <button
+              type="button"
+              onClick={onOpenNoteTagging}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <Tags className="size-4" />
+              <span>Tags</span>
             </button>
           )}
         </div>

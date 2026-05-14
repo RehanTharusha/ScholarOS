@@ -30,7 +30,6 @@ import {
 } from "@x/shared/dist/runs.js";
 import { BuiltinTools } from "../application/lib/builtin-tools.js";
 import { buildCopilotAgent } from "../application/assistant/agent.js";
-import { buildTrackRunAgent } from "../knowledge/track/run-agent.js";
 import {
   isBlocked,
   isDestructive,
@@ -55,7 +54,6 @@ import { parse } from "yaml";
 import { getRaw as getNoteCreationRaw } from "../knowledge/note_creation.js";
 import { getRaw as getLabelingAgentRaw } from "../knowledge/note_tagging_agent.js";
 import { getRaw as getNoteTaggingAgentRaw } from "../knowledge/note_tagging_agent.js";
-import { getRaw as getInlineTaskAgentRaw } from "../knowledge/inline_task_agent.js";
 import { shouldDisableTools } from "../config/config.js";
 
 function loadAgentNotesContext(): string | null {
@@ -376,10 +374,6 @@ export async function loadAgent(id: string): Promise<z.infer<typeof Agent>> {
     return buildCopilotAgent();
   }
 
-  if (id === "track-run") {
-    return buildTrackRunAgent();
-  }
-
   if (id === "note_creation") {
     const raw = getNoteCreationRaw();
     let agent: z.infer<typeof Agent> = {
@@ -447,33 +441,6 @@ export async function loadAgent(id: string): Promise<z.infer<typeof Agent>> {
       if (end !== -1) {
         const fm = noteTaggingAgentRaw.slice(3, end).trim();
         const content = noteTaggingAgentRaw.slice(end + 4).trim();
-        const yaml = parse(fm);
-        const parsed = Agent.omit({ name: true, instructions: true }).parse(
-          yaml,
-        );
-        agent = {
-          ...agent,
-          ...parsed,
-          instructions: content,
-        };
-      }
-    }
-
-    return agent;
-  }
-
-  if (id === "inline_task_agent") {
-    const inlineTaskAgentRaw = getInlineTaskAgentRaw();
-    let agent: z.infer<typeof Agent> = {
-      name: id,
-      instructions: inlineTaskAgentRaw,
-    };
-
-    if (inlineTaskAgentRaw.startsWith("---")) {
-      const end = inlineTaskAgentRaw.indexOf("\n---", 3);
-      if (end !== -1) {
-        const fm = inlineTaskAgentRaw.slice(3, end).trim();
-        const content = inlineTaskAgentRaw.slice(end + 4).trim();
         const yaml = parse(fm);
         const parsed = Agent.omit({ name: true, instructions: true }).parse(
           yaml,

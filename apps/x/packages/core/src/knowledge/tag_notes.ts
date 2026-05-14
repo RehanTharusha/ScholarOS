@@ -13,16 +13,18 @@ import {
   markNoteAsTagged,
   type NoteTaggingState,
 } from "./note_tagging_state.js";
-import { getNoteTypeDefinitions } from "./note_system.js";
 
-const SYNC_INTERVAL_MS = 15 * 1000; // 15 seconds
+let busy = false;
+
+const SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const BATCH_SIZE = 15;
 const NOTE_TAGGING_AGENT = "note_tagging_agent";
 const KNOWLEDGE_DIR = path.join(WorkDir, "knowledge");
 const MAX_CONTENT_LENGTH = 8000;
 
 /**
- * Find knowledge notes that haven't been tagged yet
+ * Find knowledge notes that haven't been tagged yet.
+ * Scans ALL .md files in /knowledge/ recursively (ScholarOS vault structure).
  */
 function getUntaggedNotes(state: NoteTaggingState): string[] {
   if (!fs.existsSync(KNOWLEDGE_DIR)) {
@@ -30,7 +32,6 @@ function getUntaggedNotes(state: NoteTaggingState): string[] {
   }
 
   const untagged: string[] = [];
-  const noteFolders = getNoteTypeDefinitions().map((d) => d.folder);
 
   function scanDir(dir: string) {
     const entries = fs.readdirSync(dir);
@@ -66,13 +67,8 @@ function getUntaggedNotes(state: NoteTaggingState): string[] {
     }
   }
 
-  for (const folder of noteFolders) {
-    const folderPath = path.join(KNOWLEDGE_DIR, folder);
-    if (!fs.existsSync(folderPath)) {
-      continue;
-    }
-    scanDir(folderPath);
-  }
+  // Scan entire knowledge directory recursively
+  scanDir(KNOWLEDGE_DIR);
 
   return untagged;
 }
@@ -88,8 +84,8 @@ async function tagNoteBatch(
     model: await getKgModel(),
   });
 
-  let message = `Tag the following ${files.length} knowledge notes by prepending YAML frontmatter with appropriate tags.\n\n`;
-  message += `**Important:** Use workspace-relative paths with workspace-edit (e.g. "knowledge/People/Sarah Chen.md", NOT absolute paths).\n\n`;
+  let message = `Tag the following ${files.length} academic knowledge notes by prepending YAML frontmatter with appropriate tags.\n\n`;
+  message += `**Important:** Use workspace-relative paths with workspace-edit (e.g. "knowledge/courses/Biology 101/concepts/Photosynthesis.md", NOT absolute paths).\n\n`;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -135,17 +131,24 @@ async function tagNoteBatch(
  * Process all untagged notes in batches
  */
 export async function processUntaggedNotes(): Promise<void> {
-  console.log("[NoteTagging] Checking for untagged notes...");
+  if (busy) {
+    console.log("[NoteTagging] Already running, skipping...");
+    return;
+  }
+  busy = true;
+  try {
+    console.log("[NoteTagging] Checking for untagged notes...");
 
-  const state = loadNoteTaggingState();
-  const untagged = getUntaggedNotes(state);
+    const state = loadNoteTaggingState();
+    const untagged = getUntaggedNotes(state);
 
   if (untagged.length === 0) {
     console.log("[NoteTagging] No untagged notes found");
+    busy = false;
     return;
   }
 
-  console.log(`[NoteTagging] Found ${untagged.length} untagged notes`);
+    console.log(`[NoteTagging] Found ${untagged.length} untagged notes`);
 
   const run = await serviceLogger.startRun({
     service: "note_tagging",
@@ -208,10 +211,16 @@ export async function processUntaggedNotes(): Promise<void> {
       totalEdited += result.filesEdited.size;
 
       // Only mark files that were actually edited by the agent
+      // Normalize paths to forward slashes for cross-platform comparison
       for (const file of files) {
-        const relativePath = path.relative(WorkDir, file.path);
-        if (result.filesEdited.has(relativePath)) {
-          markNoteAsTagged(file.path, state);
+        const relativePath = path
+          .relative(WorkDir, file.path)
+          .replace(/\\/g, "/");
+        for (const editedPath of result.filesEdited) {
+          if (editedPath.replace(/\\/g, "/") === relativePath) {
+            markNoteAsTagged(file.path, state);
+            break;
+          }
         }
       }
 
@@ -255,15 +264,18 @@ export async function processUntaggedNotes(): Promise<void> {
   });
 
   console.log(`[NoteTagging] Done. ${totalEdited} notes tagged.`);
+  } finally {
+    busy = false;
+  }
 }
 
 /**
  * Main entry point - runs as independent polling service
  */
 export async function init() {
-  console.log("[NoteTagging] Starting Note Tagging Service...");
+  console.log("[NoteTagging] Starting ScholarOS Note Tagging Service...");
   console.log(
-    `[NoteTagging] Will check for untagged notes every ${SYNC_INTERVAL_MS / 1000} seconds`,
+    `[NoteTagging] Will check for untagged notes every ${SYNC_INTERVAL_MS / 1000 / 60} minutes`,
   );
 
   // Initial run

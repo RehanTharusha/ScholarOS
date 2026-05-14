@@ -14,7 +14,6 @@ import {
   setupIpcHandlers,
   startRunsWatcher,
   startServicesWatcher,
-  startTracksWatcher,
   startWorkspaceWatcher,
   stopRunsWatcher,
   stopServicesWatcher,
@@ -26,10 +25,7 @@ import { updateElectronApp, UpdateSourceType } from "update-electron-app";
 import { init as initGranolaSync } from "@x/core/dist/knowledge/granola/sync.js";
 import { init as initGraphBuilder } from "@x/core/dist/knowledge/build_graph.js";
 import { init as initNoteTagging } from "@x/core/dist/knowledge/tag_notes.js";
-import { init as initInlineTasks } from "@x/core/dist/knowledge/inline_tasks.js";
 import { init as initAgentRunner } from "@x/core/dist/agent-schedule/runner.js";
-import { init as initTrackScheduler } from "@x/core/dist/knowledge/track/scheduler.js";
-import { init as initTrackEventProcessor } from "@x/core/dist/knowledge/track/events.js";
 import {
   init as initLocalSites,
   shutdown as shutdownLocalSites,
@@ -270,15 +266,6 @@ app.whenReady().then(async () => {
     // start services watcher
     startServicesWatcher();
 
-    // start tracks watcher
-    startTracksWatcher();
-
-    // start track scheduler (cron/window/once)
-    initTrackScheduler();
-
-    // start track event processor (consumes events/pending/, triggers matching tracks)
-    initTrackEventProcessor();
-
     // start granola sync
     initGranolaSync();
 
@@ -287,9 +274,6 @@ app.whenReady().then(async () => {
 
     // start note tagging service
     initNoteTagging();
-
-    // start inline task service (@rowboat: mentions)
-    initInlineTasks();
 
     // start background agent runner (scheduled agents)
     initAgentRunner();

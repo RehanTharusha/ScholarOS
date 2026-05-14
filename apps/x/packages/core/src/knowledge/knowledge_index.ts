@@ -5,80 +5,96 @@ import { WorkDir } from '../config/config.js';
 const KNOWLEDGE_DIR = path.join(WorkDir, 'knowledge');
 
 /**
- * Index entry for a person note
+ * Index entry for a course note
  */
-interface PersonEntry {
+interface CourseEntry {
     file: string;
     name: string;
-    email?: string;
-    aliases: string[];
-    organization?: string;
-    role?: string;
 }
 
 /**
- * Index entry for an organization note
+ * Index entry for a concept note
  */
-interface OrganizationEntry {
+interface ConceptEntry {
     file: string;
     name: string;
-    domain?: string;
-    aliases: string[];
-}
-
-/**
- * Index entry for a project note
- */
-interface ProjectEntry {
-    file: string;
-    name: string;
-    status?: string;
-    aliases: string[];
-}
-
-/**
- * Index entry for a topic note
- */
-interface TopicEntry {
-    file: string;
-    name: string;
+    course?: string;
     keywords: string[];
-    aliases: string[];
 }
 
 /**
- * Index entry for notes in non-standard folders (generic)
+ * Index entry for a lecture note
+ */
+interface LectureEntry {
+    file: string;
+    name: string;
+    course?: string;
+    date?: string;
+}
+
+/**
+ * Index entry for an assignment note
+ */
+interface AssignmentEntry {
+    file: string;
+    name: string;
+    course?: string;
+    status?: string;
+    due?: string;
+}
+
+/**
+ * Index entry for a paper note
+ */
+interface PaperEntry {
+    file: string;
+    name: string;
+    authors?: string;
+    year?: string;
+}
+
+/**
+ * Index entry for notes in other folders (generic)
  */
 interface OtherEntry {
     file: string;
     name: string;
     folder: string;
-    aliases: string[];
 }
 
 /**
- * The complete knowledge index
+ * The complete knowledge index for ScholarOS
  */
 export interface KnowledgeIndex {
-    people: PersonEntry[];
-    organizations: OrganizationEntry[];
-    projects: ProjectEntry[];
-    topics: TopicEntry[];
+    courses: CourseEntry[];
+    concepts: ConceptEntry[];
+    lectures: LectureEntry[];
+    assignments: AssignmentEntry[];
+    papers: PaperEntry[];
+    syntheses: OtherEntry[];
+    resources: OtherEntry[];
+    entities: OtherEntry[];
     other: OtherEntry[];
     buildTime: string;
 }
 
 /**
- * Extract a field value from markdown content
+ * Extract the title (first H1) from markdown content
+ */
+function extractTitle(content: string): string {
+    const match = content.match(/^#\s+(.+?)$/m);
+    return match ? match[1].trim() : '';
+}
+
+/**
+ * Extract a field value from markdown content.
  * Looks for patterns like **Field:** value or **Field:** [[Link]]
  */
 function extractField(content: string, fieldName: string): string | undefined {
-    // Match **Field:** value (handles [[links]] and plain text)
     const pattern = new RegExp(`\\*\\*${fieldName}:\\*\\*\\s*(.+?)(?:\\n|$)`, 'i');
     const match = content.match(pattern);
     if (match) {
         let value = match[1].trim();
-        // Extract text from [[link]] if present
         const linkMatch = value.match(/\[\[(?:[^\]|]+\|)?([^\]]+)\]\]/);
         if (linkMatch) {
             value = linkMatch[1];
@@ -98,93 +114,6 @@ function extractList(content: string, fieldName: string): string[] {
 }
 
 /**
- * Extract the title (first H1) from markdown content
- */
-function extractTitle(content: string): string {
-    const match = content.match(/^#\s+(.+?)$/m);
-    return match ? match[1].trim() : '';
-}
-
-/**
- * Parse a person note and extract index data
- */
-function parsePersonNote(filePath: string, content: string): PersonEntry {
-    const name = extractTitle(content);
-    const relativePath = path.relative(KNOWLEDGE_DIR, filePath);
-
-    return {
-        file: relativePath,
-        name,
-        email: extractField(content, 'Email'),
-        aliases: extractList(content, 'Aliases'),
-        organization: extractField(content, 'Organization'),
-        role: extractField(content, 'Role'),
-    };
-}
-
-/**
- * Parse an organization note and extract index data
- */
-function parseOrganizationNote(filePath: string, content: string): OrganizationEntry {
-    const name = extractTitle(content);
-    const relativePath = path.relative(KNOWLEDGE_DIR, filePath);
-
-    return {
-        file: relativePath,
-        name,
-        domain: extractField(content, 'Domain'),
-        aliases: extractList(content, 'Aliases'),
-    };
-}
-
-/**
- * Parse a project note and extract index data
- */
-function parseProjectNote(filePath: string, content: string): ProjectEntry {
-    const name = extractTitle(content);
-    const relativePath = path.relative(KNOWLEDGE_DIR, filePath);
-
-    return {
-        file: relativePath,
-        name,
-        status: extractField(content, 'Status'),
-        aliases: extractList(content, 'Aliases'),
-    };
-}
-
-/**
- * Parse a topic note and extract index data
- */
-function parseTopicNote(filePath: string, content: string): TopicEntry {
-    const name = extractTitle(content);
-    const relativePath = path.relative(KNOWLEDGE_DIR, filePath);
-
-    return {
-        file: relativePath,
-        name,
-        keywords: extractList(content, 'Keywords'),
-        aliases: extractList(content, 'Aliases'),
-    };
-}
-
-/**
- * Parse a generic note (for non-standard folders)
- */
-function parseOtherNote(filePath: string, content: string): OtherEntry {
-    const name = extractTitle(content);
-    const relativePath = path.relative(KNOWLEDGE_DIR, filePath);
-    // Get the folder name (first part of relative path)
-    const folder = relativePath.split(path.sep)[0] || 'root';
-
-    return {
-        file: relativePath,
-        name,
-        folder,
-        aliases: extractList(content, 'Aliases'),
-    };
-}
-
-/**
  * Recursively scan a directory for markdown files
  */
 function scanDirectoryRecursive(dir: string): string[] {
@@ -200,7 +129,6 @@ function scanDirectoryRecursive(dir: string): string[] {
         const stat = fs.statSync(fullPath);
 
         if (stat.isDirectory()) {
-            // Recursively scan subdirectories
             files.push(...scanDirectoryRecursive(fullPath));
         } else if (stat.isFile() && entry.endsWith('.md')) {
             files.push(fullPath);
@@ -211,61 +139,100 @@ function scanDirectoryRecursive(dir: string): string[] {
 }
 
 /**
- * Determine which folder a file belongs to based on its path
+ * Determine the folder type from the relative path.
+ * Returns the top-level category (courses, papers, syntheses, etc.) and optionally the subfolder info.
  */
-function getFolderType(filePath: string): string {
+function getFolderInfo(filePath: string): { category: string; subfolder?: string; course?: string } {
     const relativePath = path.relative(KNOWLEDGE_DIR, filePath);
     const parts = relativePath.split(path.sep);
 
-    // If file is directly in knowledge folder (no subfolder)
     if (parts.length === 1) {
-        return 'root';
+        return { category: 'root' };
     }
 
-    // Return the first folder name
-    return parts[0];
+    const category = parts[0].toLowerCase();
+
+    if (category === 'courses' && parts.length >= 3) {
+        return { category: 'courses', course: parts[1], subfolder: parts[2] };
+    }
+
+    return { category };
 }
 
 /**
- * Build a complete index of the knowledge base
- * Scans all notes recursively and extracts searchable fields using folder-based parsing
+ * Build a complete index of the ScholarOS knowledge base.
  */
 export function buildKnowledgeIndex(): KnowledgeIndex {
     const index: KnowledgeIndex = {
-        people: [],
-        organizations: [],
-        projects: [],
-        topics: [],
+        courses: [],
+        concepts: [],
+        lectures: [],
+        assignments: [],
+        papers: [],
+        syntheses: [],
+        resources: [],
+        entities: [],
         other: [],
         buildTime: new Date().toISOString(),
     };
 
-    // Scan entire knowledge directory recursively
     const allFiles = scanDirectoryRecursive(KNOWLEDGE_DIR);
 
     for (const filePath of allFiles) {
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
-            const folderType = getFolderType(filePath);
+            const { category, course, subfolder } = getFolderInfo(filePath);
+            const name = extractTitle(content);
+            const relativePath = path.relative(KNOWLEDGE_DIR, filePath);
 
-            // Use folder-based parsing
-            switch (folderType) {
-                case 'People':
-                    index.people.push(parsePersonNote(filePath, content));
-                    break;
-                case 'Organizations':
-                    index.organizations.push(parseOrganizationNote(filePath, content));
-                    break;
-                case 'Projects':
-                    index.projects.push(parseProjectNote(filePath, content));
-                    break;
-                case 'Topics':
-                    index.topics.push(parseTopicNote(filePath, content));
-                    break;
-                default:
-                    // Generic parsing for non-standard folders
-                    index.other.push(parseOtherNote(filePath, content));
-                    break;
+            if (category === 'courses') {
+                // This is under courses/
+                if (subfolder === 'concepts') {
+                    index.concepts.push({
+                        file: relativePath,
+                        name,
+                        course,
+                        keywords: extractList(content, 'Tags'),
+                    });
+                } else if (subfolder === 'lectures') {
+                    index.lectures.push({
+                        file: relativePath,
+                        name,
+                        course,
+                        date: extractField(content, 'Date'),
+                    });
+                } else if (subfolder === 'assignments') {
+                    index.assignments.push({
+                        file: relativePath,
+                        name,
+                        course,
+                        status: extractField(content, 'Status'),
+                        due: extractField(content, 'Due'),
+                    });
+                } else if (!subfolder && filePath.endsWith('index.md')) {
+                    // Course index file
+                    index.courses.push({
+                        file: relativePath,
+                        name: course ?? name,
+                    });
+                } else {
+                    index.other.push({ file: relativePath, name, folder: category });
+                }
+            } else if (category === 'papers') {
+                index.papers.push({
+                    file: relativePath,
+                    name,
+                    authors: extractField(content, 'Authors'),
+                    year: extractField(content, 'Year'),
+                });
+            } else if (category === 'syntheses') {
+                index.syntheses.push({ file: relativePath, name, folder: category });
+            } else if (category === 'resources') {
+                index.resources.push({ file: relativePath, name, folder: category });
+            } else if (category === 'entities') {
+                index.entities.push({ file: relativePath, name, folder: category });
+            } else {
+                index.other.push({ file: relativePath, name, folder: category });
             }
         } catch (error) {
             console.error(`Error parsing note ${filePath}:`, error);
@@ -282,71 +249,120 @@ export function formatIndexForPrompt(index: KnowledgeIndex): string {
     let output = '# Existing Knowledge Base Index\n\n';
     output += `Built at: ${index.buildTime}\n\n`;
 
-    // People
-    output += '## People\n\n';
-    if (index.people.length === 0) {
-        output += '_No people notes yet_\n\n';
+    // Courses
+    output += '## Courses\n\n';
+    if (index.courses.length === 0) {
+        output += '_No course overview pages yet_\n\n';
     } else {
-        output += '| File | Name | Email | Organization | Aliases |\n';
-        output += '|------|------|-------|--------------|--------|\n';
-        for (const person of index.people) {
-            const aliases = person.aliases.length > 0 ? person.aliases.join(', ') : '-';
-            output += `| ${person.file} | ${person.name} | ${person.email || '-'} | ${person.organization || '-'} | ${aliases} |\n`;
+        output += '| File | Name |\n';
+        output += '|------|------|\n';
+        for (const c of index.courses) {
+            output += `| ${c.file} | ${c.name} |\n`;
         }
         output += '\n';
     }
 
-    // Organizations
-    output += '## Organizations\n\n';
-    if (index.organizations.length === 0) {
-        output += '_No organization notes yet_\n\n';
+    // Concepts
+    output += '## Concepts\n\n';
+    if (index.concepts.length === 0) {
+        output += '_No concept notes yet_\n\n';
     } else {
-        output += '| File | Name | Domain | Aliases |\n';
-        output += '|------|------|--------|--------|\n';
-        for (const org of index.organizations) {
-            const aliases = org.aliases.length > 0 ? org.aliases.join(', ') : '-';
-            output += `| ${org.file} | ${org.name} | ${org.domain || '-'} | ${aliases} |\n`;
+        output += '| File | Name | Course | Keywords |\n';
+        output += '|------|------|--------|----------|\n';
+        for (const c of index.concepts) {
+            const course = c.course ?? '-';
+            const keywords = c.keywords.length > 0 ? c.keywords.join(', ') : '-';
+            output += `| ${c.file} | ${c.name} | ${course} | ${keywords} |\n`;
         }
         output += '\n';
     }
 
-    // Projects
-    output += '## Projects\n\n';
-    if (index.projects.length === 0) {
-        output += '_No project notes yet_\n\n';
+    // Lectures
+    output += '## Lectures\n\n';
+    if (index.lectures.length === 0) {
+        output += '_No lecture notes yet_\n\n';
     } else {
-        output += '| File | Name | Status | Aliases |\n';
-        output += '|------|------|--------|--------|\n';
-        for (const project of index.projects) {
-            const aliases = project.aliases.length > 0 ? project.aliases.join(', ') : '-';
-            output += `| ${project.file} | ${project.name} | ${project.status || '-'} | ${aliases} |\n`;
+        output += '| File | Name | Course | Date |\n';
+        output += '|------|------|--------|------|\n';
+        for (const l of index.lectures) {
+            const course = l.course ?? '-';
+            const date = l.date ?? '-';
+            output += `| ${l.file} | ${l.name} | ${course} | ${date} |\n`;
         }
         output += '\n';
     }
 
-    // Topics
-    output += '## Topics\n\n';
-    if (index.topics.length === 0) {
-        output += '_No topic notes yet_\n\n';
+    // Assignments
+    output += '## Assignments\n\n';
+    if (index.assignments.length === 0) {
+        output += '_No assignment notes yet_\n\n';
     } else {
-        output += '| File | Name | Keywords | Aliases |\n';
-        output += '|------|------|----------|--------|\n';
-        for (const topic of index.topics) {
-            const keywords = topic.keywords.length > 0 ? topic.keywords.join(', ') : '-';
-            const aliases = topic.aliases.length > 0 ? topic.aliases.join(', ') : '-';
-            output += `| ${topic.file} | ${topic.name} | ${keywords} | ${aliases} |\n`;
+        output += '| File | Name | Course | Status | Due |\n';
+        output += '|------|------|--------|--------|-----|\n';
+        for (const a of index.assignments) {
+            const course = a.course ?? '-';
+            const status = a.status ?? '-';
+            const due = a.due ?? '-';
+            output += `| ${a.file} | ${a.name} | ${course} | ${status} | ${due} |\n`;
         }
         output += '\n';
     }
 
-    // Other (non-standard folders)
+    // Papers
+    output += '## Papers\n\n';
+    if (index.papers.length === 0) {
+        output += '_No paper notes yet_\n\n';
+    } else {
+        output += '| File | Name | Authors | Year |\n';
+        output += '|------|------|---------|------|\n';
+        for (const p of index.papers) {
+            const authors = p.authors ?? '-';
+            const year = p.year ?? '-';
+            output += `| ${p.file} | ${p.name} | ${authors} | ${year} |\n`;
+        }
+        output += '\n';
+    }
+
+    // Syntheses
+    if (index.syntheses.length > 0) {
+        output += '## Syntheses\n\n';
+        output += '| File | Name |\n';
+        output += '|------|------|\n';
+        for (const s of index.syntheses) {
+            output += `| ${s.file} | ${s.name} |\n`;
+        }
+        output += '\n';
+    }
+
+    // Resources
+    if (index.resources.length > 0) {
+        output += '## Resources\n\n';
+        output += '| File | Name |\n';
+        output += '|------|------|\n';
+        for (const r of index.resources) {
+            output += `| ${r.file} | ${r.name} |\n`;
+        }
+        output += '\n';
+    }
+
+    // Entities
+    if (index.entities.length > 0) {
+        output += '## Entities\n\n';
+        output += '| File | Name |\n';
+        output += '|------|------|\n';
+        for (const e of index.entities) {
+            output += `| ${e.file} | ${e.name} |\n`;
+        }
+        output += '\n';
+    }
+
+    // Other
     if (index.other.length > 0) {
         output += '## Other Notes\n\n';
-        output += '| File | Name | Folder | Aliases |\n';
-        output += '|------|------|--------|--------|\n';
+        output += '| File | Name | Folder |\n';
+        output += '|------|------|--------|\n';
         for (const note of index.other) {
-            const aliases = note.aliases.length > 0 ? note.aliases.join(', ') : '-';
-            output += `| ${note.file} | ${note.name} | ${note.folder} | ${aliases} |\n`;
+            output += `| ${note.file} | ${note.name} | ${note.folder} |\n`;
         }
         output += '\n';
     }

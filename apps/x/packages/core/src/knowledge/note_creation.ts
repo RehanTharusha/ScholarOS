@@ -497,231 +497,140 @@ SKIP (doesn't warrant note):
 
 ---
 
-# Step 5: Identify New Entities
+# Step 5: Identify New Study Entities
 
-For entities not resolved to existing notes, determine if they warrant new notes.
+For entities not resolved to existing notes, determine if they warrant new notes or suggestion cards.
 
-## People
+## Concepts
 
-### Who Gets a Note
+### Which Concepts Get a Note
 
-**CREATE a note for people who are:**
-- External (not @user.domain)
-- People you directly interacted with in meetings
-- Email correspondents directly participating in the thread (emails that reach this step already passed label-based filtering)
-- Decision makers or contacts at customers, prospects, or partners
-- Investors or potential investors
-- Candidates you are interviewing
-- Advisors or mentors
-- Key collaborators
-- Introducers who connect you to valuable contacts
+Concepts are the core unit of the wiki. CREATE a canonical note in \`courses/<course>/concepts/\` for concepts that:
+- Are a core topic in a course you are studying
+- Have enough material (multiple sources) to fill a meaningful page
+- Are likely to come up again across multiple sources or exams
+- Connect to other concepts in the wiki
 
-**DO NOT create notes for:**
-- Large group meeting attendees you didn't interact with
-- Internal colleagues (@user.domain)
-- Assistants handling only logistics
-- People mentioned only as third parties ("we work with X", "I can introduce you to Y") when there has been no direct interaction yet
+Suggestion cards instead of canonical notes for concepts that:
+- Are mentioned only in passing with thin coverage
+- Are tangential to your main courses
+- Would benefit from more source material before a page is worthwhile
+- Are interesting but not yet clearly relevant to current studies
 
-### Role Inference
+### Handling Non-Note-Worthy Concepts
 
-If role is not explicitly stated, infer from context:
+For minor concepts that don't warrant their own page, mention them in the parent course page or a broader concept page under a "Related" section.
 
-**From email signatures:**
-- Often contains title
+## Courses
 
-**From meeting context:**
-- Organizer of cross-company meeting → likely senior or partnerships
-- Technical questions → likely engineering
-- Pricing questions → likely procurement or finance
-- Product feedback → likely product
+Courses are semester/term containers. CREATE a canonical note at \`courses/<course-name>/index.md\` when:
+- You are actively enrolled in or auditing the course
+- You have source material (lectures, readings, assignments) to organize
+- The course will generate multiple concept pages
 
-**From email patterns:**
-- firstname@company.com → often founder or senior
-- firstname.lastname@company.com → often larger company employee
+Suggestion cards instead of canonical notes for courses that:
+- Are mentioned but you haven't started studying them yet
+- Are potential future courses (next semester planning)
+- Are cross-listed or related to current courses but not yet active
 
-**From conversation content:**
-- "I'll need to check with my team" → manager
-- "Let me run this by leadership" → IC or mid-level
-- "I can make that call" → decision maker
+## Authors
 
-**Format in note:**
-\`\`\`markdown
-**Role:** Product Lead (inferred from evaluation discussions)
-**Role:** Senior (inferred — organized cross-company meeting)
-**Role:** Engineering (inferred — asked technical integration questions)
-\`\`\`
+CREATE a canonical note in \`entities/\` for authors who:
+- Are primary authors of papers you have ingested
+- Are frequently cited across multiple sources in your wiki
+- Are your instructors or advisors
+- Have a body of work you are actively studying
 
-**Never write just "Unknown" if you can make a reasonable inference.**
+DO NOT create notes for:
+- Authors cited once in passing
+- Editors or minor contributors
+- Authors of papers you have not read
 
-### Relationship Type Guide
+Suggestion cards for authors who are:
+- Emerging in your sources but not yet central
+- Potentially interesting but with limited coverage so far
 
-| Relationship Type | Create People Notes? | Create Org Note? |
-|-------------------|----------------------|------------------|
-| Customer (active deal) | Yes — key contacts | Yes |
-| Customer (support ticket) | No | Maybe update existing |
-| Prospect | Yes — decision makers | Yes |
-| Investor | Yes | Yes |
-| Strategic partner | Yes — key contacts | Yes |
-| Vendor (strategic) | Yes — main contact only | Yes |
-| Vendor (transactional) | No | Optional |
-| Bank/Financial services | No | Yes (one note) |
-| Candidate | Yes | No |
-| Service provider (one-time) | No | No |
-| Personalized outreach | Yes | Yes |
-| Generic cold outreach | No | No |
+## Institutions
 
-### Handling Non-Note-Worthy People
+CREATE a canonical note in \`entities/\` for institutions (universities, labs, departments) that:
+- Are your own institution or one you are applying to
+- Are frequently referenced across multiple sources
+- Host research groups or projects you are following
 
-For people who don't warrant their own note, add to Organization note's Contacts section:
-\`\`\`markdown
-## Contacts
-- James Wong — Relationship Manager, helped with account setup
-- Sarah Lee — Support, handled wire transfer issue
-\`\`\`
+Suggestion cards for institutions that are:
+- Mentioned but not yet relevant to your work
+- Collaborators or affiliates of key authors without their own significance yet
 
-### Direct Interaction Test (People and Organizations)
+## Papers / Syntheses / Resources
 
-For **new canonical People and Organizations notes**, require **direct interaction**, not just mention.
+As a general rule:
+- **Papers**: Create canonical notes at \`papers/\` for papers you have ingested and synthesized. Suggestion cards for papers mentioned but not yet processed.
+- **Syntheses**: Create at \`syntheses/\` when you have multiple concepts across courses that connect. Suggestion cards when a cross-course connection is spotted but not yet explored.
+- **Resources**: Create at \`resources/\` for tools, references, and materials you actively use. Suggestion cards for resources worth investigating.
 
-**Direct interaction = YES**
-- The person sent the email, replied in the thread, or was directly addressed as part of the active exchange
-- The person participated in the meeting, and there is evidence the user actually interacted with them or the meeting centered on them
-- The organization is directly represented in the exchange by participants/senders and is part of an active first-degree relationship with the user or team
-- The user is directly evaluating, selling to, buying from, partnering with, interviewing, or coordinating with that person or organization
-
-**Direct interaction = NO**
-- Someone else mentions them in passing
-- A sender says they work with someone at another company
-- A sender offers to introduce the user to someone
-- A company is referenced as a customer, partner, employer, competitor, or example, but nobody from that company is directly involved in the interaction
-- The source only establishes a second-degree relationship, not a direct one
-
-**Canonical note rule:**
-- For **new People/Organizations**, create the canonical note only if both are true:
-  1. There is **direct interaction**
-  2. The entity clears the **weekly importance test**
-
-If an entity seems strategically relevant but fails the direct interaction test, do **not** auto-create a canonical note. At most, create a suggestion card in \`suggested-topics.md\`.
-
-### Weekly Importance Test (People and Organizations only)
-
-For **People** and **Organizations**, the final gate for **creating a new canonical note** is an importance test:
-
-**Ask:** _"If I were the user, would I realistically need to look at this note on a weekly basis over the near term?"_
-
-This test is mainly for **People** and **Organizations**. **Do NOT use it as the decision rule for Topic or Project suggestions.**
-
-**Strong YES signals:**
-- Active customer, prospect, investor, partner, candidate, advisor, or strategic vendor relationship
-- Repeated interaction or a likely ongoing cadence
-- Decision-maker, owner, blocker, evaluator, or approver in an active process
-- Material relevance to launch, sales, fundraising, hiring, compliance, product delivery, or another current priority
-- The user would benefit from a durable reference note instead of repeatedly reopening raw emails or meeting transcripts
-
-**Strong NO signals:**
-- One-off logistics, scheduling, or transactional contact
-- Assistant, support rep, recruiter, or vendor rep with no ongoing strategic role
-- Incidental attendee mentioned once with no leverage on current work
-- Passing mention with no evidence of an ongoing relationship
-
-**Borderline signals:**
-- Seems potentially important, but there isn't enough evidence yet that the user will need a weekly reference note
-- Might become important soon, but the role, relationship, or repeated relevance is still unclear
-- Important enough to track, but only through second-degree mention or an offered introduction rather than direct interaction
-
-**Outcome rules for new People/Organizations:**
-- **Clear YES + direct interaction** → Create/update the canonical \`People/\` or \`Organizations/\` note
-- **Borderline or no direct interaction, but still strategically relevant** → Do **not** create the canonical note yet; instead create or update a card in \`suggested-topics.md\`
-- **Clear NO** → Skip note creation and do not add a suggestion unless the source strongly suggests near-term strategic relevance
-
-**When a canonical note already exists:**
-- Update the existing note even if the current source is weaker; the importance test is mainly for deciding whether to create a **new** People/Organization note
-- If a previously tentative person/org is now clearly important enough for a canonical note, create/update the note and remove any tentative suggestion card for that exact entity from \`suggested-topics.md\`
-
-## Organizations
-
-**CREATE a note if:**
-- There is direct interaction with that org in the source
-- They're a customer, prospect, investor, or partner in a direct first-degree interaction
-- Someone from that org sent relevant personalized correspondence or joined a meeting you actually had with them
-- They pass the weekly importance test above
-
-**DO NOT create for:**
-- Tool/service providers mentioned in passing
-- One-time transactional vendors
-- Consumer service companies
-- Organizations only referenced through third-party mention or offered introductions
-
-## Projects
-
-**If a project note already exists:** update it.
-
-**If no project note exists:** do **not** create a new canonical note in \`knowledge/Projects/\`.
-
-Instead, create or update a **suggestion card** in \`suggested-topics.md\` if the project is strong enough:
-- Discussed substantively in a meeting or email thread
-- Has a goal and timeline
-- Involves multiple interactions
-
-Otherwise skip it.
-
-Projects do **not** use the weekly importance test above. For **new** projects, the default output is a suggestion card, not a canonical note.
-
-## Topics
-
-**If a topic note already exists:** update it.
-
-**If no topic note exists:** do **not** create a new canonical note in \`knowledge/Topics/\`.
-
-Instead, create or update a **suggestion card** in \`suggested-topics.md\` if the topic is strong enough:
-- Recurring theme discussed
-- Will come up again across conversations
-
-Otherwise skip it.
-
-Topics do **not** use the weekly importance test above. For **new** topics, the default output is a suggestion card, not a canonical note.
+---
 
 ## Suggested Topics Curation
 
-Also maintain \`suggested-topics.md\` as a **curated shortlist** of things worth exploring next.
+Maintain \`suggested-topics.md\` as a curated shortlist of study leads worth exploring.
 
-Despite the filename, \`suggested-topics.md\` can contain cards for **People, Organizations, Topics, or Projects**.
+The file can contain cards for **Concepts, Courses, Papers, Syntheses, or Resources**.
 
-There are **two reasons** to add or update a suggestion card:
+### When to Add a Suggestion Card
 
-1. **High-quality Topic/Project cards**
-   - Use these for topics or projects that are timely, high-leverage, strategically important, or clearly worth exploring now
-   - These are not a dump of every topic/project note. Be selective
-   - For **new** topics and projects, cards are the default output from this pipeline
+1. **Concepts worth tracking but not yet canonical**
+   - The concept appears in source material but has thin coverage
+   - It connects to other concepts you study and will likely grow
+   - You want a reminder to revisit when more material appears
 
-2. **Tentative People/Organization cards**
-   - Use these when a person or organization seems important enough to track, but you are **not 100% sure** they clear the weekly-importance test for a canonical note yet
-   - The card should capture why they might matter and what still needs verification
+2. **Courses to consider**
+   - Future or potential courses
+   - Cross-listed courses related to current study
 
-**Do NOT add cards for:**
-- Low-signal administrative or transactional entities
-- Stale or completed items with no near-term relevance
-- People/organizations that already have a clearly established canonical note, unless the card is about a distinct project/topic exploration rather than the entity itself
+3. **Papers to read**
+   - Referenced in lectures or readings but not yet ingested
+   - Recommend papers from your institution or research area
 
-**Card guidance:**
-- For **Topics/Projects**, use category \`Topics\` or \`Projects\`
-- For tentative **People/Organizations**, use category \`People\` or \`Organizations\`
+4. **Syntheses to explore**
+   - Cross-course connections spotted during ingest
+   - Comparisons worth developing
+
+5. **Resources to catalogue**
+   - Study tools, references, or datasets worth tracking
+   - URLs, software, or libraries relevant to current courses
+
+### DO NOT Add Cards For
+
+- Stale items with no current relevance
+- Concepts that already have strong canonical pages (unless tracking a new angle)
+- Papers you have already ingested and summarized
+- Resources already catalogued with a canonical note
+
+### Card Guidance
+
+- For **Concepts**, use category \`Concepts\` and include an optional \`course\` field to tie it to a specific course
+- For **Courses**, use category \`Courses\` 
+- For **Papers**, use category \`Papers\`
+- For **Syntheses**, use category \`Syntheses\`
+- For **Resources**, use category \`Resources\`
 - Title should be concise and canonical when possible
-- Description should explain why it matters **now**
-- For tentative People/Organizations, description should also mention what is still uncertain or what the user should verify
+- Description should explain why it matters **now** for your studies
+- For Concepts, description should also mention which course or source it came from
 
-**Curation rules:**
+### Curation Rules
+
 - Maintain a **high-quality set**, not an ever-growing backlog
 - Deduplicate by normalized title
-- Prefer current, actionable, recurring, or strategically important items
+- Prefer current, actionable, or exam-relevant items
 - Keep only the strongest **8-12 cards total**
 - Preserve good existing cards unless the new source clearly supersedes them
-- Remove stale cards that are no longer relevant
-- If a tentative People/Organization card later becomes clearly important and you create a canonical note, remove the tentative card
+- Remove stale cards that are no longer relevant to current courses
+- If a concept card later gets enough material for a canonical page, create the note and remove the card
 
-**File format for \`suggested-topics.md\`:**
+### File Format
+
 \`\`\`suggestedtopic
-{"title":"Security Compliance","description":"Summarize the current compliance posture, blockers, and customer implications.","category":"Topics"}
+{"title":"Mitochondrial DNA","description":"Key concept from Biology 101 lecture 3 — needs more sources before full page.","category":"Concepts","course":"Biology 101"}
 \`\`\`
 
 The file should start with \`# Suggested Topics\` followed by one or more blocks in that format.
@@ -959,20 +868,20 @@ If new info contradicts existing:
 **For NEW entities (use workspace-writeFile):**
 \`\`\`
 workspace-writeFile({
-  path: "{knowledge_folder}/People/Jennifer.md",
-  data: "# Jennifer\\n\\n## Summary\\n..."
+  path: "{knowledge_folder}/courses/Biology 101/concepts/Photosynthesis.md",
+  data: "# Photosynthesis\\n\\n## Summary\\n..."
 })
 \`\`\`
 
 **For EXISTING entities (use workspace-edit):**
 - Read current content first with workspace-readFile
-- Use workspace-edit to add activity entry at TOP (reverse chronological)
+- Use workspace-edit to add new content
 - Update fields using targeted edits
 \`\`\`
 workspace-edit({
-  path: "{knowledge_folder}/People/Sarah Chen.md",
-  oldString: "## Activity\\n",
-  newString: "## Activity\\n- **2026-02-03** (meeting): Met to discuss project timeline\\n"
+  path: "{knowledge_folder}/courses/Biology 101/concepts/Photosynthesis.md",
+  oldString: "## Summary\\n",
+  newString: "## Summary\\n- **2026-05-13** (lecture): Light-dependent reactions overview\\n"
 })
 \`\`\`
 
@@ -1011,21 +920,21 @@ After writing, verify links go both ways.
 
 **IMPORTANT:** Always use absolute links with the folder path:
 \`\`\`markdown
-[[People/Sarah Chen]]
-[[Organizations/Acme Corp]]
-[[Projects/Acme Integration]]
-[[Topics/Security Compliance]]
+[[courses/Biology 101/concepts/Photosynthesis]]
+[[courses/Biology 101/index]]
+[[entities/John Maynard Keynes]]
+[[papers/Prospect Theory]]
 \`\`\`
 
 ## Bidirectional Link Rules
 
 | If you add... | Then also add... |
 |---------------|------------------|
-| Person → Organization | Organization → Person (in People section) |
-| Person → Project | Project → Person (in People section) |
-| Project → Organization | Organization → Project (in Projects section) |
-| Project → Topic | Topic → Project (in Related section) |
-| Person → Person | Person → Person (reverse link) |
+| Concept → Course | Course → Concept (in course index) |
+| Concept → Author | Author → Concept (in author page) |
+| Concept → Paper | Paper → Concept (in paper page) |
+| Concept → Concept | Concept → Concept (reverse link) |
+| Author → Institution | Institution → Author (in institution page) |
 
 ---
 
@@ -1076,46 +985,40 @@ ${renderNoteTypesBlock()}
 Before completing, verify:
 
 **Source Type:**
-- [ ] Correctly identified as meeting or email
-- [ ] Applied label-based filtering rules correctly
+- [ ] Correctly identified source type
+- [ ] Source worth processing
 
 **Resolution:**
-- [ ] Extracted all name variants from source
-- [ ] Searched notes including Aliases fields
+- [ ] Extracted all key entities from source
+- [ ] Searched existing notes for matches
 - [ ] Built resolution map before writing
 - [ ] Used absolute paths \`[[Folder/Name]]\` in ALL links
 
 **Filtering:**
-- [ ] Excluded self (user.name, user.email, @user.domain)
-- [ ] Applied relevance test to each person
-- [ ] Applied the direct interaction test to new People/Organizations
-- [ ] Applied the weekly importance test to new People/Organizations
-- [ ] Transactional contacts in Org Contacts, not People notes
-- [ ] Source correctly classified (process vs skip)
-- [ ] Third-party mentions did not become new canonical People/Organizations notes
-- [ ] Borderline People/Organizations became suggestion cards instead of canonical notes
+- [ ] Concepts correctly classified (core → note, tangential → suggestion card)
+- [ ] Courses correctly classified (active → index, future → suggestion card)
+- [ ] Papers correctly classified (ingested → note, referenced → suggestion card)
+- [ ] Authors sufficiently important for a note vs passing mention
+- [ ] Syntheses and resources correctly categorized
 
 **Content Quality:**
-- [ ] Summaries describe relationship, not communication method
-- [ ] Roles inferred where possible (with qualifier)
-- [ ] Key facts are substantive (no filler)
-- [ ] Open items are commitments/next steps only
+- [ ] Summaries are substantive and study-relevant
+- [ ] Connections to existing concepts flagged
+- [ ] Key facts are accurate and useful
 - [ ] Empty sections left empty rather than filled with placeholders
 
 **State Changes:**
-- [ ] Detected project status changes
-- [ ] Marked completed open items with [x]
-- [ ] Updated roles if changed
-- [ ] Updated relationships if changed
-- [ ] Logged all state changes in activity
+- [ ] Detected status changes in concepts or courses
+- [ ] Updated links between related concepts
+- [ ] Logged all changes
 
 **Structure:**
 - [ ] All entity mentions use \`[[Folder/Name]]\` absolute links
-- [ ] Activity entries are reverse chronological
-- [ ] No duplicate activity entries
+- [ ] New content added in correct locations
+- [ ] No duplicate entries
 - [ ] \`suggested-topics.md\` stays deduped and curated
-- [ ] High-quality Topics/Projects were added to suggested topics only when timely and useful
-- [ ] New Topics/Projects were not auto-created as canonical notes
+- [ ] High-quality concepts/courses/papers added to suggested topics only when timely and useful
+- [ ] New entities were not auto-created as canonical notes when they should be suggestion cards
 - [ ] Dates are YYYY-MM-DD
 - [ ] Bidirectional links are consistent
 - [ ] New notes in correct folders

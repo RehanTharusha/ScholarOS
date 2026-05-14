@@ -25,8 +25,8 @@ import { commitAll } from "./version_history.js";
 import { getTagDefinitions } from "./tag_system.js";
 
 /**
- * Build obsidian-style knowledge graph by running topic extraction
- * and note creation agents sequentially on content files
+ * Build ScholarOS knowledge graph by running topic extraction
+ * and note creation agents on raw study materials
  */
 
 const NOTES_OUTPUT_DIR = path.join(WorkDir, "knowledge");
@@ -41,16 +41,10 @@ const LEGACY_SUGGESTED_TOPICS_PATH = path.join(
 );
 
 // Configuration for the graph builder service
-const SYNC_INTERVAL_MS = 15 * 1000; // 15 seconds
+const SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const SOURCE_FOLDERS = [
-  "gmail_sync",
-  path.join("knowledge", "Meetings", "fireflies"),
-  path.join("knowledge", "Meetings", "granola"),
-  path.join("knowledge", "Meetings", "rowboat"),
+  "raw",
 ];
-
-// Voice memos are now created directly in knowledge/Voice Memos/<date>/
-const VOICE_MEMOS_KNOWLEDGE_DIR = path.join(NOTES_OUTPUT_DIR, "Voice Memos");
 
 /**
  * Check if email frontmatter contains any noise/skip filter tags.
@@ -161,94 +155,6 @@ function readSuggestedTopicsFile(): string {
 }
 
 /**
- * Get unprocessed voice memo files from knowledge/Voice Memos/
- * Voice memos are created directly in this directory by the UI.
- * Returns paths to files that need entity extraction.
- */
-function getUnprocessedVoiceMemos(state: GraphState): string[] {
-  console.log(
-    `[GraphBuilder] Checking directory: ${VOICE_MEMOS_KNOWLEDGE_DIR}`,
-  );
-
-  if (!fs.existsSync(VOICE_MEMOS_KNOWLEDGE_DIR)) {
-    console.log(`[GraphBuilder] Directory does not exist`);
-    return [];
-  }
-
-  const unprocessedFiles: string[] = [];
-
-  // Scan date folders (e.g., 2026-02-03)
-  const dateFolders = fs.readdirSync(VOICE_MEMOS_KNOWLEDGE_DIR);
-  console.log(
-    `[GraphBuilder] Found ${dateFolders.length} date folders: ${dateFolders.join(", ")}`,
-  );
-
-  for (const dateFolder of dateFolders) {
-    const dateFolderPath = path.join(VOICE_MEMOS_KNOWLEDGE_DIR, dateFolder);
-
-    // Skip if not a directory
-    try {
-      if (!fs.statSync(dateFolderPath).isDirectory()) {
-        continue;
-      }
-    } catch (err) {
-      console.log(`[GraphBuilder] Error checking ${dateFolderPath}:`, err);
-      continue;
-    }
-
-    // Scan markdown files in this date folder
-    const files = fs.readdirSync(dateFolderPath);
-    console.log(
-      `[GraphBuilder] Found ${files.length} files in ${dateFolder}: ${files.join(", ")}`,
-    );
-
-    for (const file of files) {
-      // Only process voice memo markdown files
-      if (!file.endsWith(".md") || !file.startsWith("voice-memo-")) {
-        console.log(`[GraphBuilder] Skipping ${file} - not a voice memo file`);
-        continue;
-      }
-
-      const filePath = path.join(dateFolderPath, file);
-
-      // Skip if already processed
-      if (state.processedFiles[filePath]) {
-        console.log(`[GraphBuilder] Skipping ${file} - already processed`);
-        continue;
-      }
-
-      // Check if the file has actual content (not still recording/transcribing)
-      try {
-        const content = fs.readFileSync(filePath, "utf-8");
-        // Skip files that are still recording or transcribing
-        if (content.includes("*Recording in progress...*")) {
-          console.log(`[GraphBuilder] Skipping ${file} - still recording`);
-          continue;
-        }
-        if (content.includes("*Transcribing...*")) {
-          console.log(`[GraphBuilder] Skipping ${file} - still transcribing`);
-          continue;
-        }
-        if (content.includes("*Transcription failed")) {
-          console.log(`[GraphBuilder] Skipping ${file} - transcription failed`);
-          continue;
-        }
-        console.log(`[GraphBuilder] Found unprocessed voice memo: ${file}`);
-        unprocessedFiles.push(filePath);
-      } catch (err) {
-        console.log(`[GraphBuilder] Error reading ${file}:`, err);
-        continue;
-      }
-    }
-  }
-
-  console.log(
-    `[GraphBuilder] Total unprocessed files: ${unprocessedFiles.length}`,
-  );
-  return unprocessedFiles;
-}
-
-/**
  * Read content for specific files
  */
 async function readFileContents(
@@ -292,11 +198,18 @@ async function createNotesFromBatch(
   const suggestedTopicsContent = readSuggestedTopicsFile();
 
   // Build message with index and all files in the batch
-  let message = `Process the following ${files.length} source files and create/update obsidian notes.\n\n`;
+  let message = `Process the following ${files.length} source files and create/update ScholarOS knowledge notes.\n\n`;
   message += `**Instructions:**\n`;
   message += `- Use the KNOWLEDGE BASE INDEX below to resolve entities - DO NOT grep/search for existing notes\n`;
-  message += `- Extract entities (people, organizations, projects, topics) from ALL files below\n`;
-  message += `- Create or update notes in "knowledge" directory (workspace-relative paths like "knowledge/People/Name.md")\n`;
+  message += `- Extract academic entities (concepts, courses, authors, papers, resources) from ALL files below\n`;
+  message += `- Create or update notes in "knowledge" directory using the ScholarOS vault structure:\n`;
+  message += `  - Course concept pages: "knowledge/courses/<Course>/concepts/<Concept>.md"\n`;
+  message += `  - Lecture notes: "knowledge/courses/<Course>/lectures/<Lecture Title>.md"\n`;
+  message += `  - Assignment pages: "knowledge/courses/<Course>/assignments/<Assignment Title>.md"\n`;
+  message += `  - Paper summaries: "knowledge/papers/<Paper Title>.md"\n`;
+  message += `  - Cross-source syntheses: "knowledge/syntheses/<Title>.md"\n`;
+  message += `  - Reference resources: "knowledge/resources/<Title>.md"\n`;
+  message += `  - Author/institution entities: "knowledge/entities/<Name>.md"\n`;
   message += `- You may also create or update "${SUGGESTED_TOPICS_REL_PATH}" to maintain curated suggested-topic cards\n`;
   message += `- If the same entity appears in multiple files, merge the information into a single note\n`;
   message += `- Use workspace tools to read existing notes or "${SUGGESTED_TOPICS_REL_PATH}" (when you need full content) and write updates\n`;
@@ -428,7 +341,7 @@ async function buildGraphWithFiles(
       const indexForPrompt = formatIndexForPrompt(index);
       const indexDuration = ((Date.now() - indexStartTime) / 1000).toFixed(2);
       console.log(
-        `Index built in ${indexDuration}s: ${index.people.length} people, ${index.organizations.length} orgs, ${index.projects.length} projects, ${index.topics.length} topics, ${index.other.length} other`,
+        `Index built in ${indexDuration}s: ${index.courses.length} courses, ${index.concepts.length} concepts, ${index.lectures.length} lectures, ${index.assignments.length} assignments, ${index.papers.length} papers, ${index.other.length} other`,
       );
 
       console.log(
@@ -477,7 +390,7 @@ async function buildGraphWithFiles(
 
       // Commit knowledge changes to version history
       try {
-        await commitAll("Knowledge update", "Rowboat");
+        await commitAll("Knowledge update", "ScholarOS");
       } catch (err) {
         console.error(`[GraphBuilder] Failed to commit version history:`, err);
       }
@@ -554,188 +467,12 @@ export async function buildGraph(sourceDir: string): Promise<void> {
 }
 
 /**
- * Process voice memos from knowledge/Voice Memos/ and run entity extraction on them
- * Voice memos are now created directly in the knowledge directory by the UI.
- */
-async function processVoiceMemosForKnowledge(): Promise<boolean> {
-  console.log(`[GraphBuilder] Starting voice memo processing...`);
-  const state = loadState();
-
-  // Get unprocessed voice memos from knowledge/Voice Memos/
-  const unprocessedFiles = getUnprocessedVoiceMemos(state);
-
-  if (unprocessedFiles.length === 0) {
-    console.log(`[GraphBuilder] No unprocessed voice memos found`);
-    return false;
-  }
-
-  console.log(
-    `[GraphBuilder] Processing ${unprocessedFiles.length} voice memo transcripts for entity extraction...`,
-  );
-  console.log(
-    `[GraphBuilder] Files to process: ${unprocessedFiles.map((f) => path.basename(f)).join(", ")}`,
-  );
-
-  const run = await serviceLogger.startRun({
-    service: "voice_memo",
-    message: `Processing ${unprocessedFiles.length} voice memo${unprocessedFiles.length === 1 ? "" : "s"}`,
-    trigger: "timer",
-  });
-
-  const relativeVoiceMemos = unprocessedFiles.map((filePath) =>
-    path.relative(WorkDir, filePath),
-  );
-  const limitedVoiceMemos = limitEventItems(relativeVoiceMemos);
-  await serviceLogger.log({
-    type: "changes_identified",
-    service: run.service,
-    runId: run.runId,
-    level: "info",
-    message: `Found ${unprocessedFiles.length} new voice memo${unprocessedFiles.length === 1 ? "" : "s"}`,
-    counts: { voiceMemos: unprocessedFiles.length },
-    items: limitedVoiceMemos,
-    truncated: relativeVoiceMemos.length > limitedVoiceMemos.length,
-  });
-
-  // Read the files
-  const contentFiles = await readFileContents(unprocessedFiles);
-
-  if (contentFiles.length === 0) {
-    await serviceLogger.log({
-      type: "run_complete",
-      service: run.service,
-      runId: run.runId,
-      level: "info",
-      message: "No voice memos could be read",
-      durationMs: Date.now() - run.startedAt,
-      outcome: "error",
-      summary: { processedFiles: 0 },
-    });
-    return false;
-  }
-
-  // Process in batches like other sources
-  const BATCH_SIZE = 10;
-  const totalBatches = Math.ceil(contentFiles.length / BATCH_SIZE);
-
-  const notesCreated = new Set<string>();
-  const notesModified = new Set<string>();
-  let hadError = false;
-
-  for (let i = 0; i < contentFiles.length; i += BATCH_SIZE) {
-    const batch = contentFiles.slice(i, i + BATCH_SIZE);
-    const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-
-    try {
-      // Build knowledge index
-      console.log(
-        `[GraphBuilder] Building knowledge index for batch ${batchNumber}...`,
-      );
-      const index = buildKnowledgeIndex();
-      const indexForPrompt = formatIndexForPrompt(index);
-
-      console.log(
-        `[GraphBuilder] Processing batch ${batchNumber}/${totalBatches} (${batch.length} files)...`,
-      );
-      await serviceLogger.log({
-        type: "progress",
-        service: run.service,
-        runId: run.runId,
-        level: "info",
-        message: `Processing batch ${batchNumber}/${totalBatches} (${batch.length} files)`,
-        step: "batch",
-        current: batchNumber,
-        total: totalBatches,
-        details: { filesInBatch: batch.length },
-      });
-      const batchResult = await createNotesFromBatch(
-        batch,
-        batchNumber,
-        indexForPrompt,
-      );
-      console.log(
-        `[GraphBuilder] Batch ${batchNumber}/${totalBatches} complete`,
-      );
-
-      for (const note of batchResult.notesCreated) {
-        notesCreated.add(note);
-      }
-      for (const note of batchResult.notesModified) {
-        notesModified.add(note);
-      }
-
-      // Mark files as processed
-      for (const file of batch) {
-        markFileAsProcessed(file.path, state);
-      }
-
-      // Save state after each batch
-      saveState(state);
-
-      // Commit knowledge changes to version history
-      try {
-        await commitAll("Knowledge update", "Rowboat");
-      } catch (err) {
-        console.error(`[GraphBuilder] Failed to commit version history:`, err);
-      }
-    } catch (error) {
-      hadError = true;
-      console.error(
-        `[GraphBuilder] Error processing batch ${batchNumber}:`,
-        error,
-      );
-      await serviceLogger.log({
-        type: "error",
-        service: run.service,
-        runId: run.runId,
-        level: "error",
-        message: `Error processing voice memo batch ${batchNumber}`,
-        error: error instanceof Error ? error.message : String(error),
-        context: { batchNumber },
-      });
-    }
-  }
-
-  // Update last build time
-  state.lastBuildTime = new Date().toISOString();
-  saveState(state);
-
-  await serviceLogger.log({
-    type: "run_complete",
-    service: run.service,
-    runId: run.runId,
-    level: hadError ? "error" : "info",
-    message: `Voice memos processed: ${contentFiles.length} files, ${notesCreated.size} created, ${notesModified.size} updated`,
-    durationMs: Date.now() - run.startedAt,
-    outcome: hadError ? "error" : "ok",
-    summary: {
-      processedFiles: contentFiles.length,
-      notesCreated: notesCreated.size,
-      notesModified: notesModified.size,
-    },
-  });
-
-  return true;
-}
-
-/**
  * Process all configured source directories
  */
 export async function processAllSources(): Promise<void> {
   console.log("[GraphBuilder] Checking for new content in all sources...");
 
   let anyFilesProcessed = false;
-
-  // Process voice memos first (they get moved to knowledge/)
-  try {
-    const voiceMemosProcessed = await processVoiceMemosForKnowledge();
-    if (voiceMemosProcessed) {
-      anyFilesProcessed = true;
-    }
-  } catch (error) {
-    console.error("[GraphBuilder] Error processing voice memos:", error);
-  }
-
   const state = loadState();
   const folderChanges: {
     folder: string;
@@ -867,12 +604,12 @@ export async function processAllSources(): Promise<void> {
  * Main entry point - runs as independent service monitoring all source folders
  */
 export async function init() {
-  console.log("[GraphBuilder] Starting Knowledge Graph Builder Service...");
+  console.log("[GraphBuilder] Starting ScholarOS Knowledge Graph Builder...");
   console.log(
-    `[GraphBuilder] Monitoring folders: ${SOURCE_FOLDERS.join(", ")}, knowledge/Voice Memos`,
+    `[GraphBuilder] Monitoring folder: ${SOURCE_FOLDERS.join(", ")}`,
   );
   console.log(
-    `[GraphBuilder] Will check for new content every ${SYNC_INTERVAL_MS / 1000} seconds`,
+    `[GraphBuilder] Will check for new content every ${SYNC_INTERVAL_MS / 1000 / 60} minutes`,
   );
 
   // Initial run

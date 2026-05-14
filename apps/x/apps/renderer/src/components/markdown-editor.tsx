@@ -13,13 +13,7 @@ import {
   ImageUploadPlaceholderExtension,
   createImageUploadHandler,
 } from "@/extensions/image-upload";
-import { TaskBlockExtension } from "@/extensions/task-block";
-import { TrackBlockExtension } from "@/extensions/track-block";
 import { PromptBlockExtension } from "@/extensions/prompt-block";
-import {
-  TrackTargetOpenExtension,
-  TrackTargetCloseExtension,
-} from "@/extensions/track-target";
 import { ImageBlockExtension } from "@/extensions/image-block";
 import { EmbedBlockExtension } from "@/extensions/embed-block";
 import { IframeBlockExtension } from "@/extensions/iframe-block";
@@ -58,38 +52,6 @@ function preprocessMarkdown(markdown: string): string {
     }
     return result;
   });
-}
-
-// Convert track-target open/close HTML comment markers into placeholder divs
-// that TrackTargetOpenExtension / TrackTargetCloseExtension pick up as atom
-// nodes. Content *between* the markers is left untouched — tiptap-markdown
-// parses it naturally as whatever it is (paragraphs, lists, custom-block
-// fences, etc.), all rendered live by the existing extension set.
-//
-// CommonMark rule: a type-6 HTML block (div, etc.) runs from the opening tag
-// line until a blank line terminates it, and markdown inline rules (bold,
-// italics, links) don't apply inside the block. Without surrounding blank
-// lines, the line right after our placeholder div gets absorbed as HTML and
-// its markdown is not parsed.
-//
-// Consume ALL adjacent newlines (\n*, not \n?) so the emitted `\n\n…\n\n`
-// is load/save stable. serializeBlocksToMarkdown emits `\n\n` between blocks
-// on save; a `\n?` regex on reload would only consume one of those two
-// newlines, so every cycle would add a net newline on each side of every
-// marker — causing tracks running on an open note to steadily inflate the
-// file with blank lines around target regions.
-function preprocessTrackTargets(md: string): string {
-  return md
-    .replace(
-      /\n*<!--track-target:([^\s>]+)-->\n*/g,
-      (_m, id: string) =>
-        `\n\n<div data-type="track-target-open" data-track-id="${id}"></div>\n\n`,
-    )
-    .replace(
-      /\n*<!--\/track-target:([^\s>]+)-->\n*/g,
-      (_m, id: string) =>
-        `\n\n<div data-type="track-target-close" data-track-id="${id}"></div>\n\n`,
-    );
 }
 
 // Post-process to clean up any zero-width spaces in the output
@@ -216,16 +178,8 @@ function blockToMarkdown(node: JsonNode): string {
     case "orderedList":
     case "taskList":
       return serializeList(node, 0).join("\n");
-    case "taskBlock":
-      return "```task\n" + ((node.attrs?.data as string) || "{}") + "\n```";
     case "promptBlock":
       return "```prompt\n" + ((node.attrs?.data as string) || "") + "\n```";
-    case "trackBlock":
-      return "```track\n" + ((node.attrs?.data as string) || "") + "\n```";
-    case "trackTargetOpen":
-      return `<!--track-target:${(node.attrs?.trackId as string) ?? ""}-->`;
-    case "trackTargetClose":
-      return `<!--/track-target:${(node.attrs?.trackId as string) ?? ""}-->`;
     case "imageBlock":
       return "```image\n" + ((node.attrs?.data as string) || "{}") + "\n```";
     case "embedBlock":
@@ -391,19 +345,7 @@ import {
   extractAllFrontmatterValues,
   buildFrontmatter,
 } from "@/lib/frontmatter";
-import { RowboatMentionPopover } from "./rowboat-mention-popover";
 import "@/styles/editor.css";
-
-type RowboatMentionMatch = {
-  range: { from: number; to: number };
-};
-
-type RowboatBlockEdit = {
-  /** ProseMirror position of the taskBlock node */
-  nodePos: number;
-  /** Existing instruction text */
-  existingText: string;
-};
 
 type WikiLinkConfig = {
   files: string[];
@@ -700,17 +642,6 @@ export const MarkdownEditor = forwardRef<
     value: string;
   }>({ open: false, options: [], value: "" });
   const handleSelectWikiLinkRef = useRef<(path: string) => void>(() => {});
-  const [activeRowboatMention, setActiveRowboatMention] =
-    useState<RowboatMentionMatch | null>(null);
-  const [rowboatBlockEdit, setRowboatBlockEdit] =
-    useState<RowboatBlockEdit | null>(null);
-  const [rowboatAnchorTop, setRowboatAnchorTop] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
-  const rowboatBlockEditRef = useRef<RowboatBlockEdit | null>(null);
-
   // @ mention autocomplete state (analogous to wiki-link state)
   const [activeAtMention, setActiveAtMention] = useState<{
     range: { from: number; to: number };
@@ -836,11 +767,7 @@ export const MarkdownEditor = forwardRef<
           },
         }),
         ImageUploadPlaceholderExtension,
-        TaskBlockExtension,
-        TrackBlockExtension.configure({ notePath }),
         PromptBlockExtension.configure({ notePath }),
-        TrackTargetOpenExtension,
-        TrackTargetCloseExtension,
         ImageBlockExtension,
         EmbedBlockExtension,
         IframeBlockExtension,
@@ -1103,61 +1030,7 @@ export const MarkdownEditor = forwardRef<
     [notePath, editor],
   );
 
-  const updateRowboatMentionState = useCallback(() => {
-    if (!editor) return;
-    const { selection } = editor.state;
-    if (!selection.empty) {
-      setActiveRowboatMention(null);
-      setRowboatAnchorTop(null);
-      return;
-    }
 
-    const { $from } = selection;
-    if ($from.parent.type.spec.code) {
-      setActiveRowboatMention(null);
-      setRowboatAnchorTop(null);
-      return;
-    }
-
-    const text = $from.parent.textBetween(
-      0,
-      $from.parent.content.size,
-      "\n",
-      "\n",
-    );
-    const textBefore = text.slice(0, $from.parentOffset);
-
-    // Match @rowboat at a word boundary (preceded by nothing or whitespace)
-    const match = textBefore.match(/(^|\s)@rowboat$/);
-    if (!match) {
-      setActiveRowboatMention(null);
-      setRowboatAnchorTop(null);
-      return;
-    }
-
-    const triggerStart = textBefore.length - "@rowboat".length;
-    const from = selection.from - (textBefore.length - triggerStart);
-    const to = selection.from;
-    setActiveRowboatMention({ range: { from, to } });
-
-    const wrapper = wrapperRef.current;
-    if (!wrapper) {
-      setRowboatAnchorTop(null);
-      return;
-    }
-
-    const coords = editor.view.coordsAtPos(selection.from);
-    const wrapperRect = wrapper.getBoundingClientRect();
-    const proseMirrorEl = wrapper.querySelector(
-      ".ProseMirror",
-    ) as HTMLElement | null;
-    const pmRect = proseMirrorEl?.getBoundingClientRect();
-    setRowboatAnchorTop({
-      top: coords.top - wrapperRect.top + wrapper.scrollTop,
-      left: pmRect ? pmRect.left - wrapperRect.left : 0,
-      width: pmRect ? pmRect.width : wrapperRect.width,
-    });
-  }, [editor, setActiveRowboatMention, setRowboatAnchorTop]);
 
   // Detect @ trigger for autocomplete popover (similar to [[ detection)
   const updateAtMentionState = useCallback(() => {
@@ -1201,13 +1074,6 @@ export const MarkdownEditor = forwardRef<
 
     const query = atMatch[2]; // text after @
 
-    // If the full "@rowboat" is already typed, let updateRowboatMentionState handle it
-    if (query === "rowboat") {
-      setActiveAtMention(null);
-      setAtAnchorPosition(null);
-      return;
-    }
-
     const atSymbolOffset = textBefore.lastIndexOf("@");
     const matchText = textBefore.slice(atSymbolOffset);
     const range = {
@@ -1242,16 +1108,6 @@ export const MarkdownEditor = forwardRef<
 
   useEffect(() => {
     if (!editor) return;
-    editor.on("update", updateRowboatMentionState);
-    editor.on("selectionUpdate", updateRowboatMentionState);
-    return () => {
-      editor.off("update", updateRowboatMentionState);
-      editor.off("selectionUpdate", updateRowboatMentionState);
-    };
-  }, [editor, updateRowboatMentionState]);
-
-  useEffect(() => {
-    if (!editor) return;
     editor.on("update", updateAtMentionState);
     editor.on("selectionUpdate", updateAtMentionState);
     return () => {
@@ -1259,24 +1115,6 @@ export const MarkdownEditor = forwardRef<
       editor.off("selectionUpdate", updateAtMentionState);
     };
   }, [editor, updateAtMentionState]);
-
-  // When a tell-rowboat block is clicked, compute anchor and open popover
-  useEffect(() => {
-    if (!rowboatBlockEdit || !editor) return;
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-    const coords = editor.view.coordsAtPos(rowboatBlockEdit.nodePos);
-    const wrapperRect = wrapper.getBoundingClientRect();
-    const proseMirrorEl = wrapper.querySelector(
-      ".ProseMirror",
-    ) as HTMLElement | null;
-    const pmRect = proseMirrorEl?.getBoundingClientRect();
-    setRowboatAnchorTop({
-      top: coords.top - wrapperRect.top + wrapper.scrollTop,
-      left: pmRect ? pmRect.left - wrapperRect.left : 0,
-      width: pmRect ? pmRect.width : wrapperRect.width,
-    });
-  }, [editor, rowboatBlockEdit]);
 
   // Update editor content when prop changes (e.g., file selection changes)
   useEffect(() => {
@@ -1293,11 +1131,7 @@ export const MarkdownEditor = forwardRef<
         normalizeForCompare(currentContent) !== normalizeForCompare(content)
       ) {
         isInternalUpdate.current = true;
-        // Pre-process to preserve blank lines, then wrap track-target comment
-        // regions into placeholder divs so TrackTargetExtension can pick them up.
-        const preprocessed = preprocessMarkdown(
-          preprocessTrackTargets(content),
-        );
+        const preprocessed = preprocessMarkdown(content);
         // Treat tab-open content as baseline: do not add hydration to undo history.
         editor
           .chain()
@@ -1394,221 +1228,7 @@ export const MarkdownEditor = forwardRef<
     handleSelectWikiLinkRef.current = handleSelectWikiLink;
   }, [handleSelectWikiLink]);
 
-  const handleRowboatAdd = useCallback(
-    async (instruction: string) => {
-      if (!editor) return;
 
-      if (rowboatBlockEdit) {
-        // Editing existing taskBlock — update its data attribute
-        const { nodePos } = rowboatBlockEdit;
-        const node = editor.state.doc.nodeAt(nodePos);
-        if (node && node.type.name === "taskBlock") {
-          // Preserve existing schedule data
-          let updated: Record<string, unknown> = { instruction };
-          try {
-            const existing = JSON.parse(node.attrs.data || "{}");
-            updated = { ...existing, instruction };
-          } catch {
-            // Invalid JSON — just write new
-          }
-          const tr = editor.state.tr.setNodeMarkup(nodePos, undefined, {
-            data: JSON.stringify(updated),
-          });
-          editor.view.dispatch(tr);
-        }
-        setRowboatBlockEdit(null);
-        rowboatBlockEditRef.current = null;
-        setRowboatAnchorTop(null);
-        return;
-      }
-
-      if (activeRowboatMention) {
-        // Insert a temporary processing block
-        const blockData: Record<string, unknown> = {
-          instruction,
-          processing: true,
-        };
-
-        const insertFrom = activeRowboatMention.range.from;
-        const insertTo = activeRowboatMention.range.to;
-
-        editor
-          .chain()
-          .focus()
-          .insertContentAt({ from: insertFrom, to: insertTo }, [
-            { type: "taskBlock", attrs: { data: JSON.stringify(blockData) } },
-            { type: "paragraph" },
-          ])
-          .run();
-
-        setActiveRowboatMention(null);
-        setRowboatAnchorTop(null);
-
-        // Get editor content for the agent
-        const editorContent =
-          (
-            editor.storage as { markdown?: MarkdownStorage }
-          ).markdown?.getMarkdown?.() ?? "";
-
-        // Helper to find the processing block
-        const findProcessingBlock = (): number | null => {
-          let pos: number | null = null;
-          editor.state.doc.descendants((node, p) => {
-            if (pos !== null) return false;
-            if (node.type.name === "taskBlock") {
-              try {
-                const data = JSON.parse(node.attrs.data || "{}");
-                if (
-                  data.instruction === instruction &&
-                  data.processing === true
-                ) {
-                  pos = p;
-                  return false;
-                }
-              } catch {
-                /* skip */
-              }
-            }
-          });
-          return pos;
-        };
-
-        try {
-          // Call the copilot assistant for both one-time and recurring tasks
-          const result = await window.ipc.invoke("inline-task:process", {
-            instruction,
-            noteContent: editorContent,
-            notePath: notePath ?? "",
-          });
-
-          const currentPos = findProcessingBlock();
-          if (currentPos === null) return;
-
-          const node = editor.state.doc.nodeAt(currentPos);
-          if (!node) return;
-
-          if (result.schedule) {
-            // Recurring/scheduled task: update block with schedule, write target tags to disk
-            const targetId = Math.random().toString(36).slice(2, 10);
-            const updatedData: Record<string, unknown> = {
-              instruction: result.instruction,
-              schedule: result.schedule,
-              "schedule-label": result.scheduleLabel,
-              targetId,
-            };
-            const tr = editor.state.tr.setNodeMarkup(currentPos, undefined, {
-              data: JSON.stringify(updatedData),
-            });
-            editor.view.dispatch(tr);
-
-            // Mark note as live
-            if (onFrontmatterChange) {
-              const fields = extractAllFrontmatterValues(frontmatter ?? null);
-              fields["live_note"] = "true";
-              onFrontmatterChange(buildFrontmatter(fields));
-            }
-
-            // Write target tags directly to the file on disk after a short delay
-            // to let the editor save the updated content first
-            if (notePath) {
-              setTimeout(async () => {
-                try {
-                  const file = await window.ipc.invoke("workspace:readFile", {
-                    path: notePath,
-                  });
-                  const content = file.data;
-                  const openTag = `<!--task-target:${targetId}-->`;
-                  const closeTag = `<!--/task-target:${targetId}-->`;
-
-                  // Only add if not already present
-                  if (content.includes(openTag)) return;
-
-                  // Find the task block in the raw markdown and insert target tags after it
-                  const blockJson = JSON.stringify(updatedData);
-                  const blockStart = content.indexOf("```task\n" + blockJson);
-                  if (blockStart !== -1) {
-                    const blockEnd = content.indexOf("\n```", blockStart + 8);
-                    if (blockEnd !== -1) {
-                      const insertAt = blockEnd + 4; // after the closing ```
-                      const before = content.slice(0, insertAt);
-                      const after = content.slice(insertAt);
-                      const updated =
-                        before + "\n\n" + openTag + "\n" + closeTag + after;
-                      await window.ipc.invoke("workspace:writeFile", {
-                        path: notePath,
-                        data: updated,
-                        opts: { encoding: "utf8" },
-                      });
-                    }
-                  }
-                } catch (err) {
-                  console.error(
-                    "[RowboatAdd] Failed to write target tags:",
-                    err,
-                  );
-                }
-              }, 500);
-            }
-          } else {
-            // One-time task: remove the processing block, insert response in its place
-            const insertPos = currentPos;
-            const deleteEnd = currentPos + node.nodeSize;
-            editor
-              .chain()
-              .focus()
-              .deleteRange({ from: insertPos, to: deleteEnd })
-              .run();
-
-            if (result.response) {
-              editor.chain().insertContentAt(insertPos, result.response).run();
-            }
-          }
-        } catch (error) {
-          console.error("[RowboatAdd] Processing failed:", error);
-
-          // Remove the processing block on error
-          const currentPos = findProcessingBlock();
-          if (currentPos !== null) {
-            const node = editor.state.doc.nodeAt(currentPos);
-            if (node) {
-              editor
-                .chain()
-                .focus()
-                .deleteRange({
-                  from: currentPos,
-                  to: currentPos + node.nodeSize,
-                })
-                .run();
-            }
-          }
-        }
-      }
-    },
-    [
-      editor,
-      activeRowboatMention,
-      rowboatBlockEdit,
-      frontmatter,
-      onFrontmatterChange,
-      notePath,
-    ],
-  );
-
-  const handleRowboatRemove = useCallback(() => {
-    if (!editor || !rowboatBlockEdit) return;
-    const { nodePos } = rowboatBlockEdit;
-    const node = editor.state.doc.nodeAt(nodePos);
-    if (node) {
-      editor
-        .chain()
-        .focus()
-        .deleteRange({ from: nodePos, to: nodePos + node.nodeSize })
-        .run();
-    }
-    setRowboatBlockEdit(null);
-    rowboatBlockEditRef.current = null;
-    setRowboatAnchorTop(null);
-  }, [editor, rowboatBlockEdit, setRowboatAnchorTop, setRowboatBlockEdit]);
 
   const handleScroll = useCallback(() => {
     updateWikiLinkState();
@@ -1640,13 +1260,7 @@ export const MarkdownEditor = forwardRef<
 
   // @ mention autocomplete options
   const atMentionOptions = useMemo(
-    () => [
-      {
-        value: "rowboat",
-        label: "@rowboat",
-        description: "Research, schedule, or run tasks with AI",
-      },
-    ],
+    () => [] as { value: string; label: string; description: string }[],
     [],
   );
 
@@ -1683,18 +1297,6 @@ export const MarkdownEditor = forwardRef<
   const handleSelectAtMention = useCallback(
     (value: string) => {
       if (!editor || !activeAtMention) return;
-
-      if (value === "rowboat") {
-        // Replace "@<partial>" with "@rowboat" — this triggers updateRowboatMentionState
-        editor
-          .chain()
-          .focus()
-          .insertContentAt(
-            { from: activeAtMention.range.from, to: activeAtMention.range.to },
-            "@rowboat",
-          )
-          .run();
-      }
 
       setActiveAtMention(null);
       setAtAnchorPosition(null);
@@ -1858,21 +1460,6 @@ export const MarkdownEditor = forwardRef<
             </Command>
           </PopoverContent>
         </Popover>
-        <RowboatMentionPopover
-          open={Boolean(
-            (activeRowboatMention || rowboatBlockEdit) && rowboatAnchorTop,
-          )}
-          anchor={rowboatAnchorTop}
-          initialText={rowboatBlockEdit?.existingText ?? ""}
-          onAdd={handleRowboatAdd}
-          onRemove={rowboatBlockEdit ? handleRowboatRemove : undefined}
-          onClose={() => {
-            setActiveRowboatMention(null);
-            setRowboatBlockEdit(null);
-            rowboatBlockEditRef.current = null;
-            setRowboatAnchorTop(null);
-          }}
-        />
       </div>
     </div>
   );
