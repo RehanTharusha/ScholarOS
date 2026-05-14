@@ -1,49 +1,58 @@
-# Welcome to Rowboat
+# Welcome to ScholarOS
 
-This vault is your work memory.
+This vault is your academic knowledge base.
 
-Rowboat extracts context from your emails and meetings and turns it into long-lived, editable Markdown notes. The goal is not to store everything, but to preserve the context that stays useful over time.
+ScholarOS reads your study materials — lecture PDFs, papers, slides, transcripts — and turns them into a structured, interlinked wiki of Markdown notes. The AI maintains the wiki so you don't have to.
 
 ---
 
 ## How it works
 
-**Entity-based notes**
-Notes represent people, projects, organizations, or topics that matter to your work.
+**Drop sources into `/raw`**
+Add any study material to the `/raw` folder, organized by course or unorganized — the agent sorts it out.
 
-**Auto-updating context**
-As new emails and meetings come in, Rowboat adds decisions, commitments, and relevant context to the appropriate notes.
+**Run the ingest**
+Point your AI agent at the vault and say: _"Ingest all materials in /raw."_ It reads each file, writes concept pages into `/knowledge`, and cross-references everything.
 
-**Living notes**
-These are not static summaries. Context accumulates over time, and notes evolve as your work evolves.
+**Browse in Obsidian**
+Open the vault in Obsidian to explore the wiki, follow backlinks, and see the graph of your knowledge grow with every ingest.
 
 ---
 
-## Your AI coworker
+## Your vault structure
 
-Rowboat uses this shared memory to help with everyday work, such as:
+```
+/raw          ← Drop study materials here (PDFs, slides, notes)
+/knowledge    ← AI-generated wiki (concepts, courses, syntheses)
+/meta         ← CLAUDE.md schema that guides the agent
+/assets       ← Images and diagrams
+```
 
-- Drafting emails
-- Preparing for meetings
-- Summarizing the current state of a project
-- Taking local actions when appropriate
+---
 
-The AI works with deep context, but you stay in control. All notes are visible, editable, and yours.
+## What the agent builds
+
+- **Concept pages** — one page per idea, with backlinks and source citations
+- **Course indexes** — a hub for each course linking all its concepts
+- **Synthesis pages** — cross-source comparisons and summaries
+- **Flashcards** — FSRS-scheduled cards stored in `flashcards.json` per course
 
 ---
 
 ## Design principles
 
-**Reduce noise**
-Rowboat focuses on recurring contacts and active projects instead of trying to capture everything.
+**Compile once, keep current**
+Knowledge is extracted and integrated on ingest, not re-derived on every query. Your wiki compounds with every source you add.
+
+**Surgical edits only**
+When new material arrives, the agent updates only the pages it affects — it never rewrites the whole wiki.
+
+**Flag contradictions**
+If a new source contradicts an existing claim, both positions are noted with citations. Nothing is silently overwritten.
 
 **Local and inspectable**
-All data is stored locally as plain Markdown. You can read, edit, or delete any file at any time.
-
-**Built to improve over time**
-As you keep using Rowboat, context accumulates across notes instead of being reconstructed from scratch.
+All files are plain Markdown. You can read, edit, or delete anything at any time. The vault is also a git repository — every AI edit is reversible.
 
 ---
 
-If something feels confusing or limiting, we'd love to hear about it.
-Rowboat is still evolving, and your workflow matters.
+Ready to start? Drop your first study materials into `/raw` and ask the agent to ingest them.

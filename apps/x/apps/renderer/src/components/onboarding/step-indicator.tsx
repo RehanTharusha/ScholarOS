@@ -3,17 +3,15 @@ import { CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Step, OnboardingPath } from "./use-onboarding-state"
 
-const ROWBOAT_STEPS = [
+const DIRECT_STEPS = [
   { step: 0 as Step, label: "Welcome" },
-  { step: 2 as Step, label: "Connect" },
-  { step: 3 as Step, label: "Done" },
+  { step: 2 as Step, label: "Start" },
 ]
 
 const BYOK_STEPS = [
   { step: 0 as Step, label: "Welcome" },
   { step: 1 as Step, label: "Model" },
-  { step: 2 as Step, label: "Connect" },
-  { step: 3 as Step, label: "Done" },
+  { step: 2 as Step, label: "Start" },
 ]
 
 interface StepIndicatorProps {
@@ -22,7 +20,7 @@ interface StepIndicatorProps {
 }
 
 export function StepIndicator({ currentStep, path }: StepIndicatorProps) {
-  const steps = path === 'byok' ? BYOK_STEPS : ROWBOAT_STEPS
+  const steps = path === 'byok' ? BYOK_STEPS : DIRECT_STEPS
   const currentIndex = steps.findIndex(s => s.step === currentStep)
 
   return (

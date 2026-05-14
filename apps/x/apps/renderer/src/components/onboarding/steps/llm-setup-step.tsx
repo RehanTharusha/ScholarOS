@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, ArrowLeft, X, Lightbulb } from "lucide-react"
+import { Loader2, CheckCircle2, ArrowLeft } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,7 +44,6 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
     activeConfig, testState, setTestState, showApiKey,
     showBaseURL, isLocalProvider, canTest, showMoreProviders, setShowMoreProviders,
     updateProviderConfig, handleTestAndSaveLlmConfig, handleBack,
-    upsellDismissed, setUpsellDismissed, handleSwitchToRowboat,
   } = state
 
   const isMoreProvider = moreProviders.some(p => p.id === llmProvider)
@@ -92,35 +91,6 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
       <p className="text-base text-muted-foreground text-center mb-6">
         Select a provider and configure your API key
       </p>
-
-      {/* Inline Rowboat upsell callout */}
-      {!upsellDismissed && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, height: 0 }}
-          className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-6 flex items-start gap-3"
-        >
-          <Lightbulb className="size-5 text-primary shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-foreground">
-              <span className="font-medium">Tip:</span> Sign in with Rowboat for instant access to leading models. No API keys needed.
-            </p>
-            <button
-              onClick={handleSwitchToRowboat}
-              className="text-sm text-primary font-medium hover:underline mt-1 inline-block"
-            >
-              Sign in instead
-            </button>
-          </div>
-          <button
-            onClick={() => setUpsellDismissed(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          >
-            <X className="size-4" />
-          </button>
-        </motion.div>
-      )}
 
       {/* Provider selection */}
       <div className="space-y-3 mb-4">
