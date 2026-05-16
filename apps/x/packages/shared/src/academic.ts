@@ -90,6 +90,7 @@ export interface AcademicDashboardSummary {
 /**
  * Flashcard for study mode
  * Simple Q&A cards linked to course concepts
+ * Supports FSRS v6 scheduling fields for spaced repetition.
  */
 export interface FlashCard {
   id: string;
@@ -100,6 +101,16 @@ export interface FlashCard {
   courseId: string;
   courseName?: string; // Human-readable course name
   difficulty?: "easy" | "normal" | "hard"; // Optional difficulty indicator
+  // FSRS v6 scheduling fields (set by ts-fsrs during review)
+  due?: number | null; // Due timestamp (ms epoch), null = not yet scheduled
+  stability?: number;
+  difficulty_fsrs?: number;
+  elapsed_days?: number;
+  scheduled_days?: number;
+  reps?: number;
+  lapses?: number;
+  state?: number; // 0=New, 1=Learning, 2=Review, 3=Relearning
+  last_review?: number;
 }
 
 /**

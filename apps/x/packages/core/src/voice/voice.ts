@@ -47,7 +47,7 @@ export async function synthesizeSpeech(text: string): Promise<{ audioBase64: str
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         };
-        console.log('[voice] synthesizing speech via Rowboat proxy, text length:', text.length, 'voiceId:', voiceId);
+        console.log('[voice] synthesizing speech via ScholarOS proxy, text length:', text.length, 'voiceId:', voiceId);
     } else {
         if (!config.elevenlabs) {
             throw new Error(`ElevenLabs not configured. Create ${path.join(WorkDir, 'config', 'elevenlabs.json')} with { "apiKey": "<your-key>" }`);

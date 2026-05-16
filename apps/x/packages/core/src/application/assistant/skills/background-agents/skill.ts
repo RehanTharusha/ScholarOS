@@ -1,7 +1,7 @@
 export const skill = String.raw`
 # Background Agents
 
-Load this skill whenever a user wants to inspect, create, edit, or schedule background agents inside the Rowboat workspace.
+Load this skill whenever a user wants to inspect, create, edit, or schedule background agents inside the ScholarOS workspace.
 
 ## Core Concepts
 
@@ -39,7 +39,7 @@ Background agents run automatically based on schedules defined in ` + "`config/a
 
 ### Schedule Types
 
-**IMPORTANT: All times are in local time** (the timezone of the machine running Rowboat).
+**IMPORTANT: All times are in local time** (the timezone of the machine running ScholarOS).
 
 **1. Cron Schedule** - Runs at exact times defined by cron expression
 ` + "```json" + `
@@ -227,7 +227,7 @@ Be concise and accurate.
 Tools in agents must follow one of three types. Each has specific required fields.
 
 ### 1. Builtin Tools
-Internal Rowboat tools (executeCommand, file operations, MCP queries, etc.)
+Internal ScholarOS tools (executeCommand, file operations, MCP queries, etc.)
 
 **YAML Schema:**
 ` + "```yaml" + `

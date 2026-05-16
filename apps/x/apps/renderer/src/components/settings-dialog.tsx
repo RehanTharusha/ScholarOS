@@ -65,7 +65,7 @@ const tabs: TabConfig[] = [
     id: "account",
     label: "Account",
     icon: User,
-    description: "Manage your Rowboat account",
+    description: "Manage your ScholarOS account",
   },
   {
     id: "connected-accounts",
@@ -1476,7 +1476,7 @@ function RowboatModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Select the models Rowboat uses. These are provided through your Rowboat
+        Select the models ScholarOS uses. These are provided through your ScholarOS
         account.
       </p>
 

@@ -1,9 +1,9 @@
 export const skill = String.raw`
 # Browser Control Skill
 
-You have access to the **browser-control** tool, which controls Rowboat's embedded browser pane directly.
+You have access to the **browser-control** tool, which controls ScholarOS's embedded browser pane directly.
 
-Use this skill when the user asks you to open a website, browse in-app, search the web in the browser pane, click something on a page, fill a form, or otherwise interact with a live webpage inside Rowboat.
+Use this skill when the user asks you to open a website, browse in-app, search the web in the browser pane, click something on a page, fill a form, or otherwise interact with a live webpage inside ScholarOS.
 
 ## Core Workflow
 
@@ -98,7 +98,7 @@ Parameters:
 - Prefer element ` + "`index`" + ` over CSS selectors.
 - If the tool says the snapshot is stale, call ` + "`read-page`" + ` again.
 - After navigation, clicking, typing, pressing, or scrolling, use the returned page snapshot instead of assuming the page state.
-- Use Rowboat's browser for live interaction. Use web search tools for research where a live session is unnecessary.
+- Use ScholarOS's browser for live interaction. Use web search tools for research where a live session is unnecessary.
 - Do not wrap browser URLs or browser pages in ` + "```filepath" + ` blocks. Filepath cards are only for real files on disk, not web pages or browser tabs.
 - If you mention a page the browser opened, use plain text for the URL/title instead of trying to create a clickable file card.
 `;

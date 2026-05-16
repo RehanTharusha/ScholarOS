@@ -12,9 +12,9 @@ export const LOCAL_SITES_BASE_URL = `http://localhost:${LOCAL_SITES_PORT}`;
 
 const LOCAL_SITES_DIR = path.join(WorkDir, 'sites');
 const SITE_SLUG_RE = /^[a-z0-9][a-z0-9-_]*$/i;
-const IFRAME_HEIGHT_MESSAGE = 'rowboat:iframe-height';
-const SITE_RELOAD_MESSAGE = 'rowboat:site-changed';
-const SITE_EVENTS_PATH = '__rowboat_events';
+const IFRAME_HEIGHT_MESSAGE = 'scholaros:iframe-height';
+const SITE_RELOAD_MESSAGE = 'scholaros:site-changed';
+const SITE_EVENTS_PATH = '__scholaros_events';
 const SITE_RELOAD_DEBOUNCE_MS = 140;
 const SITE_EVENTS_RETRY_MS = 1000;
 const SITE_EVENTS_HEARTBEAT_MS = 15000;

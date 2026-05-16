@@ -199,9 +199,9 @@ const TITLEBAR_HEADER_GAP_PX = 8;
 const TITLEBAR_TOGGLE_MARGIN_LEFT_PX = 12;
 const TITLEBAR_BUTTONS_COLLAPSED = 1;
 const TITLEBAR_BUTTON_GAPS_COLLAPSED = 0;
-const GRAPH_TAB_PATH = "__rowboat_graph_view__";
+const GRAPH_TAB_PATH = "__scholaros_graph_view__";
 const SUGGESTED_TOPICS_TAB_PATH = "__scholar_suggested_topics__";
-const BASES_DEFAULT_TAB_PATH = "__rowboat_bases_default__";
+const BASES_DEFAULT_TAB_PATH = "__scholaros_bases_default__";
 const FLASHCARDS_TAB_PATH = "__scholar_flashcards__";
 const CALENDAR_TAB_PATH = "__scholar_calendar__";
 const KANBAN_TAB_PATH = "__scholar_assignment_board__";
@@ -1691,6 +1691,10 @@ function App() {
     if (!debouncedContent) return;
 
     const saveFile = async () => {
+      // Guard: skip save if user navigated away — prevents stale debounced content
+      // from a previous file from overwriting the current file.
+      if (selectedPathRef.current !== pathAtStart) return;
+
       const wasActiveAtStart = selectedPathRef.current === pathAtStart;
       if (wasActiveAtStart) setIsSaving(true);
       let pathToSave = pathAtStart;
@@ -3402,12 +3406,12 @@ function App() {
       );
     };
     window.addEventListener(
-      "rowboat:open-copilot-edit-track",
+      "scholaros:open-copilot-edit-track",
       handler as EventListener,
     );
     return () =>
       window.removeEventListener(
-        "rowboat:open-copilot-edit-track",
+        "scholaros:open-copilot-edit-track",
         handler as EventListener,
       );
   }, [submitFromPalette]);
@@ -3430,12 +3434,12 @@ function App() {
       submitFromPalette(instruction, mention);
     };
     window.addEventListener(
-      "rowboat:open-copilot-prompt",
+      "scholaros:open-copilot-prompt",
       handler as EventListener,
     );
     return () =>
       window.removeEventListener(
-        "rowboat:open-copilot-prompt",
+        "scholaros:open-copilot-prompt",
         handler as EventListener,
       );
   }, [submitFromPalette]);
@@ -3942,7 +3946,7 @@ function App() {
         }
         break;
     }
-  });
+  }, [navigateToFile, navigateToView, selectedPath, isBaseFilePath]);
 
   const navigateToFullScreenChat = useCallback(() => {
     // Only treat this as navigation when coming from another view
@@ -4615,6 +4619,9 @@ function App() {
     [knowledgeFiles, recentWikiFiles, openWikiLink, ensureWikiFile],
   );
 
+  // Cache graph file contents to avoid re-reading all files on every open
+  const graphContentCacheRef = useRef<Map<string, string>>(new Map());
+
   useEffect(() => {
     if (!isGraphOpen) return;
     let cancelled = false;
@@ -4630,24 +4637,42 @@ function App() {
       }
 
       const graphFilePaths = knowledgeFilePaths;
+      const cache = graphContentCacheRef.current;
+
+      // Only read files not already in cache, or re-read all if cache is stale
+      const stalePaths = graphFilePaths.filter((p) => !cache.has(p));
+      if (stalePaths.length > 0) {
+        const fresh = await Promise.all(
+          stalePaths.map(async (path) => {
+            try {
+              const result = await window.ipc.invoke("workspace:readFile", {
+                path,
+              });
+              return { path, data: result.data as string };
+            } catch (err) {
+              console.error("Failed to read file for graph:", path, err);
+              return { path, data: "" };
+            }
+          }),
+        );
+        for (const { path, data } of fresh) {
+          cache.set(path, data);
+        }
+      }
+      // Remove stale entries for files no longer in the graph
+      const currentSet = new Set(graphFilePaths);
+      for (const key of cache.keys()) {
+        if (!currentSet.has(key)) cache.delete(key);
+      }
 
       const nodeSet = new Set(graphFilePaths);
       const edges: GraphEdge[] = [];
       const edgeKeys = new Set<string>();
 
-      const contents = await Promise.all(
-        graphFilePaths.map(async (path) => {
-          try {
-            const result = await window.ipc.invoke("workspace:readFile", {
-              path,
-            });
-            return { path, data: result.data as string };
-          } catch (err) {
-            console.error("Failed to read file for graph:", path, err);
-            return { path, data: "" };
-          }
-        }),
-      );
+      const contents = graphFilePaths.map((path) => ({
+        path,
+        data: cache.get(path) ?? "",
+      }));
 
       for (const { path, data } of contents) {
         for (const match of data.matchAll(wikiLinkRegex)) {

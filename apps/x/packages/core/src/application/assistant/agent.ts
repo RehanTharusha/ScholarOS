@@ -16,7 +16,7 @@ export async function buildCopilotAgent(): Promise<z.infer<typeof Agent>> {
     const instructions = await buildCopilotInstructions();
     return {
         name: "rowboatx",
-        description: "Rowboatx copilot",
+        description: "ScholarOS copilot",
         instructions,
         tools,
     };

@@ -17,6 +17,7 @@ export function normalizeNavigationTarget(target: string): string {
     || lower.startsWith('file://')
     || lower.startsWith('chrome://')
     || lower.startsWith('chrome-extension://')
+    || lower.startsWith('data:')
   ) {
     throw new Error('That URL scheme is not allowed in the embedded browser.');
   }

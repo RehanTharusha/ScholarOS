@@ -82,7 +82,7 @@ const providerDisplayNames: Record<string, string> = {
   openrouter: "OpenRouter",
   aigateway: "AI Gateway",
   "openai-compatible": "OpenAI-Compatible",
-  rowboat: "Rowboat",
+  rowboat: "ScholarOS",
 };
 
 type ProviderName =

@@ -1,7 +1,7 @@
 export const skill = String.raw`
 # Builtin Tools Reference
 
-Load this skill when creating or modifying agents that need access to Rowboat's builtin tools (shell execution, file operations, etc.).
+Load this skill when creating or modifying agents that need access to ScholarOS's builtin tools (shell execution, file operations, etc.).
 
 ## Available Builtin Tools
 
@@ -158,11 +158,11 @@ Pass the paper URL to the summariser. Don't ask for human input.
 
 ## Additional Builtin Tools
 
-While \`executeCommand\` is the most versatile, other builtin tools exist for specific Rowboat operations (file management, agent inspection, etc.). These are primarily used by the Rowboat copilot itself and are not typically needed in user agents. If you need file operations, consider using bash commands like \`cat\`, \`echo\`, \`tee\`, etc. through \`executeCommand\`.
+While \`executeCommand\` is the most versatile, other builtin tools exist for specific ScholarOS operations (file management, agent inspection, etc.). These are primarily used by the ScholarOS copilot itself and are not typically needed in user agents. If you need file operations, consider using bash commands like \`cat\`, \`echo\`, \`tee\`, etc. through \`executeCommand\`.
 
 ### Copilot-Specific Builtin Tools
 
-The Rowboat copilot has access to special builtin tools that regular agents don't typically use. These tools help the copilot assist users with workspace management and MCP integration:
+The ScholarOS copilot has access to special builtin tools that regular agents don't typically use. These tools help the copilot assist users with workspace management and MCP integration:
 
 #### File & Directory Operations
 - \`workspace-readdir\` - List directory contents (supports recursive exploration)
@@ -181,7 +181,7 @@ The Rowboat copilot has access to special builtin tools that regular agents don'
 
 #### Agent Operations
 - \`analyzeAgent\` - Read and analyze an agent file structure
-- \`loadSkill\` - Load a Rowboat skill definition into context
+- \`loadSkill\` - Load a ScholarOS skill definition into context
 
 #### MCP Operations
 - \`addMcpServer\` - Add or update an MCP server configuration (with validation)
@@ -220,7 +220,7 @@ Many tasks can be accomplished with just \`executeCommand\` and common Unix tool
 In the CLI, multi-agent workflows are built by:
 1. Creating specialized agents as Markdown files in the \`agents/\` directory
 2. Creating an orchestrator agent that has other agents in its \`tools\` (YAML frontmatter)
-3. Running the orchestrator with \`rowboatx --agent orchestrator_name\`
+3. Running the orchestrator with \`scholaros --agent orchestrator_name\`
 
 There are no separate "workflow" files - everything is an agent defined in Markdown!
 `;

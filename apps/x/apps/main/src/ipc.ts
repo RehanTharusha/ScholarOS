@@ -4,41 +4,7 @@ import {
   shell,
   app,
   dialog,
-  systemPreferences,
-  desktopCapturer,
-  session,
-  type Session,
 } from "electron";
-const ALLOWED_SESSION_PERMISSIONS = new Set([
-  "media",
-  "display-capture",
-  "clipboard-read",
-  "clipboard-sanitized-write",
-]);
-
-function configureSessionPermissions(targetSession: Session): void {
-  targetSession.setPermissionCheckHandler((_webContents, permission) => {
-    return ALLOWED_SESSION_PERMISSIONS.has(permission as string);
-  });
-
-  targetSession.setPermissionRequestHandler(
-    (_webContents, permission, callback) => {
-      callback(ALLOWED_SESSION_PERMISSIONS.has(permission as string));
-    },
-  );
-
-  // Auto-approve display media requests and route system audio as loopback.
-  // Electron requires a video source in the callback even if we only want audio.
-  // We pass the first available screen source; the renderer discards the video track.
-  targetSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    const sources = await desktopCapturer.getSources({ types: ["screen"] });
-    if (sources.length === 0) {
-      callback({});
-      return;
-    }
-    callback({ video: sources[0], audio: "loopback" });
-  });
-}
 import { ipc } from "@x/shared";
 import path from "node:path";
 import os from "node:os";
@@ -186,9 +152,10 @@ const demoCards: FlashCard[] = [
     id: "demo-1",
     front: "What is ScholarOS?",
     back: "ScholarOS is an AI-driven study assistant.",
-    due: null,
-    metadata: {},
-  } as unknown as FlashCard,
+    courseId: "scholaros-demo",
+    conceptId: "scholaros",
+    conceptTitle: "ScholarOS",
+  } as FlashCard,
 ];
 async function ensureUniqueWorkspaceDestination(
   destinationPath: string,
@@ -566,6 +533,13 @@ export function stopServicesWatcher(): void {
   }
 }
 
+export function killAllPtyProcesses(): void {
+  for (const [, instance] of ptyInstances) {
+    try { instance.kill(); } catch { /* process already dead */ }
+  }
+  ptyInstances.clear();
+}
+
 // ============================================================================
 // Handler Implementations
 // ============================================================================
@@ -665,10 +639,10 @@ export function setupIpcHandlers() {
       if (courseIds.length > 0) {
         // Load cards from each selected course
         for (const courseId of courseIds) {
-          let courseCards = await flashcardStorage.loadCards(courseId);
+          const courseCards = await flashcardStorage.loadCards(courseId);
           // Seed demo cards if needed
           if (courseCards.length === 0 && courseId === "scholaros-demo") {
-            await flashcardStorage.saveCards(courseCards);
+            await flashcardStorage.saveCards(demoCards);
           }
           cards.push(...courseCards);
         }
@@ -689,7 +663,7 @@ export function setupIpcHandlers() {
     },
     "academic:flashcards:listAll": async () => {
       const cards = await flashcardStorage.loadAllCards();
-      const dueCount = cards.filter((c) => (c as any).due != null).length;
+      const dueCount = cards.filter((c) => c.due == null || c.due <= Date.now()).length;
       return { cards, dueCount, totalCount: cards.length };
     },
     "academic:flashcards:addFromIngest": async (_event, args) => {
@@ -1182,53 +1156,48 @@ export function setupIpcHandlers() {
         saveVaultPath(selectedPath);
         console.log("[Vault] Vault path saved successfully");
 
-        // Try to hot-refresh WorkDir and restart in-process watchers
+        // Refresh WorkDir so any newly-created services use the correct path
+        refreshWorkDir();
+        console.log("[Vault] WorkDir refreshed");
+
+        // Restart watchers so they pick up the new WorkDir
+        stopWorkspaceWatcher();
+        await startWorkspaceWatcher();
+        stopRunsWatcher();
+        await startRunsWatcher();
+        stopServicesWatcher();
+        await startServicesWatcher();
+        // Recreate vault-scoped helpers
         try {
-          console.log("[Vault] Refreshing WorkDir in core...");
-          refreshWorkDir();
-          console.log("[Vault] WorkDir refreshed");
-
-          // Restart watchers/services so they pick up the new WorkDir
-          stopWorkspaceWatcher();
-          await startWorkspaceWatcher();
-          stopRunsWatcher();
-          await startRunsWatcher();
-          stopServicesWatcher();
-          await startServicesWatcher();
-          // Recreate vault-scoped helpers
-          try {
-            flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
-            taskManager = new TaskManager(path.join(WorkDir, "academic"));
-            upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
-          } catch (err) {
-            console.warn(
-              "[Vault] Failed to recreate vault-scoped helpers:",
-              err,
-            );
-          }
-
-          // Notify renderer windows about vault change so they reload UI
-          try {
-            emitVaultChanged(WorkDir);
-          } catch (err) {
-            console.warn("[Vault] Failed to emit vault change:", err);
-          }
-
-          console.log("[Vault] Restarted in-process watchers for new vault");
+          flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
+          taskManager = new TaskManager(path.join(WorkDir, "academic"));
+          upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
         } catch (err) {
-          console.error(
-            "[Vault] Hot-refresh failed, falling back to restart:",
+          console.warn(
+            "[Vault] Failed to recreate vault-scoped helpers:",
             err,
           );
-          // Fallback: schedule full app restart if hot-refresh fails
-          setImmediate(() => {
-            console.log(
-              `[Vault] Initiating app restart for vault: ${selectedPath}`,
-            );
-            app.relaunch();
-            app.quit();
-          });
         }
+
+        // Background services (granola, graph builder, note tagging, agent runner,
+        // chrome sync) compute paths at module init and can't hot-reload.
+        // Emit vault change and schedule a restart so they pick up the new root.
+        try {
+          emitVaultChanged(WorkDir);
+        } catch (err) {
+          console.warn("[Vault] Failed to emit vault change:", err);
+        }
+
+        console.log(
+          "[Vault] Vault changed, scheduling app restart to reload background services...",
+        );
+        setImmediate(() => {
+          console.log(
+            `[Vault] Restarting app for new vault: ${selectedPath}`,
+          );
+          app.relaunch();
+          app.quit();
+        });
 
         return { success: true, path: selectedPath };
       } catch (err) {

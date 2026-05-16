@@ -142,6 +142,41 @@ Before designing or implementing any new feature UI in `apps/x/apps/renderer/src
 cd apps/x && npm run deps && npm run lint
 ```
 
+## Playwright / UI Automation
+
+The app requires Electron's preload (`window.electronAPI`), so it **cannot** be tested by navigating to the Vite dev server URL in a regular browser. You must use Chrome DevTools Protocol (CDP) via Electron's remote debugging.
+
+### Setup
+
+```powershell
+# 1. Start the renderer (Vite) in a separate window
+Start-Process pwsh -ArgumentList "-NoExit","-Command","cd 'apps/x/apps/renderer'; npx vite"
+
+# 2. Wait for Vite to be ready, then start Electron with remote debugging
+Start-Process pwsh -ArgumentList "-NoExit","-Command","cd 'apps/x/apps/main'; npx electron --remote-debugging-port=9222 ."
+```
+
+### Connecting via Playwright
+
+Use `chromium.connectOverCDP("http://127.0.0.1:9222")` — NOT `browser.newPage()` + `page.goto()`:
+
+```js
+import { chromium } from "playwright";
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const pages = browser.contexts()[0].pages();
+const appPage = pages.find((p) => p.url().includes("localhost:5173"));
+// Now interact with appPage via click(), fill(), evaluate(), etc.
+```
+
+> **Why?** The Vite dev server serves the renderer HTML/JS in a browser, but `window.electronAPI` is only injected by Electron's preload script. CDP connects directly to Electron's Chromium renderer which has the preload loaded.
+
+### Agent workflow
+
+If an agent needs to test/interact with the app via Playwright, tell it to:
+1. Start Vite renderer + Electron with `--remote-debugging-port=9222`
+2. Write a `.mjs` script using `chromium.connectOverCDP("http://127.0.0.1:9222")`
+3. Run the script with `node` (Playwright must be installed first)
+
 ## Tech Stack
 
 | Layer   | Technology                                                                                                 |

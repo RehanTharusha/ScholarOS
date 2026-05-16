@@ -221,7 +221,7 @@ export function useConnectors(active: boolean) {
           toast.error(
             result.error ||
               (provider === "rowboat"
-                ? "Failed to log in to Rowboat"
+                ? "Failed to log in to ScholarOS"
                 : `Failed to connect to ${provider}`),
           );
           setProviderStates((prev) => ({
@@ -233,7 +233,7 @@ export function useConnectors(active: boolean) {
         console.error("Failed to connect:", error);
         toast.error(
           provider === "rowboat"
-            ? "Failed to log in to Rowboat"
+            ? "Failed to log in to ScholarOS"
             : `Failed to connect to ${provider}`,
         );
         setProviderStates((prev) => ({
@@ -287,7 +287,7 @@ export function useConnectors(active: boolean) {
             : provider.charAt(0).toUpperCase() + provider.slice(1);
         toast.success(
           provider === "rowboat"
-            ? "Logged out of Rowboat"
+            ? "Logged out of ScholarOS"
             : `Disconnected from ${displayName}`,
         );
         setProviderStates((prev) => ({
@@ -301,7 +301,7 @@ export function useConnectors(active: boolean) {
       } else {
         toast.error(
           provider === "rowboat"
-            ? "Failed to log out of Rowboat"
+            ? "Failed to log out of ScholarOS"
             : `Failed to disconnect from ${provider}`,
         );
         setProviderStates((prev) => ({
@@ -311,10 +311,10 @@ export function useConnectors(active: boolean) {
       }
     } catch (error) {
       console.error("Failed to disconnect:", error);
-      toast.error(
-        provider === "rowboat"
-          ? "Failed to log out of Rowboat"
-          : `Failed to disconnect from ${provider}`,
+        toast.error(
+      provider === "rowboat"
+        ? "Failed to log out of ScholarOS"
+        : `Failed to disconnect from ${provider}`,
       );
       setProviderStates((prev) => ({
         ...prev,
@@ -392,7 +392,7 @@ export function useConnectors(active: boolean) {
             ? "Fireflies"
             : provider.charAt(0).toUpperCase() + provider.slice(1);
         if (provider === "rowboat") {
-          toast.success("Logged in to Rowboat");
+          toast.success("Logged in to ScholarOS");
         } else if (provider === "google" || provider === "fireflies-ai") {
           toast.success(`Connected to ${displayName}`, {
             description:

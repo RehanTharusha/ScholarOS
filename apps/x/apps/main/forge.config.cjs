@@ -3,17 +3,19 @@
 // Forge loads configs with require(), which fails on ESM files
 
 const path = require("path");
-const pkg = require("./package.json");
+    const pkg = require("./package.json");
+
+
 
 module.exports = {
   packagerConfig: {
-    executableName: "rowboat",
+    executableName: "scholaros",
     icon: "./icons/icon", // .icns extension added automatically
-    appBundleId: "com.rowboat.app",
+    appBundleId: "com.scholaros.app",
     appCategoryType: "public.app-category.productivity",
     extendInfo: {
       NSAudioCaptureUsageDescription:
-        "Rowboat needs access to system audio to transcribe meetings from other apps (Zoom, Meet, etc.)",
+        "ScholarOS needs access to system audio to transcribe meetings from other apps (Zoom, Meet, etc.)",
     },
     osxSign: {
       batchCodesignCalls: true,
@@ -44,27 +46,27 @@ module.exports = {
       name: "@electron-forge/maker-dmg",
       config: (arch) => ({
         format: "ULFO",
-        name: `Rowboat-darwin-${arch}-${pkg.version}`, // Architecture-specific name to avoid conflicts
+        name: `ScholarOS-darwin-${arch}-${pkg.version}`, // Architecture-specific name to avoid conflicts
       }),
     },
     {
       name: "@electron-forge/maker-squirrel",
       config: (arch) => ({
-        authors: "rowboatlabs",
+        authors: "scholaros",
         description: "AI coworker with memory",
-        name: `Rowboat-win32-${arch}`,
-        setupExe: `Rowboat-win32-${arch}-${pkg.version}-setup.exe`,
+        name: `ScholarOS-win32-${arch}`,
+        setupExe: `ScholarOS-win32-${arch}-${pkg.version}-setup.exe`,
       }),
     },
     {
       name: "@electron-forge/maker-deb",
       config: (arch) => ({
         options: {
-          name: `Rowboat-linux`,
-          bin: "rowboat",
-          description: "AI coworker with memory",
-          maintainer: "rowboatlabs",
-          homepage: "https://rowboatlabs.com",
+          name: `ScholarOS-linux`,
+          bin: "scholaros",
+          description: "Your AI study assistant",
+          maintainer: "scholaroslabs",
+          homepage: "https://scholaros.app",
         },
       }),
     },
@@ -72,10 +74,10 @@ module.exports = {
       name: "@electron-forge/maker-rpm",
       config: {
         options: {
-          name: `Rowboat-linux`,
-          bin: "rowboat",
-          description: "AI coworker with memory",
-          homepage: "https://rowboatlabs.com",
+          name: `ScholarOS-linux`,
+          bin: "scholaros",
+          description: "Your AI study assistant",
+          homepage: "https://scholaros.app",
         },
       },
     },
@@ -89,8 +91,8 @@ module.exports = {
       name: "@electron-forge/publisher-github",
       config: {
         repository: {
-          owner: "rowboatlabs",
-          name: "rowboat",
+          owner: "scholaros",
+          name: "scholaros-app",
         },
         prerelease: true,
       },

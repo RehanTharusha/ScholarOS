@@ -1,13 +1,11 @@
 import {
   app,
   BrowserWindow,
-  desktopCapturer,
   protocol,
   net,
   shell,
   session,
   dialog,
-  type Session,
 } from "electron";
 import path from "node:path";
 import {
@@ -18,6 +16,7 @@ import {
   stopRunsWatcher,
   stopServicesWatcher,
   stopWorkspaceWatcher,
+  killAllPtyProcesses,
 } from "./ipc.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname } from "node:path";
@@ -162,6 +161,26 @@ function createWindow() {
 
   configureSessionPermissions(session.defaultSession);
   configureSessionPermissions(session.fromPartition(BROWSER_PARTITION));
+
+  // Set Content Security Policy to mitigate XSS and data injection
+  win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [
+          "default-src 'self'; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "img-src 'self' data: blob:; " +
+          "font-src 'self' data:; " +
+          "connect-src 'self' ws: wss: http://localhost:5173; " +
+          "media-src 'self' mediastream:; " +
+          "frame-src 'self' http://localhost:*; " +
+          "object-src 'none';",
+        ],
+      },
+    });
+  });
 
   // Show window when content is ready to prevent blank screen
   win.once("ready-to-show", () => {
@@ -312,10 +331,11 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  // Clean up watcher on app quit
+  // Clean up all services on app quit
   stopWorkspaceWatcher();
   stopRunsWatcher();
   stopServicesWatcher();
+  killAllPtyProcesses();
   shutdownLocalSites().catch((error) => {
     console.error("[LocalSites] Failed to shut down cleanly:", error);
   });

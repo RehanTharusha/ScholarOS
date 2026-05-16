@@ -125,7 +125,7 @@ const catalogSections = skillEntries.map((entry) =>
 );
 
 export const skillCatalog = [
-  "# Rowboat Skill Catalog",
+  "# ScholarOS Skill Catalog",
   "",
   "Use this catalog to see which specialized skills you can load. Each entry lists the exact skill file plus a short description of when it helps.",
   "",
@@ -147,7 +147,7 @@ export function buildSkillCatalog(options?: { excludeIds?: string[] }): string {
     ].join("\n"),
   );
   return [
-    "# Rowboat Skill Catalog",
+    "# ScholarOS Skill Catalog",
     "",
     "Use this catalog to see which specialized skills you can load. Each entry lists the exact skill file plus a short description of when it helps.",
     "",

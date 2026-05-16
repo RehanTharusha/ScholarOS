@@ -522,7 +522,7 @@ const extractTextWithLLM = async (
 export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
   loadSkill: {
     description:
-      "Load a Rowboat skill definition into context by fetching its guidance string",
+      "Load a ScholarOS skill definition into context by fetching its guidance string",
     inputSchema: z.object({
       skillName: z
         .string()
