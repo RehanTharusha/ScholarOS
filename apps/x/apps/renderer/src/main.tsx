@@ -20,7 +20,7 @@ createRoot(document.getElementById("root")!).render(
       apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
       options={options}
     >
-      <ThemeProvider defaultTheme="system">
+      <ThemeProvider defaultTheme="paper">
         {isIngestWindow ? <IngestWindow /> : <App />}
       </ThemeProvider>
     </PostHogProvider>

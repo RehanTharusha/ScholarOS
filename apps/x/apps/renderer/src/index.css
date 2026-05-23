@@ -1,5 +1,60 @@
 @import "tailwindcss";
 
+/* Font size scaling — all themes */
+html[data-font-size="small"] { font-size: 14px; }
+html[data-font-size="medium"] { font-size: 16px; }
+html[data-font-size="large"] { font-size: 18px; }
+
+/* Serif typography (default font style) — all themes */
+body {
+  font-family: "Charter", "Georgia", "Palatino", "Times New Roman", serif;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Charter", "Georgia", "Palatino", "Times New Roman", serif;
+  font-weight: 500;
+}
+
+/* Paper theme: UI chrome stays sans-serif */
+.paper [data-slot="badge"],
+.paper [data-slot="button"],
+.paper [data-sidebar="menu-button"],
+.paper [data-sidebar="group-label"],
+.paper [data-slot="sidebar-group-label"],
+.paper label,
+.paper .text-tag,
+.paper .label-ui,
+.paper nav a {
+  font-family: "Inter", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Sans-serif override — overrides ALL text to Inter */
+.sans-typography body,
+.sans-typography h1,
+.sans-typography h2,
+.sans-typography h3,
+.sans-typography h4,
+.sans-typography h5,
+.sans-typography h6,
+.sans-typography [data-slot="badge"],
+.sans-typography [data-slot="button"],
+.sans-typography [data-sidebar="menu-button"],
+.sans-typography [data-sidebar="group-label"],
+.sans-typography [data-slot="sidebar-group-label"],
+.sans-typography label,
+.sans-typography .text-tag,
+.sans-typography .label-ui,
+.sans-typography nav a {
+  font-family: "Inter", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+
 @layer utilities {
   .perspective-[1000px] {
     perspective: 1000px;

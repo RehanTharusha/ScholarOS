@@ -15,13 +15,15 @@ import {
   Plus,
   X,
   Wrench,
+  BookOpen,
   Search,
   ChevronRight,
   Link2,
   Mail,
-  BookOpen,
   User,
   Plug,
+  Type,
+  TextSelect,
 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -151,8 +153,33 @@ function ThemeOption({
   );
 }
 
+function OptionButton({
+  label,
+  isSelected,
+  onClick,
+}: {
+  label: string;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex-1 px-3 py-2 text-sm font-medium rounded-md border-2 transition-all",
+        isSelected
+          ? "border-primary bg-primary/5 text-primary"
+          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
 function AppearanceSettings() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, fontStyle, setFontStyle, fontSize, setFontSize } =
+    useTheme();
 
   return (
     <div className="space-y-6">
@@ -161,12 +188,18 @@ function AppearanceSettings() {
         <p className="text-xs text-muted-foreground mb-4">
           Select your preferred color scheme
         </p>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-2">
           <ThemeOption
             label="Light"
             icon={Sun}
             isSelected={theme === "light"}
             onClick={() => setTheme("light")}
+          />
+          <ThemeOption
+            label="Paper"
+            icon={BookOpen}
+            isSelected={theme === "paper"}
+            onClick={() => setTheme("paper")}
           />
           <ThemeOption
             label="Dark"
@@ -180,6 +213,50 @@ function AppearanceSettings() {
             isSelected={theme === "system"}
             onClick={() => setTheme("system")}
           />
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-medium mb-3">Typography</h4>
+        <p className="text-xs text-muted-foreground mb-4">
+          Choose font style and base size
+        </p>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Type className="size-4 text-muted-foreground shrink-0" />
+            <div className="flex flex-1 gap-1">
+              <OptionButton
+                label="Serif"
+                isSelected={fontStyle === "serif"}
+                onClick={() => setFontStyle("serif")}
+              />
+              <OptionButton
+                label="Sans"
+                isSelected={fontStyle === "sans"}
+                onClick={() => setFontStyle("sans")}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <TextSelect className="size-4 text-muted-foreground shrink-0" />
+            <div className="flex flex-1 gap-1">
+              <OptionButton
+                label="Small"
+                isSelected={fontSize === "small"}
+                onClick={() => setFontSize("small")}
+              />
+              <OptionButton
+                label="Medium"
+                isSelected={fontSize === "medium"}
+                onClick={() => setFontSize("medium")}
+              />
+              <OptionButton
+                label="Large"
+                isSelected={fontSize === "large"}
+                onClick={() => setFontSize("large")}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

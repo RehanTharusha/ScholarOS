@@ -97,6 +97,27 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Kami design tokens */
+  --color-parchment: #f5f4ed;
+  --color-ivory: #faf9f5;
+  --color-warm-sand: #e8e6dc;
+  --color-dark-surface: #30302e;
+  --color-deep-dark: #141413;
+  --color-brand: #1b365d;
+  --color-brand-light: #2d5a8a;
+  --color-brand-tint: #eef2f7;
+  --color-near-black: #141413;
+  --color-dark-warm: #3d3d3a;
+  --color-olive: #504e49;
+  --color-stone: #6b6a64;
+  --color-border-soft: #e5e3d8;
+  --color-ring-warm: #d4d3cd;
+  --color-ring-deep: #b8b7b0;
+  --color-warm-silver: #b0aea5;
+  --font-serif: "Charter", "Georgia", "Palatino", "Times New Roman", serif;
+  --font-latin-ui: "Inter", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --shadow-whisper: 0 4px 24px rgba(0,0,0,0.05);
 }
 
 :root {
@@ -168,10 +189,61 @@
   --sidebar-accent: var(--sub-color, oklch(0.35 0 0));
   --sidebar-accent-foreground: var(--text-color, oklch(0.985 0 0));
   --sidebar-border: var(--sub-alt-color, oklch(1 0 0 / 10%));
-  --sidebar-ring: var(--main-color, oklch(0.556 0 0));
+  --sidebar-ring: oklch(0.35 0.06 260);
   --scrollbar-track: oklch(0.2 0 0);
   --scrollbar-thumb: oklch(0.4 0 0);
   --scrollbar-thumb-hover: oklch(0.5 0 0);
+
+  /* Warm-toned accent for dark mode - ink-blue with warmth */
+  --accent: oklch(0.28 0.03 60);
+  --sidebar-accent: oklch(0.28 0.03 60);
+}
+
+/* Paper theme — warm parchment, ink-blue, serif-led
+   Activated by <html class="paper"> */
+.paper {
+  --background: #f5f4ed;
+  --foreground: #3d3d3a;
+  --card: #faf9f5;
+  --card-foreground: #3d3d3a;
+  --popover: #faf9f5;
+  --popover-foreground: #3d3d3a;
+  --primary: #1b365d;
+  --primary-foreground: #faf9f5;
+  --secondary: #e8e6dc;
+  --secondary-foreground: #141413;
+  --muted: #e8e6dc;
+  --muted-foreground: #6b6a64;
+  --accent: #eef2f7;
+  --accent-foreground: #1b365d;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e8e6dc;
+  --input: #e8e6dc;
+  --ring: #1b365d;
+  --chart-1: #1b365d;
+  --chart-2: #2d5a8a;
+  --chart-3: #504e49;
+  --chart-4: #6b6a64;
+  --chart-5: #b0aea5;
+  --sidebar: #f5f4ed;
+  --sidebar-foreground: #3d3d3a;
+  --sidebar-primary: #1b365d;
+  --sidebar-primary-foreground: #faf9f5;
+  --sidebar-accent: #eae8e0;
+  --sidebar-accent-foreground: #1b365d;
+  --sidebar-border: #e8e6dc;
+  --sidebar-ring: #1b365d;
+  --scrollbar-track: #ecebe2;
+  --scrollbar-thumb: #d4d3cd;
+  --scrollbar-thumb-hover: #b8b7b0;
+  --radius: 0.5rem;
+  /* Whisper shadow for all shadow utilities */
+  --shadow-xs: 0 4px 24px rgba(0,0,0,0.05);
+  --shadow-sm: 0 4px 24px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.05);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.05);
+  --shadow-xl: 0 4px 24px rgba(0,0,0,0.05);
+  --shadow-2xl: 0 4px 24px rgba(0,0,0,0.05);
 }
 
 @layer base {
@@ -354,4 +426,91 @@
     opacity: 1;
     transform: translateX(-120%);
   }
+}
+
+/* ==============================================
+   Light mode: component overrides (Kami aesthetic)
+   ============================================== */
+
+/* Buttons: pill shape */
+.paper [data-slot="button"] {
+  border-radius: 9999px;
+}
+
+.paper [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.paper [data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+  background-color: #eef2f7;
+  transform: translateY(-1px);
+}
+
+/* Badges: small radius, uppercase */
+.paper [data-slot="badge"] {
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: "Inter", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Sidebar section switcher (Chat/Knowledge tabs) container */
+.paper [data-slot="sidebar-header"] .rounded-lg {
+  background-color: #e8e6dc;
+}
+
+/* Overlays: warm transparent instead of black */
+.paper [data-slot="dialog-overlay"],
+.paper [data-slot="alert-dialog-overlay"] {
+  background-color: rgba(20,20,19,0.4);
+}
+
+/* Onboarding dot grid */
+.paper .onboarding-dot-grid {
+  background-image: radial-gradient(circle, #1b365d 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.08;
+}
+
+/* Graph view dot grid */
+.paper .graph-view::before {
+  background-image: radial-gradient(#1b365d 1px, transparent 1px);
+  opacity: 0.12;
+}
+
+/* Markdown content: serif-friendly weight overrides */
+.paper [data-slot="message-content"] h1,
+.paper [data-slot="message-content"] h2,
+.paper [data-slot="message-content"] h3,
+.paper [data-slot="message-content"] h4,
+.paper [data-slot="message-content"] h5,
+.paper [data-slot="message-content"] h6 {
+  font-weight: 500 !important;
+}
+.paper [data-slot="message-content"] h1 {
+  font-size: 1.5rem;
+}
+.paper [data-slot="message-content"] h2 {
+  font-size: 1.25rem;
+}
+.paper [data-slot="message-content"] h3 {
+  font-size: 1.125rem;
+}
+.paper [data-slot="message-content"] blockquote {
+  border-left-color: #1b365d;
+  color: #504e49;
+}
+.paper [data-slot="message-content"] a {
+  color: #1b365d;
+}
+.paper [data-slot="message-content"] code:not(pre code) {
+  background-color: #e8e6dc;
+  color: #3d3d3a;
+}
+.paper [data-slot="message-content"] pre {
+  background-color: #faf9f5;
+  border: 1px solid #e8e6dc;
+}
+.paper [data-slot="message-content"] th {
+  background-color: #e8e6dc;
 }
