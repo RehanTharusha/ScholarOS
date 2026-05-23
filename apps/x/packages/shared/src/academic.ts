@@ -35,59 +35,6 @@ export interface Course {
 }
 
 /**
- * Upcoming task — centralized store for ingest-detected + manually created tasks
- * Canonical source: knowledge/upcoming.json
- * Each task gets a sibling MD file at knowledge/tasks/<slug>.md
- */
-export interface UpcomingTask {
-  id: string;
-  courseId: string;
-  title: string;
-  description?: string;
-  dueDate: string; // ISO 8601
-  status: "not-started" | "in-progress" | "submitted" | "graded";
-  priority?: "high" | "medium" | "low";
-  wikiLinks?: string[];
-  notes?: string;
-  source: "ingest" | "manual" | "agent";
-  sourceFile?: string; // Path of doc that mentioned this task
-  mdPath: string; // knowledge/tasks/<slug>.md
-  createdAt: string; // ISO 8601
-  updatedAt: string; // ISO 8601
-}
-
-export interface UpcomingTaskStore {
-  version: number;
-  tasks: UpcomingTask[];
-}
-
-/**
- * Assignment with tracking
- */
-export interface Assignment {
-  id: string;
-  courseId: string;
-  title: string;
-  description?: string;
-  dueDate: string; // ISO 8601
-  status: "not-started" | "in-progress" | "submitted" | "graded";
-  priority?: "high" | "medium" | "low";
-  wikiLinks?: string[]; // Related concept pages
-  notes?: string; // User's working notes
-}
-
-/**
- * Aggregated dashboard metrics for the academic overview page
- */
-export interface AcademicDashboardSummary {
-  coursesCount: number;
-  dueToday: number;
-  dueThisWeek: number;
-  completedAssignments: number;
-  totalAssignments: number;
-}
-
-/**
  * PDF annotation (highlight + notes)
  */
 export interface PDFAnnotation {

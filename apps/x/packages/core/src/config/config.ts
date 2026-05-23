@@ -244,12 +244,34 @@ export function shouldDisableTools(): boolean {
   return false;
 }
 
-// Generate today.md on startup with latest assignments
-import("../knowledge/ensure_daily_note.js")
-  .then((m) => m.ensureDailyNote())
-  .catch((err) => {
-    console.error("[DailyNote] Failed to generate today.md:", err);
-  });
+/**
+ * Check if onboarding should be force-shown for development.
+ * When enabled, the onboarding modal appears regardless of actual completion state.
+ *
+ * Configuration priority (highest to lowest):
+ * 1. SCHOLAROS_SHOW_ONBOARDING environment variable ("true")
+ * 2. ~/.rowboat/config/dev.json { showOnboarding: true }
+ * 3. Default: false (normal behavior)
+ */
+export function shouldShowOnboardingOverride(): boolean {
+  if (process.env.SCHOLAROS_SHOW_ONBOARDING === "true") {
+    return true;
+  }
+
+  try {
+    const devConfigPath = path.join(WorkDir, "config", "dev.json");
+    if (fs.existsSync(devConfigPath)) {
+      const config = JSON.parse(fs.readFileSync(devConfigPath, "utf-8"));
+      if (config.showOnboarding === true) {
+        return true;
+      }
+    }
+  } catch {
+    // Ignore config errors
+  }
+
+  return false;
+}
 
 // Initialize version history repo (async, fire-and-forget on startup)
 import("../knowledge/version_history.js")

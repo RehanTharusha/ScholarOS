@@ -5,13 +5,15 @@ import type { Step, OnboardingPath } from "./use-onboarding-state"
 
 const DIRECT_STEPS = [
   { step: 0 as Step, label: "Welcome" },
-  { step: 2 as Step, label: "Start" },
+  { step: 1 as Step, label: "Appearance" },
+  { step: 3 as Step, label: "Start" },
 ]
 
 const BYOK_STEPS = [
   { step: 0 as Step, label: "Welcome" },
-  { step: 1 as Step, label: "Model" },
-  { step: 2 as Step, label: "Start" },
+  { step: 1 as Step, label: "Appearance" },
+  { step: 2 as Step, label: "Model" },
+  { step: 3 as Step, label: "Start" },
 ]
 
 interface StepIndicatorProps {

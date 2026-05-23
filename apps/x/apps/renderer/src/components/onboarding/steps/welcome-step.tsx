@@ -118,7 +118,7 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
         className="mt-6"
       >
         <button
-          onClick={() => state.setCurrentStep(2)}
+          onClick={() => state.setCurrentStep(1)}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground/50"
         >
           Skip setup, get started

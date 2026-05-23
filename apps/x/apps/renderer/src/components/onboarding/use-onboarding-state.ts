@@ -7,7 +7,7 @@ export interface ProviderState {
   isConnecting: boolean;
 }
 
-export type Step = 0 | 1 | 2;
+export type Step = 0 | 1 | 2 | 3;
 
 export type OnboardingPath = "byok" | null;
 
@@ -26,7 +26,7 @@ export interface LlmModelOption {
   release_date?: string;
 }
 
-export function useOnboardingState(open: boolean, onComplete: () => void) {
+export function useOnboardingState(open: boolean, onComplete: () => void, devMode = false) {
   const [currentStep, setCurrentStep] = useState<Step>(0);
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPath>(null);
 
@@ -235,17 +235,19 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
   }, [modelsCatalog]);
 
   // Step flow:
-  // Direct path: 0 (welcome) → 2 (start)
-  // BYOK path:   0 (welcome) → 1 (llm setup) → 2 (start)
+  // Direct path: 0 (welcome) → 1 (appearance) → 3 (completion)
+  // BYOK path:   0 (welcome) → 1 (appearance) → 2 (llm setup) → 3 (completion)
   const handleNext = useCallback(() => {
     if (currentStep === 0) {
-      if (onboardingPath === "byok") {
-        setCurrentStep(1);
-      } else {
-        setCurrentStep(2);
-      }
+      setCurrentStep(1);
     } else if (currentStep === 1) {
-      setCurrentStep(2);
+      if (onboardingPath === "byok") {
+        setCurrentStep(2);
+      } else {
+        setCurrentStep(3);
+      }
+    } else if (currentStep === 2) {
+      setCurrentStep(3);
     }
   }, [currentStep, onboardingPath]);
 
@@ -253,10 +255,14 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
     if (currentStep === 1) {
       setCurrentStep(0);
       setOnboardingPath(null);
-    } else if (currentStep === 2 && onboardingPath === "byok") {
-      setCurrentStep(1);
     } else if (currentStep === 2) {
-      setCurrentStep(0);
+      setCurrentStep(1);
+    } else if (currentStep === 3) {
+      if (onboardingPath === "byok") {
+        setCurrentStep(2);
+      } else {
+        setCurrentStep(1);
+      }
     }
   }, [currentStep, onboardingPath]);
 
@@ -335,6 +341,9 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
   }, []);
 
   return {
+    // Dev mode
+    devMode,
+
     // Step state
     currentStep,
     setCurrentStep,

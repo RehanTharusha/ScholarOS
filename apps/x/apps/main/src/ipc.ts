@@ -112,6 +112,7 @@ import { ISlackConfigRepo } from "@x/core/dist/slack/repo.js";
 import {
   isOnboardingComplete,
   markOnboardingComplete,
+  shouldShowOnboardingOverride,
 } from "@x/core/dist/config/config.js";
 import * as composioHandler from "./composio-handler.js";
 import { search } from "@x/core/dist/search/search.js";
@@ -124,16 +125,7 @@ import {
   saveVaultPath,
   getVaultPath,
 } from "@x/core/dist/config/config.js";
-import {
-  TaskManager,
-  type KanbanStatus,
-} from "@x/core/dist/academic/task-manager.js";
-import { UpcomingStore } from "@x/core/dist/academic/upcoming-store.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
-import { getRendererUrl } from "./app-url.js";
-
-let taskManager = new TaskManager(path.join(WorkDir, "academic"));
-let upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
 
 async function ensureUniqueWorkspaceDestination(
   destinationPath: string,
@@ -606,79 +598,6 @@ export function setupIpcHandlers() {
 
       return { ok: true as const, stagedFiles, errors };
     },
-    "academic:assignments:list": async (_event, args) => {
-      const assignments = await taskManager.listAssignments(args.courseId);
-      return { assignments };
-    },
-    "academic:assignments:updateStatus": async (_event, args) => {
-      const next = await taskManager.updateKanbanStatus(
-        args.assignmentId,
-        args.status as KanbanStatus,
-      );
-      if (!next) {
-        return { success: false, error: "Assignment not found" };
-      }
-
-      return { success: true, assignment: next };
-    },
-    "academic:assignments:create": async (_event, args) => {
-      const assignment = await taskManager.createAssignment({
-        title: args.title,
-        courseId: args.courseId,
-        description: args.description ?? "",
-        dueDate: args.dueDate,
-        status: args.status ?? "not-started",
-        priority: args.priority ?? "medium",
-        wikiLinks: args.wikiLinks ?? [],
-      });
-      return { success: true, assignment };
-    },
-    "academic:assignments:delete": async (_event, args) => {
-      const ok = await taskManager.deleteAssignment(args.assignmentId);
-      return { success: ok, error: ok ? undefined : "Assignment not found" };
-    },
-    "upcoming:tasks:list": async (_event, args) => {
-      const tasks = await upcomingStore.listTasks(args.courseId, args.status);
-      return { tasks };
-    },
-    "upcoming:tasks:create": async (_event, args) => {
-      try {
-        const task = await upcomingStore.createTask({
-          courseId: args.courseId,
-          title: args.title,
-          description: args.description,
-          dueDate: args.dueDate,
-          status: args.status,
-          priority: args.priority,
-          source: args.source,
-          sourceFile: args.sourceFile,
-          notes: args.notes,
-        });
-        return { success: true, task };
-      } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : String(err) };
-      }
-    },
-    "upcoming:tasks:update": async (_event, args) => {
-      const task = await upcomingStore.updateTask(args.taskId, args.updates);
-      if (!task) return { success: false, error: "Task not found" };
-      return { success: true, task };
-    },
-    "upcoming:tasks:delete": async (_event, args) => {
-      const ok = await upcomingStore.deleteTask(args.taskId);
-      return { success: ok, error: ok ? undefined : "Task not found" };
-    },
-    "upcoming:tasks:createFromIngest": async (_event, args) => {
-      const { created, errors } = await upcomingStore.createFromIngest(args.tasks);
-      return { success: errors.length === 0, count: created, errors: errors.length > 0 ? errors : undefined };
-    },
-    "today:refresh": async () => {
-      const { refreshDailyNote } = await import(
-        "@x/core/dist/knowledge/ensure_daily_note.js"
-      );
-      await refreshDailyNote();
-      return { success: true };
-    },
     "mcp:listTools": async (_event, args) => {
       return mcpCore.listTools(args.serverName, args.cursor);
     },
@@ -813,9 +732,12 @@ export function setupIpcHandlers() {
       }
     },
     "onboarding:getStatus": async () => {
-      // Show onboarding if it hasn't been completed yet
+      const devOverride = shouldShowOnboardingOverride();
+      if (devOverride) {
+        return { showOnboarding: true, devOverride: true };
+      }
       const complete = isOnboardingComplete();
-      return { showOnboarding: !complete };
+      return { showOnboarding: !complete, devOverride: false };
     },
     "onboarding:markComplete": async () => {
       markOnboardingComplete();
@@ -1027,17 +949,6 @@ export function setupIpcHandlers() {
         await startRunsWatcher();
         stopServicesWatcher();
         await startServicesWatcher();
-        // Recreate vault-scoped helpers
-        try {
-          taskManager = new TaskManager(path.join(WorkDir, "academic"));
-          upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
-        } catch (err) {
-          console.warn(
-            "[Vault] Failed to recreate vault-scoped helpers:",
-            err,
-          );
-        }
-
         // Emit vault change to renderer
         try {
           emitVaultChanged(WorkDir);

@@ -10,24 +10,28 @@ import {
 import { useOnboardingState } from "./use-onboarding-state"
 import { StepIndicator } from "./step-indicator"
 import { WelcomeStep } from "./steps/welcome-step"
+import { AppearanceStep } from "./steps/appearance-step"
 import { LlmSetupStep } from "./steps/llm-setup-step"
 import { CompletionStep } from "./steps/completion-step"
 
 interface OnboardingModalProps {
   open: boolean
   onComplete: () => void
+  devMode?: boolean
 }
 
-export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
-  const state = useOnboardingState(open, onComplete)
+export function OnboardingModal({ open, onComplete, devMode = false }: OnboardingModalProps) {
+  const state = useOnboardingState(open, onComplete, devMode)
 
   const stepContent = React.useMemo(() => {
     switch (state.currentStep) {
       case 0:
         return <WelcomeStep state={state} />
       case 1:
-        return <LlmSetupStep state={state} />
+        return <AppearanceStep state={state} />
       case 2:
+        return <LlmSetupStep state={state} />
+      case 3:
         return <CompletionStep state={state} />
     }
   }, [state.currentStep, state])

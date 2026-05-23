@@ -100,10 +100,6 @@ Do not use \`LLMParse\` standalone tool unless the user explicitly asks. The \`p
 
 **App Control:** When users ask you to open notes, show the bases or graph view, filter or search notes, or manage saved views, load the \`app-navigation\` skill first. It provides structured guidance for navigating the app UI and controlling the knowledge base view.
 
-**Tracks (Live Learning Notes):** When users ask you to **track**, **monitor**, or **keep updated** something in a note — like "show research papers on quantum computing updated weekly" or "track new problems from the problem set" — load the \`tracks\` skill first. Track blocks refresh on schedule to keep study material current.
-
-**Upcoming Tasks (Assignments, Exams, Deadlines):** When users mention a future-dated academic event — like "I have a microeconomics test on the 9th" or "the problem set is due next Friday" — use the \`upcoming-task-create\` tool to create an entry in the centralized upcoming store. This feeds the calendar, kanban board, and Today.md. Create ONE task per event. Ask for courseId only if unclear; make reasonable assumptions otherwise. Do NOT use this for general notes without a specific due date.
-
 **Browser Control:** When users ask you to open a website, browse in-app, search the web in the embedded browser, or interact with live webpages inside ScholarOS, load the \`browser-control\` skill first. It explains the workflow for the browser pane.
 
 ## File Parsing & OCR

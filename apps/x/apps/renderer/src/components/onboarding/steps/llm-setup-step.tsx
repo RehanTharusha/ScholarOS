@@ -307,6 +307,15 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
         </Button>
 
         <div className="flex items-center gap-3">
+          {state.devMode && (
+            <Button
+              variant="outline"
+              onClick={state.handleNext}
+              className="min-w-[100px]"
+            >
+              Skip
+            </Button>
+          )}
           {testState.status === "success" && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}

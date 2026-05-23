@@ -101,7 +101,6 @@ import {
   type CommandPaletteContext,
   type CommandPaletteMention,
 } from "@/components/search-dialog";
-import { TrackModal } from "@/components/track-modal";
 import { BrowserPane } from "@/components/browser-pane/BrowserPane";
 import { VersionHistoryPanel } from "@/components/version-history-panel";
 import { FileCardProvider } from "@/contexts/file-card-context";
@@ -1153,6 +1152,7 @@ function App() {
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingDevMode, setOnboardingDevMode] = useState(false);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -3244,34 +3244,6 @@ function App() {
     setPendingPaletteSubmit(null);
   }, [pendingPaletteSubmit]);
 
-  // Listener for track-block "Edit with Copilot" events
-  // (dispatched by apps/renderer/src/extensions/track-block.tsx)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const ev = e as CustomEvent<{
-        trackId?: string;
-        filePath?: string;
-      }>;
-      const trackId = ev.detail?.trackId;
-      const filePath = ev.detail?.filePath;
-      if (!trackId || !filePath) return;
-      const displayName = filePath.split("/").pop() ?? filePath;
-      submitFromPalette(
-        `Let's work on the \`${trackId}\` track in this note. Please load the \`tracks\` skill first, then ask me what I want to change.`,
-        { path: filePath, displayName },
-      );
-    };
-    window.addEventListener(
-      "scholaros:open-copilot-edit-track",
-      handler as EventListener,
-    );
-    return () =>
-      window.removeEventListener(
-        "scholaros:open-copilot-edit-track",
-        handler as EventListener,
-      );
-  }, [submitFromPalette]);
-
   // Listener for prompt-block "Run" events
   // (dispatched by apps/renderer/src/extensions/prompt-block.tsx)
   useEffect(() => {
@@ -4112,6 +4084,7 @@ function App() {
       try {
         const result = await window.ipc.invoke("onboarding:getStatus", null);
         setShowOnboarding(result.showOnboarding);
+        setOnboardingDevMode(result.devOverride || false);
       } catch (err) {
         console.error("Failed to check onboarding status:", err);
       }
@@ -5698,10 +5671,10 @@ function App() {
         />
       </SidebarSectionProvider>
       <Toaster />
-      <TrackModal />
       <OnboardingModal
         open={showOnboarding}
         onComplete={handleOnboardingComplete}
+        devMode={onboardingDevMode}
       />
     </TooltipProvider>
   );
