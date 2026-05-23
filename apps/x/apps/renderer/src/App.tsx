@@ -4744,7 +4744,7 @@ function App() {
   return (
     <TooltipProvider delayDuration={0}>
       <SidebarSectionProvider
-        defaultSection="tasks"
+        defaultSection="knowledge"
         onSectionChange={(section) => {
           if (section === "knowledge" && !selectedPath && !isGraphOpen) {
             void navigateToView({ type: "file", path: BASES_DEFAULT_TAB_PATH });
@@ -4829,6 +4829,21 @@ function App() {
                 },
                 onOpenInNewTab: (targetRunId) => {
                   openChatInNewTab(targetRunId);
+                },
+                onClearHistory: async () => {
+                  try {
+                    await window.ipc.invoke("runs:deleteAll", null);
+                    setChatTabs((prev) => {
+                      const existing = prev.find((t) => !t.runId);
+                      if (existing) return [{ ...existing }];
+                      return [{ id: newChatTabId(), runId: null, mode: "agent" }];
+                    });
+                    await loadRuns();
+                    toast.success("Chat history cleared");
+                  } catch (err) {
+                    toast.error("Failed to clear chat history");
+                    console.error("Failed to clear history:", err);
+                  }
                 },
                 onDeleteRun: async (runIdToDelete) => {
                   try {

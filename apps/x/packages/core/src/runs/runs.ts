@@ -99,6 +99,11 @@ export async function stop(runId: string, force: boolean = false): Promise<void>
     // This avoids duplicate events and ensures proper sequencing.
 }
 
+export async function deleteAllRuns(): Promise<void> {
+    const repo = container.resolve<IRunsRepo>('runsRepo');
+    await repo.deleteAll();
+}
+
 export async function deleteRun(runId: string): Promise<void> {
     const runsLock = container.resolve<IRunsLock>('runsLock');
     if (!await runsLock.lock(runId)) {

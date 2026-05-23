@@ -20,7 +20,7 @@ export function useSidebarSection() {
 }
 
 export function SidebarSectionProvider({
-  defaultSection = "tasks",
+  defaultSection = "knowledge",
   onSectionChange,
   children,
 }: {
@@ -29,6 +29,11 @@ export function SidebarSectionProvider({
   children: React.ReactNode
 }) {
   const [activeSection, setActiveSectionState] = React.useState<ActiveSection>(defaultSection)
+
+  React.useEffect(() => {
+    onSectionChange?.(defaultSection)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const setActiveSection = React.useCallback((section: ActiveSection) => {
     setActiveSectionState(section)

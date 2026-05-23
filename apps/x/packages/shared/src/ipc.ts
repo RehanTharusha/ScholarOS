@@ -226,6 +226,10 @@ const ipcSchemas = {
     }),
     res: z.object({ success: z.boolean() }),
   },
+  "runs:deleteAll": {
+    req: z.null(),
+    res: z.object({ success: z.boolean() }),
+  },
   "runs:events": {
     req: z.null(),
     res: z.null(),

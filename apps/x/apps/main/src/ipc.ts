@@ -647,6 +647,10 @@ export function setupIpcHandlers() {
       await runsCore.deleteRun(args.runId);
       return { success: true };
     },
+    "runs:deleteAll": async () => {
+      await runsCore.deleteAllRuns();
+      return { success: true };
+    },
     "models:list": async () => {
       if (await isSignedIn()) {
         return await listGatewayModels();

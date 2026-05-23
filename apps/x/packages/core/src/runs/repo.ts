@@ -32,6 +32,7 @@ export interface IRunsRepo {
     list(cursor?: string): Promise<z.infer<typeof ListRunsResponse>>;
     appendEvents(runId: string, events: z.infer<typeof RunEvent>[]): Promise<void>;
     delete(id: string): Promise<void>;
+    deleteAll(): Promise<void>;
 }
 
 /**
@@ -297,5 +298,19 @@ export class FSRunsRepo implements IRunsRepo {
     async delete(id: string): Promise<void> {
         const filePath = path.join(WorkDir, 'runs', `${id}.jsonl`);
         await fsp.unlink(filePath);
+    }
+
+    async deleteAll(): Promise<void> {
+        const runsDir = path.join(WorkDir, 'runs');
+        let entries: string[];
+        try {
+            entries = await fsp.readdir(runsDir);
+        } catch (err: unknown) {
+            const e = err as { code?: string };
+            if (e.code === 'ENOENT') return;
+            throw err;
+        }
+        const files = entries.filter(e => e.endsWith('.jsonl'));
+        await Promise.all(files.map(f => fsp.unlink(path.join(runsDir, f)).catch(() => {})));
     }
 }

@@ -144,6 +144,7 @@ type TasksActions = {
   onSelectRun: (runId: string) => void;
   onDeleteRun: (runId: string) => void;
   onOpenInNewTab?: (runId: string) => void;
+  onClearHistory?: () => void;
 };
 
 type SidebarContentPanelProps = {
@@ -168,8 +169,8 @@ type SidebarContentPanelProps = {
 } & React.ComponentProps<typeof Sidebar>;
 
 const sectionTabs: { id: ActiveSection; label: string }[] = [
-  { id: "tasks", label: "Chat" },
   { id: "knowledge", label: "Knowledge" },
+  { id: "tasks", label: "Chat" },
 ];
 
 function formatEventTime(ts: string): string {
@@ -1492,6 +1493,7 @@ function TasksSection({
   const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(
     null,
   );
+  const [pendingClearHistory, setPendingClearHistory] = useState(false);
 
   return (
     <SidebarGroup className="flex-1 flex flex-col overflow-hidden">
@@ -1499,8 +1501,19 @@ function TasksSection({
         {/* Runs Section */}
         {runs.length > 0 && (
           <>
-            <div className="px-3 py-1.5 mt-4 text-xs font-medium text-muted-foreground">
-              Chat history
+            <div className="group/header flex items-center justify-between px-3 py-1.5 mt-4">
+              <span className="text-xs font-medium text-muted-foreground">
+                Chat history
+              </span>
+              {actions?.onClearHistory && (
+                <button
+                  onClick={() => setPendingClearHistory(true)}
+                  className="invisible group-hover/header:visible flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="size-3" />
+                  Clear history
+                </button>
+              )}
             </div>
             <SidebarMenu>
               {runs.map((run) => (
@@ -1592,6 +1605,42 @@ function TasksSection({
               }}
             >
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear all history confirmation dialog */}
+      <Dialog
+        open={pendingClearHistory}
+        onOpenChange={(open) => {
+          if (!open) setPendingClearHistory(false);
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Clear chat history</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to clear all chat history? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingClearHistory(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                actions?.onClearHistory?.();
+                setPendingClearHistory(false);
+              }}
+            >
+              Clear all
             </Button>
           </DialogFooter>
         </DialogContent>
