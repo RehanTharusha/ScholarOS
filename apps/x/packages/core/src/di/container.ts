@@ -10,10 +10,7 @@ import { IRunsLock, InMemoryRunsLock } from "../runs/lock.js";
 import { IAgentRuntime, AgentRuntime } from "../agents/runtime.js";
 import { FSOAuthRepo, IOAuthRepo } from "../auth/repo.js";
 import { FSClientRegistrationRepo, IClientRegistrationRepo } from "../auth/client-repo.js";
-import { FSGranolaConfigRepo, IGranolaConfigRepo } from "../knowledge/granola/repo.js";
 import { IAbortRegistry, InMemoryAbortRegistry } from "../runs/abort-registry.js";
-import { FSAgentScheduleRepo, IAgentScheduleRepo } from "../agent-schedule/repo.js";
-import { FSAgentScheduleStateRepo, IAgentScheduleStateRepo } from "../agent-schedule/state-repo.js";
 import { FSSlackConfigRepo, ISlackConfigRepo } from "../slack/repo.js";
 import type { IBrowserControlService } from "../application/browser-control/service.js";
 
@@ -36,9 +33,6 @@ container.register({
     runsRepo: asClass<IRunsRepo>(FSRunsRepo).singleton(),
     oauthRepo: asClass<IOAuthRepo>(FSOAuthRepo).singleton(),
     clientRegistrationRepo: asClass<IClientRegistrationRepo>(FSClientRegistrationRepo).singleton(),
-    granolaConfigRepo: asClass<IGranolaConfigRepo>(FSGranolaConfigRepo).singleton(),
-    agentScheduleRepo: asClass<IAgentScheduleRepo>(FSAgentScheduleRepo).singleton(),
-    agentScheduleStateRepo: asClass<IAgentScheduleStateRepo>(FSAgentScheduleStateRepo).singleton(),
     slackConfigRepo: asClass<ISlackConfigRepo>(FSSlackConfigRepo).singleton(),
 });
 

@@ -16,7 +16,6 @@ import {
   Globe,
   AlertTriangle,
   HelpCircle,
-  Calendar,
   Mic,
   Network,
   Pencil,
@@ -30,7 +29,6 @@ import {
   Square,
   Trash2,
   Inbox,
-  Tags,
 } from "lucide-react";
 
 import {
@@ -117,7 +115,6 @@ type KnowledgeActions = {
   createFolder: (parentPath?: string) => void;
   openGraph: () => void;
   openBases: () => void;
-  openCalendar?: () => void;
   expandAll: () => void;
   collapseAll: () => void;
   rename: (path: string, newName: string, isDir: boolean) => Promise<void>;
@@ -133,31 +130,12 @@ type RunListItem = {
   agentId: string;
 };
 
-type BackgroundTaskItem = {
-  name: string;
-  description?: string;
-  schedule: {
-    type: "cron" | "window" | "once";
-    expression?: string;
-    cron?: string;
-    startTime?: string;
-    endTime?: string;
-    runAt?: string;
-  };
-  enabled: boolean;
-  status?: "scheduled" | "running" | "finished" | "failed" | "triggered";
-  nextRunAt?: string | null;
-  lastRunAt?: string | null;
-};
-
 type ServiceEventType = z.infer<typeof ServiceEvent>;
 
 const MAX_SYNC_EVENTS = 1000;
 const RUN_STALE_MS = 2 * 60 * 60 * 1000;
 
 const SERVICE_LABELS: Record<string, string> = {
-  granola: "Syncing Granola",
-  graph: "Updating knowledge",
   voice_memo: "Processing voice memo",
 };
 
@@ -166,7 +144,6 @@ type TasksActions = {
   onSelectRun: (runId: string) => void;
   onDeleteRun: (runId: string) => void;
   onOpenInNewTab?: (runId: string) => void;
-  onSelectBackgroundTask?: (taskName: string) => void;
 };
 
 type SidebarContentPanelProps = {
@@ -181,12 +158,9 @@ type SidebarContentPanelProps = {
   currentRunId?: string | null;
   processingRunIds?: Set<string>;
   tasksActions?: TasksActions;
-  backgroundTasks?: BackgroundTaskItem[];
-  selectedBackgroundTask?: string | null;
   onNewChat?: () => void;
   onOpenSearch?: () => void;
   onOpenIngestWindow?: () => void;
-  onOpenNoteTagging?: () => void;
   isBrowserOpen?: boolean;
   onToggleBrowser?: () => void;
   isSuggestedTopicsOpen?: boolean;
@@ -427,12 +401,9 @@ export function SidebarContentPanel({
   currentRunId,
   processingRunIds,
   tasksActions,
-  backgroundTasks = [],
-  selectedBackgroundTask,
   onNewChat,
   onOpenSearch,
   onOpenIngestWindow,
-  onOpenNoteTagging,
 
   isBrowserOpen = false,
   onToggleBrowser,
@@ -632,16 +603,6 @@ export function SidebarContentPanel({
               <span>Ingest materials</span>
             </button>
           )}
-          {onOpenNoteTagging && (
-            <button
-              type="button"
-              onClick={onOpenNoteTagging}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Tags className="size-4" />
-              <span>Tags</span>
-            </button>
-          )}
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -662,8 +623,6 @@ export function SidebarContentPanel({
             currentRunId={currentRunId}
             processingRunIds={processingRunIds}
             actions={tasksActions}
-            backgroundTasks={backgroundTasks}
-            selectedBackgroundTask={selectedBackgroundTask}
           />
         )}
       </SidebarContent>
@@ -1148,15 +1107,6 @@ function KnowledgeSection({
     },
     { icon: Network, label: "Graph View", action: () => actions.openGraph() },
     { icon: Table2, label: "Bases", action: () => actions.openBases() },
-    ...(actions.openCalendar
-      ? [
-          {
-            icon: Calendar,
-            label: "Calendar",
-            action: () => actions.openCalendar!(),
-          },
-        ]
-      : []),
   ];
 
   return (
@@ -1525,26 +1475,7 @@ function Tree({
   );
 }
 
-// Get status indicator color
-function getStatusColor(status?: string, enabled?: boolean): string {
-  // Disabled agents always show gray
-  if (enabled === false) {
-    return "bg-gray-400";
-  }
-  switch (status) {
-    case "running":
-      return "bg-blue-500";
-    case "finished":
-      return "bg-green-500";
-    case "failed":
-      return "bg-red-500";
-    case "triggered":
-      return "bg-gray-400";
-    case "scheduled":
-    default:
-      return "bg-yellow-500";
-  }
-}
+// Knowledge section
 
 // Tasks Section
 function TasksSection({
@@ -1552,15 +1483,11 @@ function TasksSection({
   currentRunId,
   processingRunIds,
   actions,
-  backgroundTasks = [],
-  selectedBackgroundTask,
 }: {
   runs: RunListItem[];
   currentRunId?: string | null;
   processingRunIds?: Set<string>;
   actions?: TasksActions;
-  backgroundTasks?: BackgroundTaskItem[];
-  selectedBackgroundTask?: string | null;
 }) {
   const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(
     null,
@@ -1569,37 +1496,7 @@ function TasksSection({
   return (
     <SidebarGroup className="flex-1 flex flex-col overflow-hidden">
       <SidebarGroupContent className="flex-1 overflow-y-auto">
-        {/* Background Tasks Section */}
-        {backgroundTasks.length > 0 && (
-          <>
-            <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              Background Tasks
-            </div>
-            <SidebarMenu>
-              {backgroundTasks.map((task) => (
-                <SidebarMenuItem key={task.name}>
-                  <SidebarMenuButton
-                    isActive={selectedBackgroundTask === task.name}
-                    onClick={() => actions?.onSelectBackgroundTask?.(task.name)}
-                    className="gap-2"
-                  >
-                    <div className="relative">
-                      <Bot className="size-4 shrink-0" />
-                      <span
-                        className={`absolute -bottom-0.5 -right-0.5 size-2 rounded-full ${getStatusColor(task.status, task.enabled)} ${task.status === "running" && task.enabled ? "animate-pulse" : ""}`}
-                      />
-                    </div>
-                    <span
-                      className={`truncate text-sm ${!task.enabled ? "text-muted-foreground" : ""}`}
-                    >
-                      {task.name}
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </>
-        )}
+        {/* Runs Section */}
         {runs.length > 0 && (
           <>
             <div className="px-3 py-1.5 mt-4 text-xs font-medium text-muted-foreground">

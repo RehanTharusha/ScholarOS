@@ -69,13 +69,6 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
             <div className="text-xs text-muted-foreground">Knowledge compiled once, kept current</div>
           </div>
         </div>
-        <div className="flex items-start gap-2.5 rounded-xl border bg-muted/30 p-3">
-          <Brain className="size-4 text-primary shrink-0 mt-0.5" />
-          <div>
-            <div className="text-xs font-semibold">Smart flashcards</div>
-            <div className="text-xs text-muted-foreground">FSRS spaced repetition, auto-generated</div>
-          </div>
-        </div>
       </motion.div>
 
       {/* Primary actions */}

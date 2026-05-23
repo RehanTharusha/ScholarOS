@@ -108,17 +108,12 @@ import { isSignedIn } from "@x/core/dist/account/account.js";
 import { listGatewayModels } from "@x/core/dist/models/gateway.js";
 import type { IModelConfigRepo } from "@x/core/dist/models/repo.js";
 import type { IOAuthRepo } from "@x/core/dist/auth/repo.js";
-import { IGranolaConfigRepo } from "@x/core/dist/knowledge/granola/repo.js";
-import { triggerSync as triggerGranolaSync } from "@x/core/dist/knowledge/granola/sync.js";
 import { ISlackConfigRepo } from "@x/core/dist/slack/repo.js";
 import {
   isOnboardingComplete,
   markOnboardingComplete,
 } from "@x/core/dist/config/config.js";
 import * as composioHandler from "./composio-handler.js";
-import { IAgentScheduleRepo } from "@x/core/dist/agent-schedule/repo.js";
-import { IAgentScheduleStateRepo } from "@x/core/dist/agent-schedule/state-repo.js";
-import { triggerRun as triggerAgentScheduleRun } from "@x/core/dist/agent-schedule/runner.js";
 import { search } from "@x/core/dist/search/search.js";
 import { versionHistory, voice } from "@x/core";
 import { getBillingInfo } from "@x/core/dist/billing/billing.js";
@@ -129,34 +124,17 @@ import {
   saveVaultPath,
   getVaultPath,
 } from "@x/core/dist/config/config.js";
-import { CardStorage } from "@x/core/dist/academic/fsrs-scheduler.js";
-import { processUntaggedNotes } from "@x/core/dist/knowledge/tag_notes.js";
 import {
   TaskManager,
   type KanbanStatus,
 } from "@x/core/dist/academic/task-manager.js";
 import { UpcomingStore } from "@x/core/dist/academic/upcoming-store.js";
-import type { FlashCard } from "@x/shared/dist/academic.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
 import { getRendererUrl } from "./app-url.js";
 
-// Store flashcards in knowledge base following LLM Wiki philosophy
-// Cards live in knowledge/courses/<course>/flashcards.json
-let flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
 let taskManager = new TaskManager(path.join(WorkDir, "academic"));
 let upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
 
-// Minimal demo flashcards used for seeding demo content when none exist
-const demoCards: FlashCard[] = [
-  {
-    id: "demo-1",
-    front: "What is ScholarOS?",
-    back: "ScholarOS is an AI-driven study assistant.",
-    courseId: "scholaros-demo",
-    conceptId: "scholaros",
-    conceptTitle: "ScholarOS",
-  } as FlashCard,
-];
 async function ensureUniqueWorkspaceDestination(
   destinationPath: string,
 ): Promise<string> {
@@ -628,56 +606,6 @@ export function setupIpcHandlers() {
 
       return { ok: true as const, stagedFiles, errors };
     },
-    "academic:flashcards:courses": async () => {
-      const courses = await flashcardStorage.getCoursesWithFlashcards();
-      return { courses };
-    },
-    "academic:flashcards:list": async (_event, args) => {
-      const courseIds = args.courseIds || [];
-      let cards: FlashCard[] = [];
-
-      if (courseIds.length > 0) {
-        // Load cards from each selected course
-        for (const courseId of courseIds) {
-          const courseCards = await flashcardStorage.loadCards(courseId);
-          // Seed demo cards if needed
-          if (courseCards.length === 0 && courseId === "scholaros-demo") {
-            await flashcardStorage.saveCards(demoCards);
-          }
-          cards.push(...courseCards);
-        }
-      } else {
-        // Load all cards if no specific courses selected
-        cards = await flashcardStorage.loadAllCards();
-        // Seed demo if no cards exist at all
-        if (cards.length === 0) {
-          await flashcardStorage.saveCards(demoCards);
-          cards = demoCards;
-        }
-      }
-
-      return {
-        cards,
-        totalCount: cards.length,
-      };
-    },
-    "academic:flashcards:listAll": async () => {
-      const cards = await flashcardStorage.loadAllCards();
-      const dueCount = cards.filter((c) => c.due == null || c.due <= Date.now()).length;
-      return { cards, dueCount, totalCount: cards.length };
-    },
-    "academic:flashcards:addFromIngest": async (_event, args) => {
-      // Called during ingest to add newly generated flashcards
-      const { cards } = args;
-      if (!Array.isArray(cards) || cards.length === 0) {
-        return { success: false, error: "No cards provided" };
-      }
-
-      // Type assertion - cards come from validated IPC request
-      const flashCards = cards as unknown as FlashCard[];
-      await flashcardStorage.addCards(flashCards);
-      return { success: true, count: cards.length };
-    },
     "academic:assignments:list": async (_event, args) => {
       const assignments = await taskManager.listAssignments(args.courseId);
       return { assignments };
@@ -750,18 +678,6 @@ export function setupIpcHandlers() {
       );
       await refreshDailyNote();
       return { success: true };
-    },
-    "note-tagging:trigger": async (_event, _args) => {
-      try {
-        await processUntaggedNotes();
-        return { ok: true, message: "Tagging complete" };
-      } catch (error) {
-        console.error("[NoteTagging] Trigger failed:", error);
-        return {
-          ok: false,
-          message: error instanceof Error ? error.message : String(error),
-        };
-      }
     },
     "mcp:listTools": async (_event, args) => {
       return mcpCore.listTools(args.serverName, args.cursor);
@@ -862,22 +778,6 @@ export function setupIpcHandlers() {
         return { signedIn: true, accessToken: null, config };
       }
     },
-    "granola:getConfig": async () => {
-      const repo = container.resolve<IGranolaConfigRepo>("granolaConfigRepo");
-      const config = await repo.getConfig();
-      return { enabled: config.enabled };
-    },
-    "granola:setConfig": async (_event, args) => {
-      const repo = container.resolve<IGranolaConfigRepo>("granolaConfigRepo");
-      await repo.setConfig({ enabled: args.enabled });
-
-      // Trigger sync immediately when enabled
-      if (args.enabled) {
-        triggerGranolaSync();
-      }
-
-      return { success: true };
-    },
     "slack:getConfig": async () => {
       const repo = container.resolve<ISlackConfigRepo>("slackConfigRepo");
       const config = await repo.getConfig();
@@ -952,46 +852,6 @@ export function setupIpcHandlers() {
     },
     "composio:use-composio-for-google": async () => {
       return composioHandler.useComposioForGoogle();
-    },
-    "composio:use-composio-for-google-calendar": async () => {
-      return { enabled: false };
-    },
-    // Agent schedule handlers
-    "agent-schedule:getConfig": async () => {
-      const repo = container.resolve<IAgentScheduleRepo>("agentScheduleRepo");
-      try {
-        return await repo.getConfig();
-      } catch {
-        // Return empty config if file doesn't exist
-        return { agents: {} };
-      }
-    },
-    "agent-schedule:getState": async () => {
-      const repo = container.resolve<IAgentScheduleStateRepo>(
-        "agentScheduleStateRepo",
-      );
-      try {
-        return await repo.getState();
-      } catch {
-        // Return empty state if file doesn't exist
-        return { agents: {} };
-      }
-    },
-    "agent-schedule:updateAgent": async (_event, args) => {
-      const repo = container.resolve<IAgentScheduleRepo>("agentScheduleRepo");
-      await repo.upsert(args.agentName, args.entry);
-      // Trigger the runner to pick up the change immediately
-      triggerAgentScheduleRun();
-      return { success: true };
-    },
-    "agent-schedule:deleteAgent": async (_event, args) => {
-      const repo = container.resolve<IAgentScheduleRepo>("agentScheduleRepo");
-      const stateRepo = container.resolve<IAgentScheduleStateRepo>(
-        "agentScheduleStateRepo",
-      );
-      await repo.delete(args.agentName);
-      await stateRepo.deleteAgentState(args.agentName);
-      return { success: true };
     },
     // Shell integration handlers
     "shell:openPath": async (_event, args) => {
@@ -1169,7 +1029,6 @@ export function setupIpcHandlers() {
         await startServicesWatcher();
         // Recreate vault-scoped helpers
         try {
-          flashcardStorage = new CardStorage(path.join(WorkDir, "knowledge"));
           taskManager = new TaskManager(path.join(WorkDir, "academic"));
           upcomingStore = new UpcomingStore(path.join(WorkDir, "knowledge"));
         } catch (err) {
@@ -1179,25 +1038,12 @@ export function setupIpcHandlers() {
           );
         }
 
-        // Background services (granola, graph builder, note tagging, agent runner,
-        // chrome sync) compute paths at module init and can't hot-reload.
-        // Emit vault change and schedule a restart so they pick up the new root.
+        // Emit vault change to renderer
         try {
           emitVaultChanged(WorkDir);
         } catch (err) {
           console.warn("[Vault] Failed to emit vault change:", err);
         }
-
-        console.log(
-          "[Vault] Vault changed, scheduling app restart to reload background services...",
-        );
-        setImmediate(() => {
-          console.log(
-            `[Vault] Restarting app for new vault: ${selectedPath}`,
-          );
-          app.relaunch();
-          app.quit();
-        });
 
         return { success: true, path: selectedPath };
       } catch (err) {

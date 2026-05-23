@@ -3,12 +3,9 @@ import z from 'zod';
 export const ServiceName = z.enum([
   'graph',
   'gmail',
-  'calendar',
   'fireflies',
-  'granola',
   'voice_memo',
   'email_labeling',
-  'note_tagging',
   'agent_notes',
 ]);
 

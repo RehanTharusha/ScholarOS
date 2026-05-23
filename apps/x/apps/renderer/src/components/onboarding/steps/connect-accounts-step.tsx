@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, ArrowLeft, Calendar, FileText } from "lucide-react"
+import { Loader2, CheckCircle2, ArrowLeft, FileText } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -85,7 +85,6 @@ export function ConnectAccountsStep({ state }: ConnectAccountsStepProps) {
   const {
     providers, providersLoading, providerStates, handleConnect,
     useComposioForGoogle, gmailConnected, gmailLoading, gmailConnecting, handleConnectGmail,
-    useComposioForGoogleCalendar, googleCalendarConnected, googleCalendarLoading, googleCalendarConnecting, handleConnectGoogleCalendar,
     handleNext, handleBack,
   } = state
 
@@ -108,7 +107,7 @@ export function ConnectAccountsStep({ state }: ConnectAccountsStepProps) {
       ) : (
         <div className="space-y-6">
           {/* Email & Calendar */}
-          {(useComposioForGoogle || useComposioForGoogleCalendar || providers.includes('google')) && (
+          {(useComposioForGoogle || providers.includes('google')) && (
             <div className="space-y-3">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Email & Calendar
@@ -133,18 +132,6 @@ export function ConnectAccountsStep({ state }: ConnectAccountsStepProps) {
                   iconColor="text-red-500"
                   providerState={providerStates['google']}
                   onConnect={() => handleConnect('google')}
-                  index={cardIndex++}
-                />
-              )}
-              {useComposioForGoogleCalendar && (
-                <ProviderCard
-                  name="Google Calendar"
-                  description="Read meetings and your schedule."
-                  icon={<Calendar className="size-5" />}
-                  iconBg="bg-blue-500/10"
-                  iconColor="text-blue-500"
-                  providerState={{ isConnected: googleCalendarConnected, isLoading: googleCalendarLoading, isConnecting: googleCalendarConnecting }}
-                  onConnect={handleConnectGoogleCalendar}
                   index={cardIndex++}
                 />
               )}

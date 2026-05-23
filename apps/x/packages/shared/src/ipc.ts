@@ -20,8 +20,6 @@ import {
   ToolPermissionAuthorizePayload,
 } from "./runs.js";
 import { LlmModelConfig } from "./models.js";
-import { AgentScheduleConfig, AgentScheduleEntry } from "./agent-schedule.js";
-import { AgentScheduleState } from "./agent-schedule-state.js";
 import { ServiceEvent } from "./service-events.js";
 
 import { UserMessageContent } from "./message.js";
@@ -326,20 +324,6 @@ const ipcSchemas = {
     }),
     res: z.null(),
   },
-  "granola:getConfig": {
-    req: z.null(),
-    res: z.object({
-      enabled: z.boolean(),
-    }),
-  },
-  "granola:setConfig": {
-    req: z.object({
-      enabled: z.boolean(),
-    }),
-    res: z.object({
-      success: z.literal(true),
-    }),
-  },
   "slack:getConfig": {
     req: z.null(),
     res: z.object({
@@ -361,39 +345,6 @@ const ipcSchemas = {
     res: z.object({
       workspaces: z.array(z.object({ url: z.string(), name: z.string() })),
       error: z.string().optional(),
-    }),
-  },
-  "academic:flashcards:courses": {
-    req: z.object({}),
-    res: z.object({
-      courses: z.array(z.string()),
-    }),
-  },
-  "academic:flashcards:list": {
-    req: z.object({
-      courseIds: z.array(z.string()).optional(),
-    }),
-    res: z.object({
-      cards: z.array(z.any()),
-      totalCount: z.number(),
-    }),
-  },
-  "academic:flashcards:addFromIngest": {
-    req: z.object({
-      cards: z.array(z.any()),
-    }),
-    res: z.object({
-      success: z.boolean(),
-      count: z.number().optional(),
-      error: z.string().optional(),
-    }),
-  },
-  "academic:flashcards:listAll": {
-    req: z.object({}),
-    res: z.object({
-      cards: z.array(z.any()),
-      dueCount: z.number(),
-      totalCount: z.number(),
     }),
   },
   "academic:assignments:list": {
@@ -605,12 +556,6 @@ const ipcSchemas = {
       enabled: z.boolean(),
     }),
   },
-  "composio:use-composio-for-google-calendar": {
-    req: z.null(),
-    res: z.object({
-      enabled: z.boolean(),
-    }),
-  },
   "composio:didConnect": {
     req: z.object({
       toolkitSlug: z.string(),
@@ -623,32 +568,6 @@ const ipcSchemas = {
   "composio:list-toolkits": {
     req: z.object({}),
     res: ZListToolkitsResponse,
-  },
-  // Agent schedule channels
-  "agent-schedule:getConfig": {
-    req: z.null(),
-    res: AgentScheduleConfig,
-  },
-  "agent-schedule:getState": {
-    req: z.null(),
-    res: AgentScheduleState,
-  },
-  "agent-schedule:updateAgent": {
-    req: z.object({
-      agentName: z.string(),
-      entry: AgentScheduleEntry,
-    }),
-    res: z.object({
-      success: z.literal(true),
-    }),
-  },
-  "agent-schedule:deleteAgent": {
-    req: z.object({
-      agentName: z.string(),
-    }),
-    res: z.object({
-      success: z.literal(true),
-    }),
   },
   // Shell integration channels
   "shell:openPath": {
@@ -878,14 +797,6 @@ const ipcSchemas = {
     }),
     res: z.object({
       success: z.literal(true),
-    }),
-  },
-  // Note tagging
-  "note-tagging:trigger": {
-    req: z.null(),
-    res: z.object({
-      ok: z.boolean(),
-      message: z.string(),
     }),
   },
   // Terminal PTY channels

@@ -4,11 +4,8 @@
  */
 
 import { PDFIngester, IngestResult } from "./pdf-ingester.js";
-import { FlashcardGenerator, GeneratedCard } from "./flashcard-generator.js";
 import { ContradictionDetector } from "./contradiction-detector.js";
-import { CardStorage } from "./fsrs-scheduler.js";
 import type { Contradiction as AcademicContradiction } from "@x/shared/dist/academic.js";
-import type { FlashCard } from "@x/shared/dist/academic.js";
 import path from "path";
 import { promises as fs } from "fs";
 
@@ -31,7 +28,6 @@ export interface IngestWorkflowOptions {
   courseId: string;
   courseCode?: string;
   semester?: string;
-  autoGenerateCards?: boolean;
   autoTag?: boolean;
   checkContradictions?: boolean;
   topicSuggestion?: string;
@@ -41,7 +37,6 @@ export interface IngestPreview {
   results: IngestResult[];
   suggestedConcepts: SuggestedConcept[];
   potentialContradictions?: Contradiction[];
-  generatedCards?: GeneratedCard[];
   summary: {
     total: number;
     successful: number;
@@ -68,7 +63,6 @@ export interface Contradiction {
 
 export interface CommitOptions {
   createConceptPages: boolean;
-  generateFlashcards: boolean;
   markContradictions: boolean;
   autoResolution?: "merged" | "superseded" | "both-valid";
 }
@@ -78,21 +72,16 @@ export interface CommitOptions {
  */
 export class IngestCoordinator {
   private pdfIngester: PDFIngester;
-  private cardGenerator: FlashcardGenerator;
   private contradictionDetector: ContradictionDetector;
-  private flashcardStorage: CardStorage;
   private currentWorkflow?: IngestPreview;
 
   constructor(
     private vaultPath: string,
     private llmAgent: LlmAgent,
     private knowledgeGraph: unknown, // Reference to knowledge graph for wiki integration
-    cardStorage?: CardStorage,
   ) {
     this.pdfIngester = new PDFIngester(vaultPath, llmAgent);
-    this.cardGenerator = new FlashcardGenerator(llmAgent);
     this.contradictionDetector = new ContradictionDetector(llmAgent);
-    this.flashcardStorage = cardStorage ?? new CardStorage(vaultPath);
   }
 
   /**
@@ -101,7 +90,6 @@ export class IngestCoordinator {
   async extractPDFs(filepaths: string[]): Promise<IngestResult[]> {
     return this.pdfIngester.ingestBatch(filepaths, {
       courseId: "", // Will be set in orchestrate
-      autoGenerateCards: false,
       autoTag: false,
       checkContradictions: false,
     });
@@ -115,7 +103,6 @@ export class IngestCoordinator {
     options: IngestWorkflowOptions,
   ): Promise<IngestPreview> {
     const suggestedConcepts: SuggestedConcept[] = [];
-    let generatedCards: GeneratedCard[] = [];
 
     // Use LLM to suggest concepts from all extracted PDFs
     for (const result of extractResults.filter((r) => r.success)) {
@@ -170,23 +157,6 @@ Format as JSON array.
       }
     }
 
-    // Optionally generate flashcards
-    if (options.autoGenerateCards && suggestedConcepts.length > 0) {
-      const prompt = `
-From these topics:
-${suggestedConcepts.map((c) => `- ${c.title}: ${c.description}`).join("\n")}
-
-Generate 5-8 high-quality study flashcards. Return JSON array with {front, back, difficulty} fields.
-      `;
-
-      const response = await this.llmAgent.generate(prompt);
-      try {
-        generatedCards = JSON.parse(response.text);
-      } catch (error) {
-        console.error("Failed to parse generated cards:", error);
-      }
-    }
-
     // Check for contradictions if enabled
     let potentialContradictions: Contradiction[] | undefined;
     if (options.checkContradictions && extractResults.length > 1) {
@@ -207,7 +177,6 @@ Generate 5-8 high-quality study flashcards. Return JSON array with {front, back,
         ...new Map(suggestedConcepts.map((c) => [c.title, c])).values(),
       ], // Dedupe by title
       potentialContradictions,
-      generatedCards: generatedCards.length > 0 ? generatedCards : undefined,
       summary: {
         total: extractResults.length,
         successful: extractResults.filter((r) => r.success).length,
@@ -272,29 +241,6 @@ Generate 5-8 high-quality study flashcards. Return JSON array with {front, back,
             `Failed to create concept page for ${concept.title}: ${e}`,
           );
         }
-      }
-    }
-
-    // Store flashcards in per-course storage (follows LLM Wiki philosophy)
-    if (options.generateFlashcards && this.currentWorkflow.generatedCards) {
-      try {
-        const now = new Date().toISOString();
-        const flashcards: FlashCard[] = this.currentWorkflow.generatedCards.map(
-          (card: GeneratedCard, idx: number) => ({
-            id: `${courseId}-${Date.now()}-${idx}`,
-            front: card.front,
-            back: card.back,
-            conceptId:
-              this.currentWorkflow!.suggestedConcepts[0]?.title || "general",
-            courseId,
-            difficulty: card.difficulty || "normal",
-          }),
-        );
-
-        await this.flashcardStorage.addCards(flashcards);
-        created += flashcards.length;
-      } catch (e) {
-        errors.push(`Failed to store flashcards: ${e}`);
       }
     }
 
@@ -374,8 +320,6 @@ ${concept.relatedConcepts ? concept.relatedConcepts.map((c) => `- [[${c}]]`).joi
 ## Resources
 - [Add relevant papers, videos, or external links]
 
-## Review Schedule
-- Flashcards due: [Auto-scheduled via FSRS]
 `;
 
     return frontmatter + "\n" + content;

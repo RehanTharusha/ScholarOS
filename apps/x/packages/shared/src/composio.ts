@@ -48,7 +48,6 @@ export const CURATED_TOOLKITS: CuratedToolkit[] = [
     { slug: 'dropbox', displayName: 'Dropbox', category: 'storage' },
     { slug: 'github', displayName: 'GitHub', category: 'development' },
     { slug: 'gmail', displayName: 'Gmail', category: 'communication' },
-    { slug: 'googlecalendar', displayName: 'Google Calendar', category: 'productivity' },
     { slug: 'googledocs', displayName: 'Google Docs', category: 'productivity' },
     { slug: 'googledrive', displayName: 'Google Drive', category: 'storage' },
     { slug: 'googlesheets', displayName: 'Google Sheets', category: 'productivity' },

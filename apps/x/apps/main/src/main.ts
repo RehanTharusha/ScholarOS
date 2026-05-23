@@ -21,10 +21,6 @@ import {
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname } from "node:path";
 import { updateElectronApp, UpdateSourceType } from "update-electron-app";
-import { init as initGranolaSync } from "@x/core/dist/knowledge/granola/sync.js";
-import { init as initGraphBuilder } from "@x/core/dist/knowledge/build_graph.js";
-import { init as initNoteTagging } from "@x/core/dist/knowledge/tag_notes.js";
-import { init as initAgentRunner } from "@x/core/dist/agent-schedule/runner.js";
 import {
   init as initLocalSites,
   shutdown as shutdownLocalSites,
@@ -33,7 +29,6 @@ import {
 import { initConfigs } from "@x/core/dist/config/initConfigs.js";
 import started from "electron-squirrel-startup";
 import { execSync, execFileSync } from "node:child_process";
-import { init as initChromeSync } from "@x/core/dist/knowledge/chrome-extension/server/server.js";
 import { registerBrowserControlService } from "@x/core/dist/di/container.js";
 import { browserViewManager, BROWSER_PARTITION } from "./browser/view.js";
 import { setupBrowserEventForwarding } from "./browser/ipc.js";
@@ -284,21 +279,6 @@ app.whenReady().then(async () => {
 
     // start services watcher
     startServicesWatcher();
-
-    // start granola sync
-    initGranolaSync();
-
-    // start knowledge graph builder
-    initGraphBuilder();
-
-    // start note tagging service
-    initNoteTagging();
-
-    // start background agent runner (scheduled agents)
-    initAgentRunner();
-
-    // start chrome extension sync server
-    initChromeSync();
 
     // start local sites server for iframe dashboards and other mini apps
     initLocalSites().catch((error) => {

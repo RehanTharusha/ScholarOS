@@ -81,7 +81,7 @@ export function createImageUploadHandler(
   uploadFn: (file: File) => Promise<string | null>
 ) {
   return async (file: File) => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
 
     // Generate unique ID for this upload
     const uploadId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -101,6 +101,8 @@ export function createImageUploadHandler(
       const imageUrl = await uploadFn(file)
 
       if (imageUrl) {
+        // Guard: editor may have been destroyed during upload
+        if (editor.isDestroyed) return
         // Find and replace the placeholder with the actual image
         const { state } = editor
         let placeholderPos: number | null = null
@@ -142,7 +144,7 @@ function removePlaceholder(
   editor: Editor | null,
   uploadId: string
 ) {
-  if (!editor) return
+  if (!editor || editor.isDestroyed) return
 
   const { state } = editor
   let placeholderPos: number | null = null

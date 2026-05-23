@@ -17,7 +17,6 @@ export const skill = String.raw`
 | Service | Slug |
 |---------|------|
 | Gmail | \`gmail\` |
-| Google Calendar | \`googlecalendar\` |
 | Google Sheets | \`googlesheets\` |
 | Google Docs | \`googledocs\` |
 | Google Drive | \`googledrive\` |

@@ -53,7 +53,6 @@ import { PrefixLogger } from "@x/shared";
 import { parse } from "yaml";
 import { getRaw as getNoteCreationRaw } from "../knowledge/note_creation.js";
 import { getRaw as getLabelingAgentRaw } from "../knowledge/note_tagging_agent.js";
-import { getRaw as getNoteTaggingAgentRaw } from "../knowledge/note_tagging_agent.js";
 import { shouldDisableTools } from "../config/config.js";
 
 function loadAgentNotesContext(): string | null {
@@ -414,33 +413,6 @@ export async function loadAgent(id: string): Promise<z.infer<typeof Agent>> {
       if (end !== -1) {
         const fm = labelingAgentRaw.slice(3, end).trim();
         const content = labelingAgentRaw.slice(end + 4).trim();
-        const yaml = parse(fm);
-        const parsed = Agent.omit({ name: true, instructions: true }).parse(
-          yaml,
-        );
-        agent = {
-          ...agent,
-          ...parsed,
-          instructions: content,
-        };
-      }
-    }
-
-    return agent;
-  }
-
-  if (id === "note_tagging_agent") {
-    const noteTaggingAgentRaw = getNoteTaggingAgentRaw();
-    let agent: z.infer<typeof Agent> = {
-      name: id,
-      instructions: noteTaggingAgentRaw,
-    };
-
-    if (noteTaggingAgentRaw.startsWith("---")) {
-      const end = noteTaggingAgentRaw.indexOf("\n---", 3);
-      if (end !== -1) {
-        const fm = noteTaggingAgentRaw.slice(3, end).trim();
-        const content = noteTaggingAgentRaw.slice(end + 4).trim();
         const yaml = parse(fm);
         const parsed = Agent.omit({ name: true, instructions: true }).parse(
           yaml,

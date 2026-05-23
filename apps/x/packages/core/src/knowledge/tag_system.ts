@@ -129,7 +129,6 @@ const DEFAULT_TAG_DEFINITIONS: TagDefinition[] = [
   { tag: 'synthesis', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A cross-source synthesis or comparison' },
   { tag: 'resource', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A reference resource (book, video, tool)' },
   { tag: 'exam-prep', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'Exam preparation notes or study guide' },
-  { tag: 'flashcard-set', type: 'academic-note-type', applicability: 'notes', noteEffect: 'none', description: 'A set of flashcards for review' },
 
   // ── Academic: Topic (notes only, all none) ──────────────────────────
   { tag: 'definition', type: 'academic-topic', applicability: 'notes', noteEffect: 'none', description: 'A definition or terminology note' },

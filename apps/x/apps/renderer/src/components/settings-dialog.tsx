@@ -18,7 +18,6 @@ import {
   Search,
   ChevronRight,
   Link2,
-  Tags,
   Mail,
   BookOpen,
   User,
@@ -49,8 +48,7 @@ type ConfigTab =
   | "mcp"
   | "security"
   | "appearance"
-  | "tools"
-  | "note-tagging";
+  | "tools";
 
 interface TabConfig {
   id: ConfigTab;
@@ -105,13 +103,6 @@ const tabs: TabConfig[] = [
     label: "Tools Library",
     icon: Wrench,
     description: "Browse and enable toolkits",
-  },
-  {
-    id: "note-tagging",
-    label: "Note Tagging",
-    icon: Tags,
-    path: "config/tags.json",
-    description: "Configure tags for notes and emails",
   },
 ];
 
@@ -1719,243 +1710,6 @@ function TagGroupTable({
   );
 }
 
-function NoteTaggingSettings({ dialogOpen }: { dialogOpen: boolean }) {
-  const [tags, setTags] = useState<TagDef[]>([]);
-  const [originalTags, setOriginalTags] = useState<TagDef[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    new Set(),
-  );
-  const [activeSection, setActiveSection] = useState<"notes" | "email">(
-    "notes",
-  );
-
-  const hasChanges = JSON.stringify(tags) !== JSON.stringify(originalTags);
-
-  useEffect(() => {
-    if (!dialogOpen) return;
-    async function load() {
-      setLoading(true);
-      try {
-        const result = await window.ipc.invoke("workspace:readFile", {
-          path: "config/tags.json",
-        });
-        const parsed = JSON.parse(result.data);
-        setTags(parsed);
-        setOriginalTags(parsed);
-      } catch {
-        setTags([]);
-        setOriginalTags([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [dialogOpen]);
-
-  const noteGroups = useMemo(() => {
-    const map = new Map<string, TagDef[]>();
-    for (const tag of tags) {
-      if (tag.applicability === "email") continue;
-      const list = map.get(tag.type) ?? [];
-      list.push(tag);
-      map.set(tag.type, list);
-    }
-    return NOTE_TAG_TYPE_ORDER.filter((type) => map.has(type)).map((type) => ({
-      type,
-      label: TAG_TYPE_LABELS[type],
-      tags: map.get(type) ?? [],
-    }));
-  }, [tags]);
-
-  const emailGroups = useMemo(() => {
-    const map = new Map<string, TagDef[]>();
-    for (const tag of tags) {
-      if (tag.applicability === "notes") continue;
-      const list = map.get(tag.type) ?? [];
-      list.push(tag);
-      map.set(tag.type, list);
-    }
-    return EMAIL_TAG_TYPE_ORDER.filter((type) => map.has(type)).map((type) => ({
-      type,
-      label: TAG_TYPE_LABELS[type],
-      tags: map.get(type) ?? [],
-    }));
-  }, [tags]);
-
-  const getGlobalIndex = useCallback(
-    (type: string, localIndex: number) => {
-      let count = 0;
-      for (let i = 0; i < tags.length; i++) {
-        if (tags[i].type === type) {
-          if (count === localIndex) return i;
-          count++;
-        }
-      }
-      return -1;
-    },
-    [tags],
-  );
-
-  const updateTag = useCallback(
-    (index: number, field: keyof TagDef, value: string | boolean) => {
-      setTags((prev) =>
-        prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)),
-      );
-    },
-    [],
-  );
-
-  const removeTag = useCallback((index: number) => {
-    setTags((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const addTag = useCallback(
-    (type: string) => {
-      const isEmailSection = activeSection === "email";
-      const applicability = isEmailSection
-        ? ("email" as const)
-        : ("notes" as const);
-      // For email-only types, always use "email"; for notes-only types, always use "notes"; otherwise use "both"
-      const emailOnlyTypes = ["email-type", "noise"];
-      const notesOnlyTypes = ["relationship-sub", "source"];
-      let finalApplicability: "email" | "notes" | "both" = "both";
-      if (emailOnlyTypes.includes(type)) finalApplicability = "email";
-      else if (notesOnlyTypes.includes(type)) finalApplicability = "notes";
-      else finalApplicability = isEmailSection ? "email" : applicability;
-
-      const newTag: TagDef = {
-        tag: "",
-        type,
-        applicability:
-          finalApplicability === "email" && !isEmailSection
-            ? "both"
-            : finalApplicability === "notes" && isEmailSection
-              ? "both"
-              : finalApplicability,
-        description: "",
-        noteEffect: isEmailSection ? "create" : "none",
-      };
-      const lastIndex = tags.reduce(
-        (acc, t, i) => (t.type === type ? i : acc),
-        -1,
-      );
-      if (lastIndex === -1) {
-        setTags((prev) => [...prev, newTag]);
-      } else {
-        setTags((prev) => [
-          ...prev.slice(0, lastIndex + 1),
-          newTag,
-          ...prev.slice(lastIndex + 1),
-        ]);
-      }
-    },
-    [tags, activeSection],
-  );
-
-  const handleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      await window.ipc.invoke("workspace:writeFile", {
-        path: "config/tags.json",
-        data: JSON.stringify(tags, null, 2),
-      });
-      setOriginalTags([...tags]);
-      toast.success("Tag configuration saved");
-    } catch {
-      toast.error("Failed to save tag configuration");
-    } finally {
-      setSaving(false);
-    }
-  }, [tags]);
-
-  const toggleGroup = useCallback((type: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-        <Loader2 className="size-4 animate-spin mr-2" />
-        Loading...
-      </div>
-    );
-  }
-
-  const currentGroups = activeSection === "notes" ? noteGroups : emailGroups;
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center gap-1 mb-3 border-b">
-        <button
-          onClick={() => setActiveSection("notes")}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
-            activeSection === "notes"
-              ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <BookOpen className="size-3.5" />
-          Note Tags
-        </button>
-        <button
-          onClick={() => setActiveSection("email")}
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors",
-            activeSection === "email"
-              ? "border-foreground text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Mail className="size-3.5" />
-          Email Labels
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
-        {currentGroups.map((group) => (
-          <TagGroupTable
-            key={group.type}
-            group={group}
-            tags={tags}
-            collapsed={collapsedGroups.has(group.type)}
-            onToggle={() => toggleGroup(group.type)}
-            onAdd={() => addTag(group.type)}
-            onUpdate={updateTag}
-            onRemove={removeTag}
-            getGlobalIndex={getGlobalIndex}
-            isEmail={activeSection === "email"}
-          />
-        ))}
-      </div>
-      <div className="pt-3 border-t mt-3 flex items-center justify-between">
-        <div>
-          {hasChanges && (
-            <span className="text-xs text-muted-foreground">
-              Unsaved changes
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={saving || !hasChanges}
-          >
-            {saving ? "Saving..." : "Save"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // --- Main Settings Dialog ---
 
 export function SettingsDialog({ children }: SettingsDialogProps) {
@@ -2003,7 +1757,6 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     if (
       tab === "appearance" ||
       tab === "models" ||
-      tab === "note-tagging" ||
       tab === "account" ||
       tab === "connected-accounts"
     )
@@ -2121,9 +1874,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                   activeTab === "account" ||
                   activeTab === "connected-accounts"
                   ? "overflow-y-auto"
-                  : activeTab === "note-tagging"
-                    ? "overflow-hidden flex flex-col"
-                    : "overflow-hidden",
+                  : "overflow-hidden",
               )}
             >
               {activeTab === "account" ? (
@@ -2136,8 +1887,6 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                 ) : (
                   <ModelSettings dialogOpen={open} />
                 )
-              ) : activeTab === "note-tagging" ? (
-                <NoteTaggingSettings dialogOpen={open} />
               ) : activeTab === "appearance" ? (
                 <AppearanceSettings />
               ) : activeTab === "tools" ? (

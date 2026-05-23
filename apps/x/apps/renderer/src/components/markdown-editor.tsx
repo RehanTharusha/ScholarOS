@@ -31,7 +31,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Calendar, ChevronDown, ExternalLink } from "lucide-react";
+
 
 // Zero-width space used as invisible marker for blank lines
 const BLANK_LINE_MARKER = "\u200B";
@@ -353,146 +353,6 @@ type WikiLinkConfig = {
   onOpen: (path: string) => void;
   onCreate: (path: string) => void | Promise<void>;
 };
-
-// --- Meeting Event Banner ---
-
-interface ParsedCalendarEvent {
-  summary?: string;
-  start?: string;
-  end?: string;
-  location?: string;
-  htmlLink?: string;
-  conferenceLink?: string;
-  source?: string;
-}
-
-function parseCalendarEvent(
-  raw: string | undefined,
-): ParsedCalendarEvent | null {
-  if (!raw) return null;
-  // Strip surrounding quotes if present (YAML single-quoted string)
-  let json = raw;
-  if (
-    (json.startsWith("'") && json.endsWith("'")) ||
-    (json.startsWith('"') && json.endsWith('"'))
-  ) {
-    json = json.slice(1, -1);
-  }
-  // Unescape doubled single quotes from YAML
-  json = json.replace(/''/g, "'");
-  try {
-    return JSON.parse(json) as ParsedCalendarEvent;
-  } catch {
-    return null;
-  }
-}
-
-function formatEventTime(start?: string, end?: string): string {
-  if (!start) return "";
-  const s = new Date(start);
-  const startStr = s.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  const startTime = s.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  if (!end) return `${startStr} \u00b7 ${startTime}`;
-  const e = new Date(end);
-  const endTime = e.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `${startStr} \u00b7 ${startTime} \u2013 ${endTime}`;
-}
-
-function formatEventDate(start?: string): string {
-  if (!start) return "";
-  const s = new Date(start);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (s.toDateString() === today.toDateString()) return "Today";
-  if (s.toDateString() === yesterday.toDateString()) return "Yesterday";
-  if (s.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-  return s.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function MeetingEventBanner({
-  frontmatter,
-}: {
-  frontmatter: string | null | undefined;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  if (!frontmatter) return null;
-  const fields = extractAllFrontmatterValues(frontmatter);
-  if (fields.type !== "meeting") return null;
-
-  const calStr =
-    typeof fields.calendar_event === "string"
-      ? fields.calendar_event
-      : undefined;
-  const cal = parseCalendarEvent(calStr);
-  if (!cal) return null;
-
-  return (
-    <div className="meeting-event-banner" ref={ref}>
-      <button className="meeting-event-pill" onClick={() => setOpen(!open)}>
-        <Calendar size={13} />
-        {formatEventDate(cal.start)}
-        <ChevronDown
-          size={12}
-          className={`meeting-event-chevron ${open ? "meeting-event-chevron-open" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="meeting-event-dropdown">
-          <div className="meeting-event-dropdown-header">
-            <span className="meeting-event-dropdown-dot" />
-            <div className="meeting-event-dropdown-info">
-              <div className="meeting-event-dropdown-title">
-                {cal.summary || "Meeting"}
-              </div>
-              <div className="meeting-event-dropdown-time">
-                {formatEventTime(cal.start, cal.end)}
-              </div>
-            </div>
-          </div>
-          {cal.htmlLink && (
-            <button
-              className="meeting-event-dropdown-link"
-              onClick={() => window.open(cal.htmlLink, "_blank")}
-            >
-              <ExternalLink size={14} />
-              Open in Google Calendar
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // --- Editor ---
 
@@ -1118,7 +978,7 @@ export const MarkdownEditor = forwardRef<
 
   // Update editor content when prop changes (e.g., file selection changes)
   useEffect(() => {
-    if (editor && content !== undefined) {
+    if (editor && !editor.isDestroyed && content !== undefined) {
       const currentContent = getMarkdownWithBlankLines(editor);
       // Normalize for comparison (trim trailing whitespace from lines)
       const normalizeForCompare = (s: string) =>
@@ -1145,14 +1005,14 @@ export const MarkdownEditor = forwardRef<
 
   useEffect(() => {
     if (!onHistoryHandlersChange) return;
-    if (!editor) {
+    if (!editor || editor.isDestroyed) {
       onHistoryHandlersChange(null);
       return;
     }
 
     onHistoryHandlersChange({
-      undo: () => editor.chain().focus().undo().run(),
-      redo: () => editor.chain().focus().redo().run(),
+      undo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().undo().run(); },
+      redo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().redo().run(); },
     });
 
     return () => {
@@ -1203,7 +1063,7 @@ export const MarkdownEditor = forwardRef<
 
   const handleSelectWikiLink = useCallback(
     (path: string) => {
-      if (!editor || !activeWikiLink) return;
+      if (!editor || editor.isDestroyed || !activeWikiLink) return;
       const normalized = normalizeWikiPath(path);
       if (!normalized) return;
       const finalPath = ensureMarkdownExtension(normalized);
@@ -1344,7 +1204,6 @@ export const MarkdownEditor = forwardRef<
           editable={editable}
         />
       )}
-      <MeetingEventBanner frontmatter={frontmatter} />
       <div
         className="editor-content-wrapper"
         ref={wrapperRef}

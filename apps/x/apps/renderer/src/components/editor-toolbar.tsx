@@ -75,7 +75,7 @@ export function EditorToolbar({
   }, [onSelectionHighlight])
 
   const applyLink = useCallback(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
 
     if (linkUrl === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
@@ -91,7 +91,7 @@ export function EditorToolbar({
   }, [editor, linkUrl, closeLinkPopover])
 
   const removeLink = useCallback(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
     editor.chain().focus().extendMarkRange('link').unsetLink().run()
     closeLinkPopover()
   }, [editor, closeLinkPopover])
@@ -113,7 +113,16 @@ export function EditorToolbar({
     }
   }, [onImageUpload])
 
-  if (!editor) return null
+  const safe = useCallback(
+    <T extends unknown[]>(fn: (...args: T) => void) =>
+      (...args: T) => {
+        if (!editor || editor.isDestroyed) return;
+        fn(...args);
+      },
+    [editor],
+  );
+
+  if (!editor || editor.isDestroyed) return null
 
   const isLinkActive = editor.isActive('link')
 
@@ -123,7 +132,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleBold().run()}
+        onClick={safe(() => editor.chain().focus().toggleBold().run())}
         data-active={editor.isActive('bold') || undefined}
         className="data-active:bg-accent"
         title="Bold (Ctrl+B)"
@@ -133,7 +142,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleItalic().run()}
+        onClick={safe(() => editor.chain().focus().toggleItalic().run())}
         data-active={editor.isActive('italic') || undefined}
         className="data-active:bg-accent"
         title="Italic (Ctrl+I)"
@@ -143,7 +152,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleStrike().run()}
+        onClick={safe(() => editor.chain().focus().toggleStrike().run())}
         data-active={editor.isActive('strike') || undefined}
         className="data-active:bg-accent"
         title="Strikethrough"
@@ -153,7 +162,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleCode().run()}
+        onClick={safe(() => editor.chain().focus().toggleCode().run())}
         data-active={editor.isActive('code') || undefined}
         className="data-active:bg-accent"
         title="Inline Code"
@@ -167,7 +176,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        onClick={safe(() => editor.chain().focus().toggleHeading({ level: 1 }).run())}
         data-active={editor.isActive('heading', { level: 1 }) || undefined}
         className="data-active:bg-accent"
         title="Heading 1"
@@ -177,7 +186,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        onClick={safe(() => editor.chain().focus().toggleHeading({ level: 2 }).run())}
         data-active={editor.isActive('heading', { level: 2 }) || undefined}
         className="data-active:bg-accent"
         title="Heading 2"
@@ -187,7 +196,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        onClick={safe(() => editor.chain().focus().toggleHeading({ level: 3 }).run())}
         data-active={editor.isActive('heading', { level: 3 }) || undefined}
         className="data-active:bg-accent"
         title="Heading 3"
@@ -201,7 +210,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        onClick={safe(() => editor.chain().focus().toggleBulletList().run())}
         data-active={editor.isActive('bulletList') || undefined}
         className="data-active:bg-accent"
         title="Bullet List"
@@ -211,7 +220,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        onClick={safe(() => editor.chain().focus().toggleOrderedList().run())}
         data-active={editor.isActive('orderedList') || undefined}
         className="data-active:bg-accent"
         title="Ordered List"
@@ -221,7 +230,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleTaskList().run()}
+        onClick={safe(() => editor.chain().focus().toggleTaskList().run())}
         data-active={editor.isActive('taskList') || undefined}
         className="data-active:bg-accent"
         title="Task List"
@@ -235,7 +244,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        onClick={safe(() => editor.chain().focus().toggleBlockquote().run())}
         data-active={editor.isActive('blockquote') || undefined}
         className="data-active:bg-accent"
         title="Blockquote"
@@ -245,7 +254,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        onClick={safe(() => editor.chain().focus().toggleCodeBlock().run())}
         data-active={editor.isActive('codeBlock') || undefined}
         className="data-active:bg-accent"
         title="Code Block"
@@ -255,7 +264,7 @@ export function EditorToolbar({
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+        onClick={safe(() => editor.chain().focus().setHorizontalRule().run())}
         title="Horizontal Rule"
       >
         <MinusIcon className="size-4" />

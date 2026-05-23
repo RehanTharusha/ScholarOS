@@ -47,6 +47,7 @@ import * as XLSX from "xlsx";
 import PapaParse from "papaparse";
 import mammothModule from "mammoth";
 import { getPdfWorkerPath } from "./pdf-worker-resolver.js";
+import { classifyFiles as classifyFilesFn, suggestCourseFromFilename } from "../../academic/file-classifier.js";
 
 // Use the imported modules directly
 const Papa = (PapaParse as any).default || PapaParse;
@@ -1233,12 +1234,29 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       try {
         const fileName = path.basename(filePath);
         const ext = path.extname(filePath).toLowerCase();
-        const supportedExts = [".pdf", ".pptx", ".xlsx", ".xls", ".csv", ".docx", ".png", ".jpg", ".jpeg"];
+        const supportedExts = [".pdf", ".pptx", ".xlsx", ".xls", ".csv", ".docx", ".png", ".jpg", ".jpeg", ".md", ".txt", ".html", ".htm"];
 
         if (!supportedExts.includes(ext)) {
           return {
             success: false,
             error: `Unsupported file format '${ext}'. Supported formats: ${supportedExts.join(", ")}`,
+          };
+        }
+
+        // Plain text formats — just read the file content
+        if (ext === ".md" || ext === ".txt" || ext === ".html" || ext === ".htm") {
+          let content: string;
+          if (path.isAbsolute(filePath)) {
+            content = await fs.readFile(filePath, "utf-8");
+          } else {
+            const result = await workspace.readFile(filePath, "utf8");
+            content = result.data;
+          }
+          return {
+            success: true,
+            fileName,
+            format: ext === ".md" ? "markdown" : ext === ".txt" ? "text" : "html",
+            content,
           };
         }
 
@@ -1252,9 +1270,14 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         if (ext === ".pdf") {
-          const pdfWorkerSrc = getPdfWorkerPath();
-          if (pdfWorkerSrc) {
-            PDFParse.setWorker(pdfWorkerSrc);
+          // Try to set worker, but don't fail if it's unavailable
+          try {
+            const pdfWorkerSrc = getPdfWorkerPath();
+            if (pdfWorkerSrc) {
+              PDFParse.setWorker(pdfWorkerSrc);
+            }
+          } catch {
+            // pdf-parse can still work without an explicit worker in many cases
           }
 
           const parser = new PDFParse({ data: new Uint8Array(buffer) });
@@ -1460,6 +1483,62 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         return { success: false, error: "Unexpected error" };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "classifyFiles": {
+    description:
+      "Classify files into course folders using local embeddings. Zero API calls, runs entirely on your machine. Returns the best matching course for each file, or flags files that likely belong to a new course. Use this instead of guessing course assignments manually.",
+    inputSchema: z.object({
+      files: z
+        .array(
+          z.object({
+            filepath: z.string().min(1).describe("Absolute or workspace-relative path to the file"),
+            content: z.string().min(1).describe("Extracted text content of the file (use parseFile first)"),
+          }),
+        )
+        .min(1)
+        .max(50)
+        .describe("Files to classify (1-50)"),
+    }),
+    execute: async ({
+      files,
+    }: {
+      files: Array<{ filepath: string; content: string }>;
+    }) => {
+      try {
+        const knowledgeDir = path.join(WorkDir, "knowledge");
+        const results = await classifyFilesFn(files, knowledgeDir);
+
+        return {
+          success: true,
+          classifications: results.map((r) => ({
+            filepath: r.filepath,
+            course: r.classification.course
+              ? {
+                  id: r.classification.course.courseId,
+                  name: r.classification.course.courseName,
+                  similarity: Math.round(r.classification.course.similarity * 100) / 100,
+                }
+              : null,
+            isNewCourse: r.classification.isNewCourse,
+            suggestedNewCourse: r.classification.isNewCourse
+              ? suggestCourseFromFilename(path.basename(r.filepath))
+              : undefined,
+            allCandidates: r.classification.allCandidates
+              .slice(0, 3)
+              .map((c) => ({
+                name: c.courseName,
+                similarity: Math.round(c.similarity * 100) / 100,
+              })),
+          })),
+        };
       } catch (error) {
         return {
           success: false,

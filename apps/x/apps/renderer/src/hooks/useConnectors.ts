@@ -29,10 +29,6 @@ export function useConnectors(active: boolean) {
     string | undefined
   >(undefined);
 
-  // Granola state
-  const [granolaEnabled, setGranolaEnabled] = useState(false);
-  const [granolaLoading, setGranolaLoading] = useState(true);
-
   // Composio API key state
   const [composioApiKeyOpen, setComposioApiKeyOpen] = useState(false);
   const [composioApiKeyTarget, setComposioApiKeyTarget] = useState<
@@ -72,34 +68,6 @@ export function useConnectors(active: boolean) {
       }
     }
     loadProviders();
-  }, []);
-
-  // Load Granola config
-  const refreshGranolaConfig = useCallback(async () => {
-    try {
-      setGranolaLoading(true);
-      const result = await window.ipc.invoke("granola:getConfig", null);
-      setGranolaEnabled(result.enabled);
-    } catch (error) {
-      console.error("Failed to load Granola config:", error);
-      setGranolaEnabled(false);
-    } finally {
-      setGranolaLoading(false);
-    }
-  }, []);
-
-  const handleGranolaToggle = useCallback(async (enabled: boolean) => {
-    try {
-      setGranolaLoading(true);
-      await window.ipc.invoke("granola:setConfig", { enabled });
-      setGranolaEnabled(enabled);
-      toast.success(enabled ? "Granola sync enabled" : "Granola sync disabled");
-    } catch (error) {
-      console.error("Failed to update Granola config:", error);
-      toast.error("Failed to update Granola sync settings");
-    } finally {
-      setGranolaLoading(false);
-    }
   }, []);
 
   // Slack
@@ -325,7 +293,6 @@ export function useConnectors(active: boolean) {
 
   // Refresh all statuses
   const refreshAllStatuses = useCallback(async () => {
-    refreshGranolaConfig();
     refreshSlackConfig();
 
     if (providers.length === 0) return;
@@ -363,7 +330,7 @@ export function useConnectors(active: boolean) {
     }
 
     setProviderStates(newStates);
-  }, [providers, refreshGranolaConfig, refreshSlackConfig]);
+  }, [providers, refreshSlackConfig]);
 
   // Refresh when active or providers change
   useEffect(() => {
@@ -431,11 +398,6 @@ export function useConnectors(active: boolean) {
     googleClientIdDescription,
     setGoogleClientIdDescription,
     handleGoogleClientIdSubmit,
-
-    // Granola
-    granolaEnabled,
-    granolaLoading,
-    handleGranolaToggle,
 
     // Composio API key modal
     composioApiKeyOpen,

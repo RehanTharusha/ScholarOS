@@ -3,7 +3,6 @@ import path from "node:path";
 import type {
   AcademicDashboardSummary,
   Assignment,
-  FlashCard,
 } from "@x/shared/dist/academic.js";
 
 export type KanbanStatus = "not-started" | "in-progress" | "done";
@@ -125,7 +124,6 @@ export class TaskManager {
   }
 
   async dashboardSummary(
-    flashcards: FlashCard[],
     courseId?: string,
   ): Promise<AcademicDashboardSummary> {
     const assignments = await this.listAssignments(courseId);

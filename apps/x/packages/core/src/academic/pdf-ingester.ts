@@ -379,7 +379,6 @@ async function extractWithLLM(
 export interface IngestOptions {
   courseId: string;
   topicId?: string;
-  autoGenerateCards?: boolean;
   autoTag?: boolean;
   checkContradictions?: boolean;
 }
@@ -537,7 +536,6 @@ Suggest:
 2. Best naming convention for each concept page
 3. Related concepts that might already exist
 4. Suggested difficulty level (beginner/intermediate/advanced)
-5. Recommended flashcards (3-5 Q&A pairs)
 
 Format as JSON.
     `;
@@ -558,9 +556,13 @@ class PDFExtractor {
   }> {
     const fileBuffer = await fs.readFile(filepath);
 
-    const pdfWorkerSrc = getPdfWorkerPath();
-    if (pdfWorkerSrc) {
-      PDFParse.setWorker(pdfWorkerSrc);
+    try {
+      const pdfWorkerSrc = getPdfWorkerPath();
+      if (pdfWorkerSrc) {
+        PDFParse.setWorker(pdfWorkerSrc);
+      }
+    } catch {
+      // pdf-parse can still work without an explicit worker in many cases
     }
 
     const parser = new PDFParse({ data: new Uint8Array(fileBuffer) });

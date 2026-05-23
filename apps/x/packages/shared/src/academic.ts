@@ -88,32 +88,6 @@ export interface AcademicDashboardSummary {
 }
 
 /**
- * Flashcard for study mode
- * Simple Q&A cards linked to course concepts
- * Supports FSRS v6 scheduling fields for spaced repetition.
- */
-export interface FlashCard {
-  id: string;
-  front: string; // Question/prompt
-  back: string; // Answer
-  conceptId: string; // Link to wiki concept (e.g., "Photosynthesis")
-  conceptTitle?: string; // Human-readable concept name for display
-  courseId: string;
-  courseName?: string; // Human-readable course name
-  difficulty?: "easy" | "normal" | "hard"; // Optional difficulty indicator
-  // FSRS v6 scheduling fields (set by ts-fsrs during review)
-  due?: number | null; // Due timestamp (ms epoch), null = not yet scheduled
-  stability?: number;
-  difficulty_fsrs?: number;
-  elapsed_days?: number;
-  scheduled_days?: number;
-  reps?: number;
-  lapses?: number;
-  state?: number; // 0=New, 1=Learning, 2=Review, 3=Relearning
-  last_review?: number;
-}
-
-/**
  * PDF annotation (highlight + notes)
  */
 export interface PDFAnnotation {
@@ -140,7 +114,6 @@ export interface SemesterAnalytics {
   totalConcepts: number;
   assignmentsDue: number;
   assignmentsCompleted: number;
-  flashcardsReviewed: number;
   masteryByFactor: Map<string, number>; // concept -> mastery %
   averageGrade?: number;
 }

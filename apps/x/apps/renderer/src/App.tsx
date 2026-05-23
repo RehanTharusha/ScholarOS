@@ -102,16 +102,11 @@ import {
   type CommandPaletteMention,
 } from "@/components/search-dialog";
 import { TrackModal } from "@/components/track-modal";
-import { BackgroundTaskDetail } from "@/components/background-task-detail";
 import { BrowserPane } from "@/components/browser-pane/BrowserPane";
 import { VersionHistoryPanel } from "@/components/version-history-panel";
 import { FileCardProvider } from "@/contexts/file-card-context";
-import { FlashcardReview } from "@/components/flashcards/flashcard-review";
 
-import { AcademicCalendar } from "@/components/academic/calendar-view";
-import { KanbanAcademic } from "@/components/academic/kanban-academic";
 import { IngestWindow } from "@/components/ingest-window";
-import { NoteTaggingView } from "@/components/note-tagging-view";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
@@ -139,8 +134,6 @@ import {
   toToolState,
 } from "@/lib/chat-conversation";
 import { COMPOSIO_DISPLAY_NAMES as composioDisplayNames } from "@x/shared/src/composio.js";
-import { AgentScheduleConfig } from "@x/shared/dist/agent-schedule.js";
-import { AgentScheduleState } from "@x/shared/dist/agent-schedule-state.js";
 import { toast } from "sonner";
 import { useVoiceMode } from "@/hooks/useVoiceMode";
 import { useVoiceTTS } from "@/hooks/useVoiceTTS";
@@ -202,11 +195,8 @@ const TITLEBAR_BUTTON_GAPS_COLLAPSED = 0;
 const GRAPH_TAB_PATH = "__scholaros_graph_view__";
 const SUGGESTED_TOPICS_TAB_PATH = "__scholar_suggested_topics__";
 const BASES_DEFAULT_TAB_PATH = "__scholaros_bases_default__";
-const FLASHCARDS_TAB_PATH = "__scholar_flashcards__";
-const CALENDAR_TAB_PATH = "__scholar_calendar__";
-const KANBAN_TAB_PATH = "__scholar_assignment_board__";
+
 const INGEST_TAB_PATH = "__scholar_ingest__";
-const NOTE_TAGGING_TAB_PATH = "__scholar_note_tagging__";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -359,10 +349,7 @@ const getAncestorDirectoryPaths = (path: string): string[] => {
 const isGraphTabPath = (path: string) => path === GRAPH_TAB_PATH;
 const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
-const isFlashcardsTabPath = (path: string) => path === FLASHCARDS_TAB_PATH;
-const isCalendarTabPath = (path: string) => path === CALENDAR_TAB_PATH;
-const isKanbanTabPath = (path: string) => path === KANBAN_TAB_PATH;
-const isNoteTaggingTabPath = (path: string) => path === NOTE_TAGGING_TAB_PATH;
+
 const isBaseFilePath = (path: string) =>
   path.endsWith(".base") || path === BASES_DEFAULT_TAB_PATH;
 
@@ -569,15 +556,13 @@ type ViewState =
   | { type: "chat"; runId: string | null }
   | { type: "file"; path: string }
   | { type: "graph" }
-  | { type: "task"; name: string }
   | { type: "suggested-topics" };
 
 function viewStatesEqual(a: ViewState, b: ViewState): boolean {
   if (a.type !== b.type) return false;
   if (a.type === "chat" && b.type === "chat") return a.runId === b.runId;
   if (a.type === "file" && b.type === "file") return a.path === b.path;
-  if (a.type === "task" && b.type === "task") return a.name === b.name;
-  return true; // both graph
+  return true;
 }
 
 /** Sidebar toggle (fixed position, top-left) */
@@ -615,8 +600,6 @@ function ContentHeader({
   canNavigateBack,
   canNavigateForward,
   collapsedLeftPaddingPx,
-  onOpenFlashcards,
-  onOpenKanban,
 }: {
   children: React.ReactNode;
   onNavigateBack?: () => void;
@@ -624,8 +607,6 @@ function ContentHeader({
   canNavigateBack?: boolean;
   canNavigateForward?: boolean;
   collapsedLeftPaddingPx?: number;
-  onOpenFlashcards?: () => void;
-  onOpenKanban?: () => void;
 }) {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -667,28 +648,6 @@ function ContentHeader({
         />
       ) : null}
       {children}
-      {onOpenFlashcards ? (
-        <div className="titlebar-no-drag flex items-center pl-2">
-          <button
-            type="button"
-            onClick={onOpenFlashcards}
-            className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background/80 px-3 text-xs text-foreground transition-colors hover:bg-accent/60"
-          >
-            Flashcards
-          </button>
-        </div>
-      ) : null}
-      {onOpenKanban ? (
-        <div className="titlebar-no-drag flex items-center pl-2">
-          <button
-            type="button"
-            onClick={onOpenKanban}
-            className="inline-flex h-8 items-center rounded-md border border-border/70 bg-background/80 px-3 text-xs text-foreground transition-colors hover:bg-accent/60"
-          >
-            Assignment Board
-          </button>
-        </div>
-      ) : null}
     </header>
   );
 }
@@ -1100,9 +1059,6 @@ function App() {
   const getFileTabTitle = useCallback((tab: FileTab) => {
     if (isGraphTabPath(tab.path)) return "Graph View";
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
-    if (isFlashcardsTabPath(tab.path)) return "Flashcards";
-    if (isCalendarTabPath(tab.path)) return "Calendar";
-    if (isKanbanTabPath(tab.path)) return "Assignment Board";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
     if (tab.path.endsWith(".base"))
       return (
@@ -1200,26 +1156,6 @@ function App() {
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-  // Background tasks state
-  type BackgroundTaskItem = {
-    name: string;
-    description?: string;
-    schedule: z.infer<typeof AgentScheduleConfig>["agents"][string]["schedule"];
-    enabled: boolean;
-    startingMessage?: string;
-    status?: z.infer<typeof AgentScheduleState>["agents"][string]["status"];
-    nextRunAt?: string | null;
-    lastRunAt?: string | null;
-    lastError?: string | null;
-    runCount?: number;
-  };
-  const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTaskItem[]>(
-    [],
-  );
-  const [selectedBackgroundTask, setSelectedBackgroundTask] = useState<
-    string | null
-  >(null);
 
   // Keep selectedPathRef in sync for async guards
   useEffect(() => {
@@ -1438,14 +1374,6 @@ function App() {
       })();
       const selectedPathAtEvent = selectedPathRef.current;
 
-      // Reload background tasks if agent-schedule.json changed
-      if (
-        changedPath === "config/agent-schedule.json" ||
-        changedPaths.includes("config/agent-schedule.json")
-      ) {
-        loadBackgroundTasks();
-      }
-
       // Invalidate cached content for files changed outside the active editor.
       // This prevents stale backlinks after rename-rewrite passes touch many files.
       for (const path of eventPaths) {
@@ -1504,14 +1432,6 @@ function App() {
   // Load file content when selected
   useEffect(() => {
     if (!selectedPath) {
-      setFileContent("");
-      setEditorContent("");
-      editorContentRef.current = "";
-      initialContentRef.current = "";
-      setLastSaved(null);
-      return;
-    }
-    if (isFlashcardsTabPath(selectedPath)) {
       setFileContent("");
       setEditorContent("");
       editorContentRef.current = "";
@@ -1899,68 +1819,6 @@ function App() {
   useEffect(() => {
     loadRuns();
   }, [loadRuns]);
-
-  // Load background tasks
-  const loadBackgroundTasks = useCallback(async () => {
-    try {
-      const [configResult, stateResult] = await Promise.all([
-        window.ipc.invoke("agent-schedule:getConfig", null),
-        window.ipc.invoke("agent-schedule:getState", null),
-      ]);
-
-      const tasks: BackgroundTaskItem[] = Object.entries(
-        configResult.agents,
-      ).map(([name, entry]) => {
-        const state = stateResult.agents[name];
-        return {
-          name,
-          description: entry.description,
-          schedule: entry.schedule,
-          enabled: entry.enabled ?? true,
-          startingMessage: entry.startingMessage,
-          status: state?.status,
-          nextRunAt: state?.nextRunAt,
-          lastRunAt: state?.lastRunAt,
-          lastError: state?.lastError,
-          runCount: state?.runCount ?? 0,
-        };
-      });
-
-      setBackgroundTasks(tasks);
-    } catch (err) {
-      console.error("Failed to load background tasks:", err);
-    }
-  }, []);
-
-  // Load background tasks on mount
-  useEffect(() => {
-    loadBackgroundTasks();
-  }, [loadBackgroundTasks]);
-
-  // Handle toggling background task enabled state
-  const handleToggleBackgroundTask = useCallback(
-    async (taskName: string, enabled: boolean) => {
-      const task = backgroundTasks.find((t) => t.name === taskName);
-      if (!task) return;
-
-      try {
-        await window.ipc.invoke("agent-schedule:updateAgent", {
-          agentName: taskName,
-          entry: {
-            schedule: task.schedule,
-            enabled,
-            startingMessage: task.startingMessage,
-            description: task.description,
-          },
-        });
-        // Reload to get updated state
-        await loadBackgroundTasks();
-      } catch (err) {
-        console.error("Failed to update background task:", err);
-      }
-    },
-    [backgroundTasks, loadBackgroundTasks],
-  );
 
   // Load a specific run and populate conversation
   const loadRun = useCallback(async (id: string) => {
@@ -2869,7 +2727,6 @@ function App() {
     setPendingAskHumanRequests(new Map());
     setAllPermissionRequests(new Map());
     setPermissionResponses(new Map());
-    setSelectedBackgroundTask(null);
     setChatViewportAnchor(activeChatTabIdRef.current, null);
     setChatViewStateByTab((prev) => ({
       ...prev,
@@ -3170,7 +3027,6 @@ function App() {
       const tab = fileTabs.find((t) => t.id === tabId);
       if (!tab) return;
       setActiveFileTabId(tabId);
-      setSelectedBackgroundTask(null);
       setExpandedFrom(null);
       // If chat-only maximize is active, drop back to a visible knowledge layout.
       if (isRightPaneMaximized) {
@@ -3524,14 +3380,11 @@ function App() {
   }, [expandedFrom]);
 
   const currentViewState = React.useMemo<ViewState>(() => {
-    if (selectedBackgroundTask)
-      return { type: "task", name: selectedBackgroundTask };
     if (isSuggestedTopicsOpen) return { type: "suggested-topics" };
     if (selectedPath) return { type: "file", path: selectedPath };
     if (isGraphOpen) return { type: "graph" };
     return { type: "chat", runId };
   }, [
-    selectedBackgroundTask,
     isSuggestedTopicsOpen,
     selectedPath,
     isGraphOpen,
@@ -3606,15 +3459,10 @@ function App() {
     async (view: ViewState) => {
       switch (view.type) {
         case "file":
-          setSelectedBackgroundTask(null);
           setIsGraphOpen(false);
-          // Navigating to a file dismisses the browser overlay so the file is
-          // visible in the middle pane.
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
           setExpandedFrom(null);
-          // Preserve split vs knowledge-max mode when navigating knowledge files.
-          // Only exit chat-only maximize, because that would hide the selected file.
           if (isRightPaneMaximized) {
             setIsRightPaneMaximized(false);
           }
@@ -3622,7 +3470,6 @@ function App() {
           ensureFileTabForPath(view.path);
           return;
         case "graph":
-          setSelectedBackgroundTask(null);
           setSelectedPath(null);
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
@@ -3633,33 +3480,20 @@ function App() {
             setIsRightPaneMaximized(false);
           }
           return;
-        case "task":
-          setSelectedPath(null);
-          setIsGraphOpen(false);
-          setIsBrowserOpen(false);
-          setIsSuggestedTopicsOpen(false);
-          setExpandedFrom(null);
-          setIsRightPaneMaximized(false);
-          setSelectedBackgroundTask(view.name);
-          return;
         case "suggested-topics":
           setSelectedPath(null);
           setIsGraphOpen(false);
           setIsBrowserOpen(false);
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
-          setSelectedBackgroundTask(null);
           setIsSuggestedTopicsOpen(true);
           ensureSuggestedTopicsFileTab();
           return;
         case "chat":
           setSelectedPath(null);
           setIsGraphOpen(false);
-          // Don't touch isBrowserOpen here — chat navigation should land in
-          // the right sidebar when the browser overlay is active.
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
-          setSelectedBackgroundTask(null);
           setIsSuggestedTopicsOpen(false);
           if (view.runId) {
             await loadRun(view.runId);
@@ -3762,14 +3596,6 @@ function App() {
     },
     [navigateToView],
   );
-
-  const openFlashcards = useCallback(() => {
-    void navigateToView({ type: "file", path: FLASHCARDS_TAB_PATH });
-  }, [navigateToView]);
-
-  const openKanban = useCallback(() => {
-    void navigateToView({ type: "file", path: KANBAN_TAB_PATH });
-  }, [navigateToView]);
 
   const handleBaseConfigChange = useCallback(
     (path: string, config: BaseConfig) => {
@@ -4007,7 +3833,6 @@ function App() {
     !selectedPath &&
     !isGraphOpen &&
     !isSuggestedTopicsOpen &&
-    !selectedBackgroundTask &&
     !isBrowserOpen;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -4215,8 +4040,7 @@ function App() {
       if (
         !selectedPath &&
         !isGraphOpen &&
-        !isSuggestedTopicsOpen &&
-        !selectedBackgroundTask
+        !isSuggestedTopicsOpen
       ) {
         setIsChatSidebarOpen(false);
         setIsRightPaneMaximized(false);
@@ -4349,12 +4173,10 @@ function App() {
         }
       },
       openGraph: () => {
-        // From chat-only landing state, open graph directly in full knowledge view.
         if (
           !selectedPath &&
           !isGraphOpen &&
-          !isSuggestedTopicsOpen &&
-          !selectedBackgroundTask
+          !isSuggestedTopicsOpen
         ) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
@@ -4365,25 +4187,12 @@ function App() {
         if (
           !selectedPath &&
           !isGraphOpen &&
-          !isSuggestedTopicsOpen &&
-          !selectedBackgroundTask
+          !isSuggestedTopicsOpen
         ) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "file", path: BASES_DEFAULT_TAB_PATH });
-      },
-      openCalendar: () => {
-        if (
-          !selectedPath &&
-          !isGraphOpen &&
-          !isSuggestedTopicsOpen &&
-          !selectedBackgroundTask
-        ) {
-          setIsChatSidebarOpen(false);
-          setIsRightPaneMaximized(false);
-        }
-        void navigateToView({ type: "file", path: CALENDAR_TAB_PATH });
       },
       expandAll: () => setExpandedPaths(new Set(collectDirPaths(tree))),
       collapseAll: () => setExpandedPaths(new Set()),
@@ -4505,7 +4314,6 @@ function App() {
       tree,
       selectedPath,
       isGraphOpen,
-      selectedBackgroundTask,
       workspaceRoot,
       navigateToFile,
       navigateToView,
@@ -4937,9 +4745,6 @@ function App() {
   const hasConversation =
     activeChatTabState.conversation.length > 0 ||
     activeChatTabState.currentAssistantMessage;
-  const selectedTask = selectedBackgroundTask
-    ? backgroundTasks.find((t) => t.name === selectedBackgroundTask)
-    : null;
   const isRightPaneContext = Boolean(
     selectedPath || isGraphOpen || isSuggestedTopicsOpen || isBrowserOpen,
   );
@@ -5104,12 +4909,7 @@ function App() {
                     console.error("Failed to delete run:", err);
                   }
                 },
-                onSelectBackgroundTask: (taskName) => {
-                  void navigateToView({ type: "task", name: taskName });
-                },
               }}
-              backgroundTasks={backgroundTasks}
-              selectedBackgroundTask={selectedBackgroundTask}
               onNewChat={handleNewChatTab}
               onOpenSearch={() => setIsSearchOpen(true)}
               isBrowserOpen={isBrowserOpen}
@@ -5120,9 +4920,6 @@ function App() {
               }
               onOpenIngestWindow={() => {
                 void navigateToView({ type: "file", path: INGEST_TAB_PATH });
-              }}
-              onOpenNoteTagging={() => {
-                void navigateToView({ type: "file", path: NOTE_TAGGING_TAB_PATH });
               }}
             />
             <SidebarInset
@@ -5148,8 +4945,6 @@ function App() {
                 canNavigateBack={canNavigateBack}
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
-                onOpenFlashcards={openFlashcards}
-                onOpenKanban={openKanban}
               >
                 {(selectedPath || isGraphOpen || isSuggestedTopicsOpen) &&
                 fileTabs.length >= 1 ? (
@@ -5160,14 +4955,13 @@ function App() {
                     getTabId={(t) => t.id}
                     onSwitchTab={switchFileTab}
                     onCloseTab={closeFileTab}
-                    allowSingleTabClose={
-                      fileTabs.length === 1 &&
-                      (isGraphOpen ||
-                        isSuggestedTopicsOpen ||
-                        (selectedPath != null &&
-                          (isBaseFilePath(selectedPath) ||
-                            isFlashcardsTabPath(selectedPath))))
-                    }
+                      allowSingleTabClose={
+                        fileTabs.length === 1 &&
+                        (isGraphOpen ||
+                          isSuggestedTopicsOpen ||
+                          (selectedPath != null &&
+                            isBaseFilePath(selectedPath)))
+                      }
                   />
                 ) : (
                   <TabBar
@@ -5228,7 +5022,6 @@ function App() {
                 {!selectedPath &&
                   !isGraphOpen &&
                   !isSuggestedTopicsOpen &&
-                  !selectedTask &&
                   !isBrowserOpen && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -5249,7 +5042,6 @@ function App() {
                 {!selectedPath &&
                   !isGraphOpen &&
                   !isSuggestedTopicsOpen &&
-                  !selectedTask &&
                   !isBrowserOpen && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -5321,21 +5113,11 @@ function App() {
 
               {isBrowserOpen ? (
                 <BrowserPane onClose={handleCloseBrowser} />
-              ) : selectedPath === FLASHCARDS_TAB_PATH ? (
-                <FlashcardReview />
-              ) : selectedPath === CALENDAR_TAB_PATH ? (
-                <AcademicCalendar
-                  onNavigateToTask={(path) => navigateToFile(path)}
-                />
-              ) : selectedPath === KANBAN_TAB_PATH ? (
-                <KanbanAcademic />
               ) : selectedPath === INGEST_TAB_PATH ? (
                 <IngestWindow
                   onProcessIngest={handleIngestProcess}
                   isProcessing={isIngestProcessing}
                 />
-              ) : selectedPath === NOTE_TAGGING_TAB_PATH ? (
-                <NoteTaggingView />
               ) : isSuggestedTopicsOpen ? (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <SuggestedTopicsView
@@ -5543,23 +5325,6 @@ function App() {
                     </pre>
                   </div>
                 )
-              ) : selectedTask ? (
-                <div className="flex-1 min-h-0 overflow-hidden">
-                  <BackgroundTaskDetail
-                    name={selectedTask.name}
-                    description={selectedTask.description}
-                    schedule={selectedTask.schedule}
-                    enabled={selectedTask.enabled}
-                    status={selectedTask.status}
-                    nextRunAt={selectedTask.nextRunAt}
-                    lastRunAt={selectedTask.lastRunAt}
-                    lastError={selectedTask.lastError}
-                    runCount={selectedTask.runCount}
-                    onToggleEnabled={(enabled) =>
-                      handleToggleBackgroundTask(selectedTask.name, enabled)
-                    }
-                  />
-                </div>
               ) : (
                 <FileCardProvider
                   onOpenKnowledgeFile={(path) => {
