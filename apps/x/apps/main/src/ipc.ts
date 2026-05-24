@@ -25,6 +25,8 @@ import fs from "node:fs/promises";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import z from "zod";
+import mammothModule from "mammoth";
+const mammoth = (mammothModule as any).default || mammothModule;
 
 const execAsync = promisify(exec);
 
@@ -478,6 +480,16 @@ export function setupIpcHandlers() {
     },
     "workspace:remove": async (_event, args) => {
       return workspace.remove(args.path, args.opts);
+    },
+    "workspace:convertToHtml": async (_event, args) => {
+      const absPath = workspace.resolveWorkspacePath(args.path);
+      const ext = path.extname(absPath).toLowerCase();
+      if (ext === ".docx") {
+        const buffer = await fs.readFile(absPath);
+        const result = await mammoth.convertToHtml({ buffer });
+        return { html: result.value };
+      }
+      return { html: `<p>Preview not supported for ${ext} files.</p>` };
     },
     "ingest:addFiles": async (_event, args) => {
       const { root: workspaceRoot } = await workspace.getRoot();

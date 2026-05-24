@@ -123,6 +123,14 @@ const ipcSchemas = {
     req: WorkspaceChangeEvent,
     res: z.null(),
   },
+  "workspace:convertToHtml": {
+    req: z.object({
+      path: RelPath,
+    }),
+    res: z.object({
+      html: z.string(),
+    }),
+  },
   "vault:changed": {
     req: z.object({
       path: z.string(),

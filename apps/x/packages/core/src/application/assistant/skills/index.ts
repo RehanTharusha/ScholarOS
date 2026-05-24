@@ -5,12 +5,18 @@ import deletionGuardrailsSkill from "./deletion-guardrails/skill.js";
 import docCollabSkill from "./doc-collab/skill.js";
 import mcpIntegrationSkill from "./mcp-integration/skill.js";
 import organizeFilesSkill from "./organize-files/skill.js";
-import createPresentationsSkill from "./create-presentations/skill.js";
 
 import appNavigationSkill from "./app-navigation/skill.js";
 import browserControlSkill from "./browser-control/skill.js";
 import composioIntegrationSkill from "./composio-integration/skill.js";
 import { skill as cavemanSkill } from "./caveman/skill.js";
+import { skill as revisionGuideSkill } from "./revision-guide/skill.js";
+import { skill as youtubeVideoWorkflowSkill } from "./youtube-video-workflow/skill.js";
+import { skill as pdfSkill } from "./pdf/skill.js";
+import { skill as pptxSkill } from "./pptx/skill.js";
+import { skill as docxSkill } from "./docx/skill.js";
+import { skill as xlsxSkill } from "./xlsx/skill.js";
+import { skill as webArtifactsBuilderSkill } from "./web-artifacts-builder/skill.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_PREFIX = "src/application/assistant/skills";
@@ -31,13 +37,6 @@ type ResolvedSkill = {
 };
 
 const definitions: SkillDefinition[] = [
-  {
-    id: "create-presentations",
-    title: "Create Presentations",
-    summary:
-      "Create PDF presentations and slide decks from natural language requests using knowledge base context.",
-    content: createPresentationsSkill,
-  },
   {
     id: "doc-collab",
     title: "Document Collaboration",
@@ -100,6 +99,55 @@ const definitions: SkillDefinition[] = [
     summary:
       "Control the embedded browser pane - open sites, inspect page state, and interact with indexed page elements.",
     content: browserControlSkill,
+  },
+  {
+    id: "pdf",
+    title: "PDF Processing",
+    summary:
+      "Process PDF files - merge, split, rotate, extract text/tables, create new PDFs, fill forms, OCR, encrypt/decrypt, add watermarks.",
+    content: pdfSkill,
+  },
+  {
+    id: "pptx",
+    title: "PowerPoint Presentations",
+    summary:
+      "Create, read, and edit PowerPoint slide decks (.pptx) using PptxGenJS and template-based XML editing.",
+    content: pptxSkill,
+  },
+  {
+    id: "docx",
+    title: "Word Documents",
+    summary:
+      "Create, read, and edit Word documents (.docx) with full formatting, tables, images, tracked changes, and comments.",
+    content: docxSkill,
+  },
+  {
+    id: "xlsx",
+    title: "Excel Spreadsheets",
+    summary:
+      "Create, read, and edit Excel spreadsheets (.xlsx) with formulas, formatting, charts, and financial model standards.",
+    content: xlsxSkill,
+  },
+  {
+    id: "web-artifacts-builder",
+    title: "Web Artifacts Builder",
+    summary:
+      "Build complex React+Tailwind+shadcn/ui HTML artifacts bundled into self-contained single HTML files.",
+    content: webArtifactsBuilderSkill,
+  },
+  {
+    id: "revision-guide",
+    title: "Revision Guide",
+    summary:
+      "Generate comprehensive HTML revision guides for college modules with exam weight badges, diagrams, and quick-fire checklists.",
+    content: revisionGuideSkill,
+  },
+  {
+    id: "youtube-video-workflow",
+    title: "YouTube Video Link Finder",
+    summary:
+      "Find real YouTube video links for topics using search scraping to fix broken or placeholder video IDs in supplement files.",
+    content: youtubeVideoWorkflowSkill,
   },
 ];
 
