@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { WorkDir } from '../config/config.js';
+import { GlobalConfigDir } from '../config/config.js';
 import { SlackConfig } from './types.js';
 
 export interface ISlackConfigRepo {
@@ -9,7 +9,7 @@ export interface ISlackConfigRepo {
 }
 
 export class FSSlackConfigRepo implements ISlackConfigRepo {
-    private readonly configPath = path.join(WorkDir, 'config', 'slack.json');
+    private readonly configPath = path.join(GlobalConfigDir, 'slack.json');
     private readonly defaultConfig: SlackConfig = { enabled: false, workspaces: [] };
 
     constructor() {

@@ -2128,6 +2128,8 @@ function App() {
               llmEvent.type === "tool-input-delta"
             ) {
               setCurrentToolDraftActive(true);
+            } else if (llmEvent.type === "tool-input-end") {
+              setCurrentToolDraftActive(false);
             } else if (llmEvent.type === "tool-call") {
               setConversation((prev) => [
                 ...prev,

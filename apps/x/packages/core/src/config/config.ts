@@ -60,6 +60,16 @@ function resolveWorkDir(): string {
   return resolvedPath;
 }
 
+/**
+ * Global config directory — lives at ~/.rowboat/config/
+ * This is the default location for app-wide settings that persist across vault switches:
+ * model config, MCP servers, OAuth tokens, Slack config, security allow-lists, voice config,
+ * Composio config, user profile, and the models.dev catalog cache.
+ *
+ * Switching vaults (WorkDir) only changes where the agent works, NOT the app's own config.
+ */
+export const GlobalConfigDir = path.join(homedir(), ".rowboat", "config");
+
 // Resolve app root relative to compiled file location (dist/...)
 // Allow override via ROWBOAT_WORKDIR env var for standalone pipeline usage.
 // Normalize to an absolute path so workspace boundary checks behave consistently.

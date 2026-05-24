@@ -1,7 +1,7 @@
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
-import { WorkDir } from "../config/config.js";
+import { GlobalConfigDir } from "../config/config.js";
 import {
     ZAuthConfig,
     ZConnectedAccount,
@@ -23,7 +23,7 @@ import { getAccessToken } from "../auth/tokens.js";
 import { API_URL } from "../config/env.js";
 
 const COMPOSIO_BASE_URL = 'https://backend.composio.dev/api/v3';
-const CONFIG_FILE = path.join(WorkDir, 'config', 'composio.json');
+const CONFIG_FILE = path.join(GlobalConfigDir, 'composio.json');
 
 async function getBaseUrl(): Promise<string> {
     if (await isSignedIn()) {

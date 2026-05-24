@@ -1,4 +1,4 @@
-import { WorkDir } from "../config/config.js";
+import { GlobalConfigDir } from "../config/config.js";
 import { McpServerConfig, McpServerDefinition } from "@x/shared/dist/mcp.js";
 import fs from "fs/promises";
 import path from "path";
@@ -15,7 +15,7 @@ export interface IMcpConfigRepo {
 }
 
 export class FSMcpConfigRepo implements IMcpConfigRepo {
-    private readonly configPath = path.join(WorkDir, "config", "mcp.json");
+    private readonly configPath = path.join(GlobalConfigDir, "mcp.json");
 
     async ensureConfig(): Promise<void> {
         try {

@@ -1286,6 +1286,26 @@ async function* streamLlm(
           providerOptions: event.providerMetadata,
         };
         break;
+      case "tool-input-start":
+        yield {
+          type: "tool-input-start",
+          toolCallId: event.id,
+          toolName: event.toolName,
+        };
+        break;
+      case "tool-input-delta":
+        yield {
+          type: "tool-input-delta",
+          toolCallId: event.id,
+          delta: event.delta,
+        };
+        break;
+      case "tool-input-end":
+        yield {
+          type: "tool-input-end",
+          toolCallId: event.id,
+        };
+        break;
       case "tool-call":
         yield {
           type: "tool-call",

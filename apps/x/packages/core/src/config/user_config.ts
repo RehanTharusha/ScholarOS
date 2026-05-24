@@ -1,9 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { z } from "zod";
-import { WorkDir } from "./config.js";
+import { GlobalConfigDir } from "./config.js";
 
-const USER_CONFIG_PATH = path.join(WorkDir, "config", "user.json");
+const USER_CONFIG_PATH = path.join(GlobalConfigDir, "user.json");
 
 export const UserConfig = z.object({
   name: z.string().optional(),

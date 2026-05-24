@@ -1,12 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import z from "zod";
-import { WorkDir } from "../config/config.js";
+import { GlobalConfigDir } from "../config/config.js";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function getCachePath(): string {
-  return path.join(WorkDir, "config", "models.dev.json");
+  return path.join(GlobalConfigDir, "models.dev.json");
 }
 
 /*

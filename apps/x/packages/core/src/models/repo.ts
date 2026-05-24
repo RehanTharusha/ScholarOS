@@ -1,5 +1,5 @@
 import { ModelConfig } from "./models.js";
-import { WorkDir } from "../config/config.js";
+import { GlobalConfigDir } from "../config/config.js";
 import fs from "fs/promises";
 import path from "path";
 import z from "zod";
@@ -19,7 +19,7 @@ const defaultConfig: z.infer<typeof ModelConfig> = {
 
 export class FSModelConfigRepo implements IModelConfigRepo {
   private get configPath(): string {
-    return path.join(WorkDir, "config", "models.json");
+    return path.join(GlobalConfigDir, "models.json");
   }
 
   async ensureConfig(): Promise<void> {

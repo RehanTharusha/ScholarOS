@@ -1,4 +1,4 @@
-import { WorkDir } from '../config/config.js';
+import { GlobalConfigDir } from '../config/config.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { OAuthTokens } from './types.js';
@@ -37,7 +37,7 @@ export interface IOAuthRepo {
 }
 
 export class FSOAuthRepo implements IOAuthRepo {
-  private readonly configPath = path.join(WorkDir, 'config', 'oauth.json');
+  private readonly configPath = path.join(GlobalConfigDir, 'oauth.json');
 
   constructor() {
     this.ensureConfigFile();

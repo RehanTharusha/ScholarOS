@@ -1,11 +1,10 @@
 import path from "path";
 import fs from "fs";
 import fsPromises from "fs/promises";
-import { WorkDir } from "./config.js";
+import { GlobalConfigDir } from "./config.js";
 
 export const SECURITY_CONFIG_PATH = path.join(
-  WorkDir,
-  "config",
+  GlobalConfigDir,
   "security.json",
 );
 

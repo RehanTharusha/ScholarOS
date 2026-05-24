@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { isSignedIn } from '../account/account.js';
 import { getAccessToken } from '../auth/tokens.js';
-import { WorkDir } from '../config/config.js';
+import { GlobalConfigDir } from '../config/config.js';
 import { API_URL } from '../config/env.js';
 
 export interface VoiceConfig {
@@ -12,7 +12,7 @@ export interface VoiceConfig {
 
 async function readJsonConfig(filename: string): Promise<Record<string, unknown> | null> {
     try {
-        const configPath = path.join(WorkDir, 'config', filename);
+        const configPath = path.join(GlobalConfigDir, filename);
         const raw = await fs.readFile(configPath, 'utf8');
         return JSON.parse(raw);
     } catch {
@@ -50,7 +50,7 @@ export async function synthesizeSpeech(text: string): Promise<{ audioBase64: str
         console.log('[voice] synthesizing speech via ScholarOS proxy, text length:', text.length, 'voiceId:', voiceId);
     } else {
         if (!config.elevenlabs) {
-            throw new Error(`ElevenLabs not configured. Create ${path.join(WorkDir, 'config', 'elevenlabs.json')} with { "apiKey": "<your-key>" }`);
+            throw new Error(`ElevenLabs not configured. Create ${path.join(GlobalConfigDir, 'elevenlabs.json')} with { "apiKey": "<your-key>" }`);
         }
         const voiceId = config.elevenlabs.voiceId || 'UgBBYS2sOqTuMpoF3BR0';
         url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
