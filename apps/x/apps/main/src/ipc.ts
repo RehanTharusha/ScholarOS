@@ -25,80 +25,9 @@ import fs from "node:fs/promises";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import z from "zod";
-import type { IPty } from "node-pty";
 
 const execAsync = promisify(exec);
 
-// ============================================================================
-// PTY Terminal Management
-// ============================================================================
-
-const ptyInstances = new Map<string, IPty>();
-
-/**
- * Spawn a PTY and wire up data/exit events
- */
-function spawnPty(ptyId: string, command: string | null, cwd?: string): IPty {
-  // Dynamic require for node-pty (native module, may not be installed in dev)
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { spawn: ptySpawn } = require("node-pty") as typeof import("node-pty");
-
-  // Detect the best shell to use
-  const shell =
-    process.platform === "win32"
-      ? "powershell.exe"
-      : process.env.SHELL || "/bin/zsh";
-
-  // If no command provided, spawn interactive shell
-  // If command provided, execute it in the shell
-  const args: string[] = [];
-  if (command) {
-    // Execute specific command
-    if (process.platform === "win32") {
-      args.push("-NoLogo", "-Command", command);
-    } else {
-      // Use login shell to get proper environment
-      args.push("-l", "-c", command);
-    }
-  } else {
-    // Interactive shell - no additional args needed for most shells
-    // The shell will start interactively by default
-    if (process.platform === "win32") {
-      args.push("-NoLogo");
-    }
-  }
-
-  const instance = ptySpawn(shell, args, {
-    name: "xterm-color",
-    cols: 80,
-    rows: 24,
-    cwd: cwd || process.cwd(),
-    env: { ...process.env } as Record<string, string>,
-  });
-
-  // Forward data to all renderer windows
-  instance.onData((data) => {
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      if (!win.isDestroyed() && win.webContents) {
-        win.webContents.send("terminal:data", { ptyId, data });
-      }
-    }
-  });
-
-  instance.onExit(({ exitCode, signal }) => {
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      if (!win.isDestroyed() && win.webContents) {
-        win.webContents.send("terminal:exit", { ptyId, exitCode, signal });
-      }
-    }
-    ptyInstances.delete(ptyId);
-  });
-
-  ptyInstances.set(ptyId, instance);
-  return instance;
-}
 import { RunEvent } from "@x/shared/dist/runs.js";
 import { ServiceEvent } from "@x/shared/dist/service-events.js";
 import container from "@x/core/dist/di/container.js";
@@ -501,13 +430,6 @@ export function stopServicesWatcher(): void {
     servicesWatcher();
     servicesWatcher = null;
   }
-}
-
-export function killAllPtyProcesses(): void {
-  for (const [, instance] of ptyInstances) {
-    try { instance.kill(); } catch { /* process already dead */ }
-  }
-  ptyInstances.clear();
 }
 
 // ============================================================================
@@ -976,40 +898,6 @@ export function setupIpcHandlers() {
     "vault:setPath": async (_event, args) => {
       saveVaultPath(args.path);
       return { success: true as const };
-    },
-    // Terminal PTY handlers
-    "terminal:spawn": async (_event, args) => {
-      try {
-        if (ptyInstances.has(args.ptyId)) {
-          ptyInstances.get(args.ptyId)?.kill();
-        }
-        spawnPty(args.ptyId, args.command || null, args.cwd);
-        return { ok: true as const };
-      } catch (err) {
-        throw new Error(`Failed to spawn terminal: ${String(err)}`);
-      }
-    },
-    "terminal:write": async (_event, args) => {
-      const instance = ptyInstances.get(args.ptyId);
-      if (instance) {
-        instance.write(args.data);
-      }
-      return { ok: true as const };
-    },
-    "terminal:resize": async (_event, args) => {
-      const instance = ptyInstances.get(args.ptyId);
-      if (instance) {
-        instance.resize(args.cols, args.rows);
-      }
-      return { ok: true as const };
-    },
-    "terminal:kill": async (_event, args) => {
-      const instance = ptyInstances.get(args.ptyId);
-      if (instance) {
-        instance.kill();
-        ptyInstances.delete(args.ptyId);
-      }
-      return { ok: true as const };
     },
     // Embedded browser handlers (WebContentsView + navigation)
     ...browserIpcHandlers,

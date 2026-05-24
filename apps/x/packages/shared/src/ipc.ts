@@ -669,51 +669,6 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
-  // Terminal PTY channels
-  "terminal:spawn": {
-    req: z.object({
-      ptyId: z.string().min(1),
-      command: z.string().min(1),
-      cwd: z.string().optional(),
-    }),
-    res: z.object({ ok: z.literal(true) }),
-  },
-  "terminal:write": {
-    req: z.object({
-      ptyId: z.string().min(1),
-      data: z.string(),
-    }),
-    res: z.object({ ok: z.literal(true) }),
-  },
-  "terminal:resize": {
-    req: z.object({
-      ptyId: z.string().min(1),
-      cols: z.number().int().positive(),
-      rows: z.number().int().positive(),
-    }),
-    res: z.object({ ok: z.literal(true) }),
-  },
-  "terminal:kill": {
-    req: z.object({
-      ptyId: z.string().min(1),
-    }),
-    res: z.object({ ok: z.literal(true) }),
-  },
-  "terminal:data": {
-    req: z.object({
-      ptyId: z.string().min(1),
-      data: z.string(),
-    }),
-    res: z.null(),
-  },
-  "terminal:exit": {
-    req: z.object({
-      ptyId: z.string().min(1),
-      exitCode: z.number().optional(),
-      signal: z.string().optional(),
-    }),
-    res: z.null(),
-  },
 } as const;
 
 // ============================================================================

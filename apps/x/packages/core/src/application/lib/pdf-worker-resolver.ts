@@ -40,11 +40,12 @@ class PdfWorkerResolver {
     }
 
     // Try resolution strategies in order of reliability
+    this.tryRequireResolveWorker();
+    this.tryPdfjsDistBuiltIn();
     this.tryDirectNodeModulesPath();
-    this.tryRelativeToBuiltinToolsDir();
     this.tryPackagedAppLocations();
     this.tryWorkingDirectoryLocations();
-    this.tryPdfjsDistBuiltIn();
+    this.tryRelativeToBuiltinToolsDir();
 
     // Log all attempts if debugging
     if (this.DEBUG) {
@@ -72,8 +73,31 @@ class PdfWorkerResolver {
   }
 
   /**
-   * Strategy 1: Direct path to pdfjs-dist/build/pdf.worker.mjs in node_modules
-   * This is the most reliable as it uses the actual installed package.
+   * Strategy 1: Use Node's require.resolve to find the worker.
+   * This works reliably in both dev and production because it uses actual
+   * module resolution rather than relative file paths.
+   */
+  private tryRequireResolveWorker(): void {
+    try {
+      const candidate = require.resolve("pdfjs-dist/build/pdf.worker.mjs");
+      if (fs.existsSync(candidate)) {
+        this.recordAttempt("require.resolve pdfjs-dist/build/pdf.worker.mjs", candidate, true);
+        this.resolvedPath = pathToFileURL(candidate).href;
+        return;
+      }
+      this.recordAttempt("require.resolve pdfjs-dist/build/pdf.worker.mjs", candidate, false);
+    } catch {
+      this.recordAttempt(
+        "require.resolve pdfjs-dist/build/pdf.worker.mjs",
+        "require.resolve failed",
+        false,
+      );
+    }
+  }
+
+  /**
+   * Strategy 2: Direct path to pdfjs-dist/build/pdf.worker.mjs in node_modules
+   * Uses relative paths from the bundle location.
    */
   private tryDirectNodeModulesPath(): void {
     try {
@@ -102,7 +126,29 @@ class PdfWorkerResolver {
   }
 
   /**
-   * Strategy 2: Relative to builtin-tools.ts directory
+   * Strategy 3: Use pdfjs-dist's built-in worker path
+   * pdfjs-dist exports a default worker path that can be used directly.
+   */
+  private tryPdfjsDistBuiltIn(): void {
+    try {
+      // Import the package to get its resolved location
+      const pdfjsDistPkg = require.resolve("pdfjs-dist/package.json");
+      const pdfjsDistDir = path.dirname(pdfjsDistPkg);
+      const workerPath = path.join(pdfjsDistDir, "build", "pdf.worker.mjs");
+
+      this.recordAttempt("pdfjs-dist built-in", workerPath, fs.existsSync(workerPath));
+
+      if (fs.existsSync(workerPath)) {
+        this.resolvedPath = pathToFileURL(workerPath).href;
+        return;
+      }
+    } catch {
+      this.recordAttempt("pdfjs-dist built-in", "require.resolve failed", false);
+    }
+  }
+
+  /**
+   * Strategy 6: Relative to builtin-tools.ts directory
    * Works in development when files are in expected locations.
    */
   private tryRelativeToBuiltinToolsDir(): void {
@@ -122,9 +168,9 @@ class PdfWorkerResolver {
   }
 
   /**
-   * Strategy 3: Packaged Electron app locations
+   * Strategy 4: Packaged Electron app locations
    * When bundled with esbuild, the app structure is .package/dist/main.cjs
-   * The worker should be copied to .package/dist/ by forge.config.cjs
+   * The worker should be copied to .package/dist/ by bundle.mjs and forge.config.cjs
    */
   private tryPackagedAppLocations(): void {
     // In a packaged app, __dirname will be something like:
@@ -152,7 +198,7 @@ class PdfWorkerResolver {
   }
 
   /**
-   * Strategy 4: Working directory locations
+   * Strategy 5: Working directory locations
    * process.cwd() in different contexts (dev, test, packaged)
    */
   private tryWorkingDirectoryLocations(): void {
@@ -170,29 +216,6 @@ class PdfWorkerResolver {
         return;
       }
       this.recordAttempt("Working directory", candidate, false);
-    }
-  }
-
-  /**
-   * Strategy 5: Use pdfjs-dist's built-in worker path
-   * pdfjs-dist exports a default worker path that can be used directly.
-   * This is a last resort but often works.
-   */
-  private tryPdfjsDistBuiltIn(): void {
-    try {
-      // Import the package to get its resolved location
-      const pdfjsDistPkg = require.resolve("pdfjs-dist/package.json");
-      const pdfjsDistDir = path.dirname(pdfjsDistPkg);
-      const workerPath = path.join(pdfjsDistDir, "build", "pdf.worker.mjs");
-
-      this.recordAttempt("pdfjs-dist built-in", workerPath, fs.existsSync(workerPath));
-
-      if (fs.existsSync(workerPath)) {
-        this.resolvedPath = pathToFileURL(workerPath).href;
-        return;
-      }
-    } catch {
-      this.recordAttempt("pdfjs-dist built-in", "require.resolve failed", false);
     }
   }
 

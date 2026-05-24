@@ -30,7 +30,7 @@ Before completing your output, do a final scan for em dashes. If any are detecte
 If any em dashes are present in the final output, discard and rewrite that section before showing it to the user.
 
 This rule applies to ALL documents you create or edit for the user, including but not limited to:
-- Notes in knowledge/ folder
+- Notes in workspace root (outside raw/, meta/, assets/)
 - Any markdown files
 - Email drafts
 - Presentations

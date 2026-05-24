@@ -4,7 +4,7 @@ import * as fs from "fs/promises";
 import { createReadStream } from "fs";
 import { createInterface } from "readline";
 import { execSync } from "child_process";
-import { homedir, tmpdir } from "os";
+import { homedir } from "os";
 import { glob } from "glob";
 import { executeCommand, executeCommandAbortable } from "./command-executor.js";
 import { resolveSkill, availableSkills } from "../assistant/skills/index.js";
@@ -171,118 +171,10 @@ const splitPdfTextIntoChunks = (text: string): string[] => {
   return chunks;
 };
 
-const shellQuote = (value: string): string =>
-  `'${value.replace(/'/g, `'"'"'`)}'`;
-
-const commandExists = (command: string): boolean => {
-  try {
-    if (process.platform === "win32") {
-      execSync(`where ${shellQuote(command)}`, {
-        stdio: "pipe",
-        shell: "cmd.exe",
-      });
-    } else {
-      execSync(`command -v ${shellQuote(command)}`, {
-        stdio: "pipe",
-        shell: "/bin/sh",
-      });
-    }
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const getSystemShell = (): string =>
-  process.platform === "win32"
-    ? (process.env.ComSpec || "cmd.exe")
-    : "/bin/sh";
-
-const runShellCommand = (command: string): string | undefined => {
-  try {
-    return execSync(command, {
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: getSystemShell(),
-      maxBuffer: 20 * 1024 * 1024,
-    }).toString("utf8");
-  } catch {
-    return undefined;
-  }
-};
-
 const isLowTextPdf = (text: string, pages: number): boolean => {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (normalized.length < 100) return true;
   return normalized.length / Math.max(pages, 1) < 40;
-};
-
-const extractPdfTextWithPdftotext = async (
-  filePath: string,
-): Promise<string | undefined> => {
-  if (!commandExists("pdftotext")) {
-    return undefined;
-  }
-
-  const output = runShellCommand(
-    `pdftotext -layout -enc UTF-8 -q ${shellQuote(filePath)} -`,
-  );
-
-  const cleaned = output?.trim();
-  return cleaned ? cleaned : undefined;
-};
-
-const extractPdfTextWithOcrmypdf = async (
-  filePath: string,
-): Promise<{ text: string; pages: number } | undefined> => {
-  if (!commandExists("ocrmypdf")) {
-    return undefined;
-  }
-
-  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-pdf-"));
-  const outputPdf = path.join(tempDir, "ocr.pdf");
-
-  try {
-    const result = runShellCommand(
-      `ocrmypdf --skip-text --quiet --output-type pdf ${shellQuote(filePath)} ${shellQuote(outputPdf)}`,
-    );
-
-    if (result === undefined) {
-      return undefined;
-    }
-
-    const outputExists = await fs
-      .access(outputPdf)
-      .then(() => true)
-      .catch(() => false);
-
-    if (!outputExists) {
-      return undefined;
-    }
-
-    const ocrBuffer = await fs.readFile(outputPdf);
-    const pdfWorkerSrc = getPdfWorkerPath();
-    if (pdfWorkerSrc) {
-      PDFParse.setWorker(pdfWorkerSrc);
-    }
-
-    const parser = new PDFParse({ data: new Uint8Array(ocrBuffer) });
-    try {
-      const textResult = await parser.getText();
-      const cleaned = textResult.text.replace(/\s+/g, " ").trim();
-      if (!cleaned) {
-        return undefined;
-      }
-
-      return {
-        text: textResult.text,
-        pages: textResult.total,
-      };
-    } finally {
-      await parser.destroy();
-    }
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  }
 };
 
 const extractPptxText = async (buffer: Buffer): Promise<string> => {
@@ -338,43 +230,11 @@ const extractTextFromImage = async (
   }
 };
 
-async function tryExtractPdfPagesViaCli(
-  filePath: string,
-  tempDir: string,
-): Promise<string[]> {
-  if (commandExists("pdftoppm")) {
-    runShellCommand(
-      `pdftoppm -png -r 300 ${shellQuote(filePath)} ${path.join(tempDir, "page")}`,
-    );
-    const entries = await fs.readdir(tempDir).catch(() => []);
-    const images = entries.filter((f) => f.endsWith(".png")).sort();
-    if (images.length > 0) return images.map((f) => path.join(tempDir, f));
-  }
-
-  if (commandExists("gs")) {
-    runShellCommand(
-      `gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r300 -sOutputFile=${path.join(tempDir, "page-%d.png")} ${shellQuote(filePath)}`,
-    );
-    const entries = await fs.readdir(tempDir).catch(() => []);
-    const images = entries.filter((f) => f.endsWith(".png")).sort();
-    if (images.length > 0) return images.map((f) => path.join(tempDir, f));
-  }
-
-  return [];
-}
-
 const PARSE_DEBUG = () => process.env.PARSE_DEBUG === "1";
 
-async function tryExtractPdfPagesViaCanvas(
+async function tryOcrPdfViaCanvas(
   filePath: string,
-): Promise<
-  { text: string; pages: number } | undefined
-> {
-  if (typeof OffscreenCanvas === "undefined") {
-    if (PARSE_DEBUG()) console.log("[parse] OffscreenCanvas not available");
-    return undefined;
-  }
-
+): Promise<{ text: string; pages: number } | undefined> {
   try {
     const buffer = await fs.readFile(filePath);
     const pdfjsLib = await import("pdfjs-dist");
@@ -396,7 +256,7 @@ async function tryExtractPdfPagesViaCanvas(
       const pageTexts: string[] = [];
       for (let i = 1; i <= pdfDoc.numPages; i++) {
         const page = await pdfDoc.getPage(i);
-        const viewport = page.getViewport({ scale: 3.0 });
+        const viewport = page.getViewport({ scale: 1.5 });
         const canvas = new OffscreenCanvas(viewport.width, viewport.height);
         const ctx = canvas.getContext("2d");
         if (!ctx) {
@@ -404,7 +264,11 @@ async function tryExtractPdfPagesViaCanvas(
           continue;
         }
 
-        await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport }).promise;
+        await page.render({
+          canvas: canvas as unknown as HTMLCanvasElement,
+          canvasContext: ctx as unknown as CanvasRenderingContext2D,
+          viewport,
+        }).promise;
 
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         if (!imageData?.data?.length) {
@@ -434,47 +298,47 @@ async function tryExtractPdfPagesViaCanvas(
   }
 }
 
-async function ocrImagesWithTesseract(
-  imagePaths: string[],
-): Promise<{ text: string; pages: number } | undefined> {
-  const Tesseract = (await import("tesseract.js")).default;
-  const worker = await Tesseract.createWorker("eng");
-  try {
-    const pageTexts: string[] = [];
-    for (const imgPath of imagePaths) {
-      const imgBuffer = await fs.readFile(imgPath);
-      const { data } = await worker.recognize(imgBuffer);
-      if (data.text?.trim()) {
-        pageTexts.push(data.text.trim());
-      }
-    }
-    const combined = pageTexts.join("\n\n");
-    return combined ? { text: combined, pages: imagePaths.length } : undefined;
-  } finally {
-    await worker.terminate();
-  }
-}
-
 const extractPdfTextWithTesseractJs = async (
   filePath: string,
 ): Promise<{ text: string; pages: number } | undefined> => {
-  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
+  const canvasResult = await tryOcrPdfViaCanvas(filePath);
+  if (canvasResult) {
+    return canvasResult;
+  }
+
+  // Last-resort: render pages one at a time via Buffer to PNG → tesseract.js
   try {
-    const cliImages = await tryExtractPdfPagesViaCli(filePath, tempDir);
-    if (cliImages.length > 0) {
-      return await ocrImagesWithTesseract(cliImages);
-    }
+    const buffer = await fs.readFile(filePath);
+    const pdfjsLib = await import("pdfjs-dist");
+    const { getDocument } = pdfjsLib;
+    const pdfDoc = await getDocument({ data: buffer.slice(0) }).promise;
 
-    const canvasResult = await tryExtractPdfPagesViaCanvas(filePath);
-    if (canvasResult) {
-      return canvasResult;
+    const Tesseract = (await import("tesseract.js")).default;
+    const worker = await Tesseract.createWorker("eng");
+    try {
+      const pageTexts: string[] = [];
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
+        await page.render({
+          canvas: canvas as unknown as HTMLCanvasElement,
+          canvasContext: ctx as unknown as CanvasRenderingContext2D,
+          viewport,
+        }).promise;
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const { data } = await worker.recognize(imageData);
+        if (data.text?.trim()) pageTexts.push(data.text.trim());
+      }
+      const combined = pageTexts.join("\n\n");
+      return combined ? { text: combined, pages: pdfDoc.numPages } : undefined;
+    } finally {
+      await worker.terminate();
     }
-
-    return undefined;
   } catch {
     return undefined;
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 };
 
@@ -1221,7 +1085,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
 
   parseFile: {
     description:
-      "Parse and extract text content from files (PDF, PPTX, DOCX, XLSX, CSV, PNG, JPG). Auto-detects format from file extension. PDFs use automatic fallback chain: pdf-parse → pdftotext → ocrmypdf → pdftoppm+tesseract.js → LLM. Images use tesseract.js OCR → LLM.",
+      "Parse and extract text content from files (PDF, PPTX, DOCX, XLSX, CSV, PNG, JPG). Auto-detects format from file extension. PDFs use automatic fallback chain: pdf-parse (text PDFs) → tesseract.js OCR (scanned PDFs) → LLM vision. Images use tesseract.js OCR → LLM vision.",
     inputSchema: z.object({
       path: z
         .string()
@@ -1270,141 +1134,115 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         if (ext === ".pdf") {
-          // Try to set worker, but don't fail if it's unavailable
+          // --- Primary extraction via pdf-parse ---
+          let pdfPrimaryText = "";
+          let pdfPages = 0;
+          let pdfTitle: string | undefined;
+          let pdfAuthor: string | undefined;
+
           try {
             const pdfWorkerSrc = getPdfWorkerPath();
             if (pdfWorkerSrc) {
               PDFParse.setWorker(pdfWorkerSrc);
             }
+
+            const parser = new PDFParse({ data: new Uint8Array(buffer) });
+            try {
+              const [textResult, infoResult] = await Promise.all([
+                parser.getText(),
+                parser.getInfo().catch(() => undefined),
+              ]);
+              pdfPrimaryText = textResult.text;
+              pdfPages = textResult.total;
+              pdfTitle = infoResult?.info?.Title || undefined;
+              pdfAuthor = infoResult?.info?.Author || undefined;
+
+              if (!isLowTextPdf(pdfPrimaryText, pdfPages)) {
+                const chunks = splitPdfTextIntoChunks(pdfPrimaryText);
+                return {
+                  success: true,
+                  fileName,
+                  format: "pdf",
+                  content: pdfPrimaryText,
+                  chunks,
+                  metadata: {
+                    pages: pdfPages,
+                    title: pdfTitle,
+                    author: pdfAuthor,
+                    chunkCount: chunks.length,
+                    chunkTarget: PDF_CHUNK_TARGET,
+                  },
+                };
+              }
+            } finally {
+              await parser.destroy();
+            }
           } catch {
-            // pdf-parse can still work without an explicit worker in many cases
+            // pdf-parse failed (worker missing, corrupt file, etc.) —
+            // fall through to CLI / OCR fallback chain below
           }
 
-          const parser = new PDFParse({ data: new Uint8Array(buffer) });
-          try {
-            const [textResult, infoResult] = await Promise.all([
-              parser.getText(),
-              parser.getInfo().catch(() => undefined),
-            ]);
+          // --- Fallback chain (runs when pdf-parse failed or returned low text) ---
+          const pdfFallbackMetadata = {
+            title: pdfTitle,
+            author: pdfAuthor,
+          };
 
-            if (!isLowTextPdf(textResult.text, textResult.total)) {
-              const chunks = splitPdfTextIntoChunks(textResult.text);
-              return {
-                success: true,
-                fileName,
-                format: "pdf",
-                content: textResult.text,
-                chunks,
-                metadata: {
-                  pages: textResult.total,
-                  title: infoResult?.info?.Title || undefined,
-                  author: infoResult?.info?.Author || undefined,
-                  chunkCount: chunks.length,
-                  chunkTarget: PDF_CHUNK_TARGET,
-                },
-              };
-            }
-
-            const pdftotext = await extractPdfTextWithPdftotext(filePath);
-            if (pdftotext && !isLowTextPdf(pdftotext, textResult.total)) {
-              const chunks = splitPdfTextIntoChunks(pdftotext);
-              return {
-                success: true,
-                fileName,
-                format: "pdf",
-                content: pdftotext,
-                chunks,
-                metadata: {
-                  pages: textResult.total,
-                  title: infoResult?.info?.Title || undefined,
-                  author: infoResult?.info?.Author || undefined,
-                  chunkCount: chunks.length,
-                  chunkTarget: PDF_CHUNK_TARGET,
-                },
-              };
-            }
-
-            const ocrResult = await extractPdfTextWithOcrmypdf(filePath);
-            if (ocrResult) {
-              const chunks = splitPdfTextIntoChunks(ocrResult.text);
-              return {
-                success: true,
-                fileName,
-                format: "pdf",
-                content: ocrResult.text,
-                chunks,
-                metadata: {
-                  pages: ocrResult.pages || textResult.total,
-                  title: infoResult?.info?.Title || undefined,
-                  author: infoResult?.info?.Author || undefined,
-                  fallback: "ocrmypdf",
-                  chunkCount: chunks.length,
-                  chunkTarget: PDF_CHUNK_TARGET,
-                },
-              };
-            }
-
-            const jsOcrResult = await extractPdfTextWithTesseractJs(filePath);
-            if (jsOcrResult) {
-              const chunks = splitPdfTextIntoChunks(jsOcrResult.text);
-              return {
-                success: true,
-                fileName,
-                format: "pdf",
-                content: jsOcrResult.text,
-                chunks,
-                metadata: {
-                  pages: jsOcrResult.pages || textResult.total,
-                  title: infoResult?.info?.Title || undefined,
-                  author: infoResult?.info?.Author || undefined,
-                  fallback: "tesseract.js",
-                  chunkCount: chunks.length,
-                  chunkTarget: PDF_CHUNK_TARGET,
-                },
-              };
-            }
-
-            const llmResult = await extractTextWithLLM(filePath, "application/pdf");
-            if (llmResult) {
-              const chunks = splitPdfTextIntoChunks(llmResult);
-              return {
-                success: true,
-                fileName,
-                format: "pdf",
-                content: llmResult,
-                chunks,
-                metadata: {
-                  pages: textResult.total,
-                  title: infoResult?.info?.Title || undefined,
-                  author: infoResult?.info?.Author || undefined,
-                  fallback: "llm",
-                  chunkCount: chunks.length,
-                  chunkTarget: PDF_CHUNK_TARGET,
-                },
-              };
-            }
-
-            const hasContent = textResult.text.replace(/\s+/g, " ").trim().length > 50;
-            const chunks = splitPdfTextIntoChunks(textResult.text);
-
+          const jsOcrResult = await extractPdfTextWithTesseractJs(filePath);
+          if (jsOcrResult) {
+            const chunks = splitPdfTextIntoChunks(jsOcrResult.text);
             return {
               success: true,
               fileName,
               format: "pdf",
-              content: textResult.text,
+              content: jsOcrResult.text,
               chunks,
               metadata: {
-                pages: textResult.total,
-                title: infoResult?.info?.Title || undefined,
-                author: infoResult?.info?.Author || undefined,
-                fallback: hasContent ? "partial" : "low-text",
+                pages: jsOcrResult.pages || pdfPages || 0,
+                ...pdfFallbackMetadata,
+                fallback: "tesseract.js",
                 chunkCount: chunks.length,
                 chunkTarget: PDF_CHUNK_TARGET,
               },
             };
-          } finally {
-            await parser.destroy();
           }
+
+          const llmResult = await extractTextWithLLM(filePath, "application/pdf");
+          if (llmResult) {
+            const chunks = splitPdfTextIntoChunks(llmResult);
+            return {
+              success: true,
+              fileName,
+              format: "pdf",
+              content: llmResult,
+              chunks,
+              metadata: {
+                pages: pdfPages || 0,
+                ...pdfFallbackMetadata,
+                fallback: "llm",
+                chunkCount: chunks.length,
+                chunkTarget: PDF_CHUNK_TARGET,
+              },
+            };
+          }
+
+          // All fallbacks exhausted — return whatever pdf-parse gave us
+          const hasContent = pdfPrimaryText.replace(/\s+/g, " ").trim().length > 50;
+          const chunks = splitPdfTextIntoChunks(pdfPrimaryText);
+          return {
+            success: true,
+            fileName,
+            format: "pdf",
+            content: pdfPrimaryText,
+            chunks,
+            metadata: {
+              pages: pdfPages || 0,
+              ...pdfFallbackMetadata,
+              fallback: hasContent ? "partial" : "low-text",
+              chunkCount: chunks.length,
+              chunkTarget: PDF_CHUNK_TARGET,
+            },
+          };
         }
 
         if (ext === ".xlsx" || ext === ".xls") {
@@ -1513,8 +1351,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       files: Array<{ filepath: string; content: string }>;
     }) => {
       try {
-        const knowledgeDir = path.join(WorkDir, "knowledge");
-        const results = await classifyFilesFn(files, knowledgeDir);
+        const results = await classifyFilesFn(files, WorkDir);
 
         return {
           success: true,
@@ -1966,7 +1803,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         .string()
         .optional()
         .describe(
-          "Knowledge file path for open-note, e.g. knowledge/People/John.md",
+          "Knowledge file path for open-note, e.g. People/John.md",
         ),
       // open-view
       view: z
@@ -2063,13 +1900,14 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         }
 
         case "get-base-state": {
-          // Scan knowledge/ files and extract frontmatter properties
+          // Scan knowledge files and extract frontmatter properties
           try {
             const { parseFrontmatter } =
               await import("@x/shared/dist/frontmatter.js");
-            const entries = await workspace.readdir("knowledge", {
+            const entries = await workspace.readdir("", {
               recursive: true,
               allowedExtensions: [".md"],
+              excludeDirPrefixes: ["raw", "meta", "assets"],
             });
             const files = entries.filter((e) => e.kind === "file");
             const properties = new Map<string, Set<string>>();

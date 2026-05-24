@@ -61,9 +61,19 @@ export function absToRelPosix(absPath: string): string | null {
   return relPath.split(path.sep).join('/');
 }
 
+const NON_KNOWLEDGE_DIRS = ['raw/', 'meta/', 'assets/'];
+
+export function isKnowledgeRelPath(relPath: string): boolean {
+  const normalized = relPath.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
+  for (const dir of NON_KNOWLEDGE_DIRS) {
+    if (normalized.startsWith(dir)) return false;
+  }
+  return true;
+}
+
 function isKnowledgeMarkdownRelPath(relPath: string): boolean {
   const normalized = relPath.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
-  return normalized.startsWith('knowledge/') && normalized.endsWith('.md');
+  return isKnowledgeRelPath(normalized) && normalized.endsWith('.md');
 }
 
 // ============================================================================
@@ -154,6 +164,14 @@ export async function readdir(
       let itemStat: { size: number; mtimeMs: number } | undefined;
 
       if (item.isDirectory()) {
+        // Skip directories that match excludeDirPrefixes
+        if (opts?.excludeDirPrefixes) {
+          const shouldExclude = opts.excludeDirPrefixes.some(
+            prefix => itemRelPath === prefix || itemRelPath.startsWith(prefix + '/')
+          );
+          if (shouldExclude) continue;
+        }
+
         itemKind = 'dir';
         if (opts?.includeStats) {
           const stats = await fs.lstat(itemPath);
@@ -288,7 +306,7 @@ export async function writeFile(
   });
 
   // Schedule a debounced version history commit for knowledge files
-  if (relPath.startsWith('knowledge/') && relPath.endsWith('.md')) {
+  if (isKnowledgeMarkdownRelPath(relPath)) {
     scheduleKnowledgeCommit(path.basename(relPath));
   }
 

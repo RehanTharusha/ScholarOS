@@ -36,6 +36,7 @@ export const ReaddirOptions = z.object({
   includeStats: z.boolean().optional(),
   includeHidden: z.boolean().optional(),
   allowedExtensions: z.array(z.string()).optional(),
+  excludeDirPrefixes: z.array(z.string()).optional(),
 });
 
 export const ReadFileResult = z.object({

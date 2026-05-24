@@ -92,18 +92,18 @@ You have access to these tools:
 
 **For reading files:**
 \`\`\`
-workspace-readFile({ path: "knowledge/People/Sarah Chen.md" })
+workspace-readFile({ path: "People/Sarah Chen.md" })
 \`\`\`
 
 **For creating NEW files:**
 \`\`\`
-workspace-writeFile({ path: "knowledge/People/Sarah Chen.md", data: "# Sarah Chen\\n\\n..." })
+workspace-writeFile({ path: "People/Sarah Chen.md", data: "# Sarah Chen\\n\\n..." })
 \`\`\`
 
 **For editing EXISTING files (preferred for updates):**
 \`\`\`
 workspace-edit({
-  path: "knowledge/People/Sarah Chen.md",
+  path: "People/Sarah Chen.md",
   oldString: "## Activity\\n",
   newString: "## Activity\\n- **2026-02-03** (meeting): New activity entry\\n"
 })
@@ -111,22 +111,22 @@ workspace-edit({
 
 **For listing directories:**
 \`\`\`
-workspace-readdir({ path: "knowledge/People" })
+workspace-readdir({ path: "People" })
 \`\`\`
 
 **For creating directories:**
 \`\`\`
-workspace-mkdir({ path: "knowledge/Projects", recursive: true })
+workspace-mkdir({ path: "Projects", recursive: true })
 \`\`\`
 
 **For searching files:**
 \`\`\`
-workspace-grep({ pattern: "Acme Corp", searchPath: "knowledge", fileGlob: "*.md" })
+workspace-grep({ pattern: "Acme Corp", fileGlob: "*.md" })
 \`\`\`
 
 **For finding files by pattern:**
 \`\`\`
-workspace-glob({ pattern: "**/*.md", cwd: "knowledge/People" })
+workspace-glob({ pattern: "**/*.md", cwd: "People" })
 \`\`\`
 
 **IMPORTANT:**
@@ -165,7 +165,7 @@ workspace-readFile({ path: "{source_file}" })
 - Has \`Attendees:\` field
 - Has \`Meeting:\` title
 - Transcript format with speaker labels
-- Source file path is under \`knowledge/Meetings/\` (e.g. \`knowledge/Meetings/granola/...\` or \`knowledge/Meetings/fireflies/...\`)
+- Source file path is under \`Meetings/\` (e.g. \`Meetings/granola/...\` or \`Meetings/fireflies/...\`)
 
 **Email indicators:**
 - Has \`From:\` and \`To:\` fields

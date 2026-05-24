@@ -11,11 +11,11 @@ Open a specific knowledge file in the editor pane.
 **When to use:** When the user asks to see, open, or view a specific note (e.g., "open John's note", "show me the Acme project page").
 
 **Parameters:**
-- ` + "`path`" + `: Full workspace-relative path (e.g., ` + "`knowledge/People/John Smith.md`" + `)
+- ` + "`path`" + `: Full workspace-relative path (e.g., ` + "`People/John Smith.md`" + `)
 
 **Tips:**
 - Use ` + "`workspace-grep`" + ` first to find the exact path if you're unsure of the filename.
-- Always pass the full ` + "`knowledge/...`" + ` path, not just the filename.
+- Always pass the full workspace-relative path (e.g., ` + "`People/John.md`" + `), not just the filename.
 
 ### open-view
 Switch the UI to the graph or bases view.

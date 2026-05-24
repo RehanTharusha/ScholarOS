@@ -48,19 +48,19 @@ When the user mentions a document name, search for it using multiple approaches:
 
 1. **Search by name pattern** (handles partial matches, different cases):
 \`\`\`
-workspace-glob({ pattern: "knowledge/**/*[name]*", path: "knowledge/" })
+workspace-glob({ pattern: "**/*[name]*", path: "" })
 \`\`\`
 
 2. **Search by content** (finds docs that mention the topic):
 \`\`\`
-workspace-grep({ pattern: "[name]", path: "knowledge/" })
+workspace-grep({ pattern: "[name]", path: "" })
 \`\`\`
 
 3. **Try common variations:**
    - With/without hyphens: "show-hn" vs "showhn" vs "show hn"
    - With/without spaces
    - Different capitalizations
-   - In subfolders: knowledge/, knowledge/Projects/, knowledge/Topics/
+    - In subfolders: People/, Organizations/, Projects/, Topics/
 
 **Only say "document doesn't exist" if ALL searches return nothing.**
 
@@ -118,7 +118,7 @@ workspace-createFile({
 **For edits, use workspace-editFile:**
 \`\`\`
 workspace-editFile({
-  path: "knowledge/[path].md",
+  path: "[path].md",
   old_string: "[exact text to replace]",
   new_string: "[new text]"
 })
@@ -127,7 +127,7 @@ workspace-editFile({
 **For additions at the end:**
 \`\`\`
 workspace-editFile({
-  path: "knowledge/[path].md",
+  path: "[path].md",
   old_string: "[last line or section]",
   new_string: "[last line or section]\n\n[new content]"
 })
@@ -149,14 +149,14 @@ When the user mentions people, companies, or projects:
 
 **Search for relevant notes:**
 \`\`\`
-workspace-grep({ pattern: "[Name]", path: "knowledge/" })
+workspace-grep({ pattern: "[Name]", path: "" })
 \`\`\`
 
 **Read relevant notes:**
 \`\`\`
-workspace-readFile("knowledge/People/[Person].md")
-workspace-readFile("knowledge/Organizations/[Company].md")
-workspace-readFile("knowledge/Projects/[Project].md")
+workspace-readFile("People/[Person].md")
+workspace-readFile("Organizations/[Company].md")
+workspace-readFile("Projects/[Project].md")
 \`\`\`
 
 **Use the context:**
@@ -166,7 +166,7 @@ workspace-readFile("knowledge/Projects/[Project].md")
 
 ## Document Locations
 
-Documents are stored in \`knowledge/\` within the workspace root, with subfolders:
+Documents are stored within the workspace root, with subfolders:
 - \`Notes/\` - **Default location for user notes. Create new notes here unless the user specifies a different folder.**
 - \`People/\` - Notes about individuals
 - \`Organizations/\` - Notes about companies, teams
@@ -265,7 +265,7 @@ Renders a styled table from structured data.
 **You:** "Should I make edits directly, or show you changes first?"
 **User:** "directly is fine"
 **You:** *Search for it, read it*
-"Found knowledge/Investor Update Q1.md. What would you like to change?"
+"Found Investor Update Q1.md. What would you like to change?"
 
 **Direct mode - making edits:**
 **User:** "Add a section about our new partnership with Acme Corp"
@@ -286,7 +286,7 @@ Ok to add?"
 
 **Creating a new doc:**
 **User:** "Create a doc for the roadmap"
-**You:** "Shall I create knowledge/roadmap.md?"
+**You:** "Shall I create roadmap.md?"
 **User:** "yes"
 **You:** *Creates file with just title*
 "Created. What would you like in this?"

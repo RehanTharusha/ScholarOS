@@ -15,7 +15,6 @@ import {
   ChevronRightIcon,
   SquarePen,
   HistoryIcon,
-  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -107,10 +106,10 @@ import { FileCardProvider } from "@/contexts/file-card-context";
 
 import { IngestWindow } from "@/components/ingest-window";
 import { PdfViewer } from "@/components/pdf-viewer";
+import { HtmlViewer } from "@/components/html-viewer";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
-import { TerminalPanel } from "@/components/terminal-panel";
 import { TabBar, type ChatTab, type FileTab } from "@/components/tab-bar";
 import {
   type ChatMessage,
@@ -233,32 +232,24 @@ const getBaseName = (path: string) => {
 };
 
 const WIKI_LINK_TOKEN_REGEX = /\[\[([^[\]]+)\]\]/g;
-const KNOWLEDGE_PREFIX = "knowledge/";
+const NON_KNOWLEDGE_DIR_NAMES = ["raw/", "meta/", "assets/"];
+
+const isKnowledgeRelPath = (relPath: string) => {
+  const normalized = relPath.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
+  for (const dir of NON_KNOWLEDGE_DIR_NAMES) {
+    if (normalized.startsWith(dir)) return false;
+  }
+  return true;
+};
 
 const normalizeRelPathForWiki = (relPath: string) =>
   relPath.replace(/\\/g, "/").replace(/^\/+/, "");
-
-const stripKnowledgePrefixForWiki = (relPath: string) => {
-  const normalized = normalizeRelPathForWiki(relPath);
-  return normalized.toLowerCase().startsWith(KNOWLEDGE_PREFIX)
-    ? normalized.slice(KNOWLEDGE_PREFIX.length)
-    : normalized;
-};
 
 const stripMarkdownExtensionForWiki = (wikiPath: string) =>
   wikiPath.toLowerCase().endsWith(".md") ? wikiPath.slice(0, -3) : wikiPath;
 
 const wikiPathCompareKey = (wikiPath: string) =>
   stripMarkdownExtensionForWiki(wikiPath).toLowerCase();
-
-const splitWikiPathPrefix = (rawPath: string) => {
-  let normalized = rawPath.trim().replace(/^\/+/, "").replace(/^\.\//, "");
-  const hadKnowledgePrefix = /^knowledge\//i.test(normalized);
-  if (hadKnowledgePrefix) {
-    normalized = normalized.slice(KNOWLEDGE_PREFIX.length);
-  }
-  return { pathWithoutPrefix: normalized, hadKnowledgePrefix };
-};
 
 const rewriteWikiLinksForRenamedFileInMarkdown = (
   markdown: string,
@@ -267,15 +258,13 @@ const rewriteWikiLinksForRenamedFileInMarkdown = (
 ) => {
   const normalizedFrom = normalizeRelPathForWiki(fromRelPath);
   const normalizedTo = normalizeRelPathForWiki(toRelPath);
-  const lowerFrom = normalizedFrom.toLowerCase();
-  const lowerTo = normalizedTo.toLowerCase();
-  if (!lowerFrom.startsWith(KNOWLEDGE_PREFIX) || !lowerFrom.endsWith(".md"))
+  if (!isKnowledgeRelPath(normalizedFrom) || !normalizedFrom.endsWith(".md"))
     return markdown;
-  if (!lowerTo.startsWith(KNOWLEDGE_PREFIX) || !lowerTo.endsWith(".md"))
+  if (!isKnowledgeRelPath(normalizedTo) || !normalizedTo.endsWith(".md"))
     return markdown;
 
-  const fromWikiPath = stripKnowledgePrefixForWiki(normalizedFrom);
-  const toWikiPath = stripKnowledgePrefixForWiki(normalizedTo);
+  const fromWikiPath = normalizedFrom;
+  const toWikiPath = normalizedTo;
   const fromCompareKey = wikiPathCompareKey(fromWikiPath);
   const fromBaseName =
     stripMarkdownExtensionForWiki(fromWikiPath)
@@ -304,8 +293,7 @@ const rewriteWikiLinksForRenamedFileInMarkdown = (
       const rawPath = pathPart.trim();
       if (!rawPath) return fullMatch;
 
-      const { pathWithoutPrefix, hadKnowledgePrefix } =
-        splitWikiPathPrefix(rawPath);
+      const pathWithoutPrefix = rawPath.trim().replace(/^\/+/, "").replace(/^\.\//, "");
       if (!pathWithoutPrefix) return fullMatch;
 
       const matchesFullPath =
@@ -319,16 +307,13 @@ const rewriteWikiLinksForRenamedFileInMarkdown = (
       if (!matchesFullPath && !matchesBareSelfName) return fullMatch;
 
       const preserveMarkdownExtension = rawPath.toLowerCase().endsWith(".md");
-      const rewrittenTarget = matchesBareSelfName
+      const finalPath = matchesBareSelfName
         ? preserveMarkdownExtension
           ? `${toBaseName}.md`
           : toBaseName
         : preserveMarkdownExtension
           ? toWikiPath
           : toWikiPathWithoutExtension;
-      const finalPath = hadKnowledgePrefix
-        ? `${KNOWLEDGE_PREFIX}${rewrittenTarget}`
-        : rewrittenTarget;
 
       return `[[${leadingWhitespace}${finalPath}${trailingWhitespace}${anchorSuffix}${aliasSuffix}]]`;
     },
@@ -400,9 +385,9 @@ const buildSuggestedTopicExplorePrompt = ({
     `- Category: ${categoryLabel}`,
     courseLine,
     `- Description: ${description}`,
-    `- Target folder: knowledge/${folder}/`,
+    `- Target folder: ${folder}/`,
     "",
-    `Please start by telling me that you can set up a tracking note for "${title}" under knowledge/${folder}/.`,
+    `Please start by telling me that you can set up a tracking note for "${title}" under ${folder}/.`,
     "Then briefly explain what that tracking note would monitor or refresh and ask me if you should set it up.",
     "Do not create or modify anything yet.",
     "Treat a clear confirmation from me as explicit approval to proceed.",
@@ -921,7 +906,7 @@ function App() {
 
   // Chat tab state
   const [chatTabs, setChatTabs] = useState<ChatTab[]>([
-    { id: "default-chat-tab", runId: null, mode: "agent" },
+    { id: "default-chat-tab", runId: null },
   ]);
   const [activeChatTabId, setActiveChatTabId] = useState("default-chat-tab");
   const [chatViewStateByTab, setChatViewStateByTab] = useState<
@@ -1024,10 +1009,6 @@ function App() {
 
   const getChatTabTitle = useCallback(
     (tab: ChatTab) => {
-      if (tab.mode === "terminal") {
-        const cmd = tab.terminalConfig?.command || "claude";
-        return `Terminal: ${cmd}`;
-      }
       if (!tab.runId) return "New chat";
       return runs.find((r) => r.id === tab.runId)?.title || "(Untitled chat)";
     },
@@ -1495,6 +1476,8 @@ function App() {
         return;
       }
     }
+    // Clear stale content before async load to prevent rendering with old data (e.g. PDF gets markdown text)
+    setFileContent("");
     const requestId = (fileLoadRequestIdRef.current += 1);
     const pathToLoad = selectedPath;
     let cancelled = false;
@@ -1630,7 +1613,7 @@ function App() {
           wasActiveAtStart &&
           selectedPathRef.current === pathAtStart &&
           !renameInProgressRef.current &&
-          pathAtStart.startsWith("knowledge/")
+          isKnowledgeRelPath(pathAtStart)
         ) {
           const currentBase = getBaseName(pathAtStart);
           if (isUntitledPlaceholderName(currentBase)) {
@@ -2812,7 +2795,7 @@ function App() {
       const id = newChatTabId();
       setChatTabs((prev) => [
         ...prev,
-        { id, runId: targetRunId, mode: "agent" },
+        { id, runId: targetRunId },
       ]);
       setActiveChatTabId(id);
       loadRun(targetRunId);
@@ -2906,24 +2889,6 @@ function App() {
       restoreChatTabState,
       saveChatScrollForTab,
     ],
-  );
-
-  const switchChatTabMode = useCallback(
-    (tabId: string, mode: "agent" | "terminal") => {
-      setChatTabs((prev) =>
-        prev.map((t) =>
-          t.id === tabId
-            ? {
-                ...t,
-                mode,
-                terminalConfig:
-                  mode === "terminal" ? { command: "claude" } : undefined,
-              }
-            : t,
-        ),
-      );
-    },
-    [],
   );
 
   useEffect(() => {
@@ -3118,12 +3083,9 @@ function App() {
   );
 
   const handleNewChatTab = useCallback(
-    (
-      mode: "agent" | "terminal" = "agent",
-      terminalConfig?: { command: string; cwd?: string },
-    ) => {
-      // If there's already an empty "New chat" tab with same mode, switch to it
-      const emptyTab = chatTabs.find((t) => !t.runId && t.mode === mode);
+    () => {
+      // If there's already an empty "New chat" tab, switch to it
+      const emptyTab = chatTabs.find((t) => !t.runId);
       let newTabId: string | null = null;
       if (emptyTab) {
         if (emptyTab.id !== activeChatTabId) {
@@ -3137,15 +3099,13 @@ function App() {
           {
             id: newTabId!,
             runId: null,
-            mode,
-            ...(terminalConfig ? { terminalConfig } : {}),
           },
         ]);
         setActiveChatTabId(newTabId);
       }
 
       const targetTabId = emptyTab?.id ?? newTabId;
-      if (mode === "agent" && targetTabId && selectedPathRef.current) {
+      if (targetTabId && selectedPathRef.current) {
         const currentPath = selectedPathRef.current;
         if (currentPath.endsWith(".pdf")) {
           initialChatContextByTabRef.current.set(targetTabId, {
@@ -3188,11 +3148,8 @@ function App() {
 
   // Sidebar variant: create/switch chat tab without leaving file/graph context.
   const handleNewChatTabInSidebar = useCallback(
-    (
-      mode: "agent" | "terminal" = "agent",
-      terminalConfig?: { command: string; cwd?: string },
-    ) => {
-      const emptyTab = chatTabs.find((t) => !t.runId && t.mode === mode);
+    () => {
+      const emptyTab = chatTabs.find((t) => !t.runId);
       if (emptyTab) {
         if (emptyTab.id !== activeChatTabId) {
           setActiveChatTabId(emptyTab.id);
@@ -3204,8 +3161,6 @@ function App() {
           {
             id,
             runId: null,
-            mode,
-            ...(terminalConfig ? { terminalConfig } : {}),
           },
         ]);
         setActiveChatTabId(id);
@@ -3774,7 +3729,7 @@ function App() {
         const timestamp = Date.now();
         const extension = file.name.split(".").pop() || "png";
         const filename = `image-${timestamp}.${extension}`;
-        const assetsPath = "knowledge/.assets";
+        const assetsPath = ".assets";
         const imagePath = `${assetsPath}/${filename}`;
 
         try {
@@ -3994,8 +3949,8 @@ function App() {
 
     // Top-level knowledge folders open as a bases view with folder filter
     const parts = path.split("/");
-    if (parts.length === 2 && parts[0] === "knowledge") {
-      const folderName = parts[1];
+    if (parts.length === 1 && isKnowledgeRelPath(parts[0] + "/")) {
+      const folderName = parts[0];
       const folderCfg = FOLDER_BASE_CONFIGS[folderName];
       setBaseConfigByPath((prev) => ({
         ...prev,
@@ -4030,22 +3985,14 @@ function App() {
     setExpandedPaths(newExpanded);
   };
 
-  // Knowledge quick actions (only consider files under knowledge/)
-  const knowledgeFiles = React.useMemo(() => {
+  // Knowledge quick actions (only consider knowledge files)
+  const knowledgeFilePaths = React.useMemo(() => {
     const files = collectFilePaths(tree).filter(
-      (path) => path.startsWith("knowledge/") && path.endsWith(".md"),
+      (path) => isKnowledgeRelPath(path) && path.endsWith(".md"),
     );
-    return Array.from(new Set(files.map(stripKnowledgePrefix)));
+    return Array.from(new Set(files));
   }, [tree]);
-  const knowledgeFilePaths = React.useMemo(
-    () =>
-      knowledgeFiles.reduce<string[]>((acc, filePath) => {
-        const resolved = toKnowledgePath(filePath);
-        if (resolved) acc.push(resolved);
-        return acc;
-      }, []),
-    [knowledgeFiles],
-  );
+  const knowledgeFiles = knowledgeFilePaths;
 
   // Compute visible files (files whose parent directories are expanded)
   const visibleKnowledgeFiles = React.useMemo(() => {
@@ -4063,8 +4010,7 @@ function App() {
     };
 
     for (const file of knowledgeFiles) {
-      const fullPath = toKnowledgePath(file);
-      if (fullPath && isPathVisible(fullPath)) {
+      if (isPathVisible(file)) {
         visible.push(file);
       }
     }
@@ -4836,7 +4782,7 @@ function App() {
                     setChatTabs((prev) => {
                       const existing = prev.find((t) => !t.runId);
                       if (existing) return [{ ...existing }];
-                      return [{ id: newChatTabId(), runId: null, mode: "agent" }];
+                      return [{ id: newChatTabId(), runId: null }];
                     });
                     await loadRuns();
                     toast.success("Chat history cleared");
@@ -4960,7 +4906,6 @@ function App() {
                     isProcessing={isChatTabProcessing}
                     onSwitchTab={switchChatTab}
                     onCloseTab={closeChatTab}
-                    onSwitchMode={switchChatTabMode}
                   />
                 )}
                 {selectedPath && selectedPath.endsWith(".md") && (
@@ -4979,7 +4924,7 @@ function App() {
                   </div>
                 )}
                 {selectedPath &&
-                  selectedPath.startsWith("knowledge/") &&
+                  isKnowledgeRelPath(selectedPath) &&
                   selectedPath.endsWith(".md") && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -5024,28 +4969,6 @@ function App() {
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
                         New chat tab
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                {!selectedPath &&
-                  !isGraphOpen &&
-                  !isSuggestedTopicsOpen &&
-                  !isBrowserOpen && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleNewChatTab("terminal", { command: "claude" })
-                          }
-                          className="titlebar-no-drag flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors self-center shrink-0"
-                          aria-label="New terminal tab (Claude)"
-                        >
-                          <Monitor className="size-5" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        New terminal tab (Claude)
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -5284,9 +5207,7 @@ function App() {
                         onRestore={async (oid) => {
                           try {
                             await window.ipc.invoke("knowledge:restore", {
-                              path: versionHistoryPath.startsWith("knowledge/")
-                                ? versionHistoryPath.slice("knowledge/".length)
-                                : versionHistoryPath,
+                              path: versionHistoryPath,
                               oid,
                             });
                             // Reload file content
@@ -5306,6 +5227,8 @@ function App() {
                   </div>
                 ) : selectedPath.endsWith(".pdf") && fileContent ? (
                   <PdfViewer base64Data={fileContent} />
+                ) : /\.html?$/i.test(selectedPath) && fileContent ? (
+                  <HtmlViewer htmlContent={fileContent} fileName={getBaseName(selectedPath)} />
                 ) : (
                   <div className="flex-1 overflow-auto p-4">
                     <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">
@@ -5343,18 +5266,7 @@ function App() {
                             data-chat-tab-panel={tab.id}
                             aria-hidden={!isActive}
                           >
-                            {tab.mode === "terminal" ? (
-                              <div className="flex-1 min-h-0">
-                                <TerminalPanel
-                                  tabId={tab.id}
-                                  command={
-                                    tab.terminalConfig?.command || "claude"
-                                  }
-                                  cwd={tab.terminalConfig?.cwd}
-                                />
-                              </div>
-                            ) : (
-                              <Conversation
+                            <Conversation
                                 anchorMessageId={
                                   chatViewportAnchorByTab[tab.id]?.messageId
                                 }
@@ -5491,7 +5403,6 @@ function App() {
                                 </ConversationContent>
                                 <ConversationScrollButton />
                               </Conversation>
-                            )}
                           </div>
                         );
                       })}

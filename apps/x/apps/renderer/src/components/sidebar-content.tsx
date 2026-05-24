@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { isKnowledgeRelPath } from "@/lib/wiki-links";
 import {
-  Bot,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -14,15 +14,12 @@ import {
   FolderOpen,
   FolderPlus,
   Globe,
-  AlertTriangle,
-  HelpCircle,
   Mic,
   Network,
   Pencil,
   SearchIcon,
   SquarePen,
   Table2,
-  Plug,
   Lightbulb,
   LoaderIcon,
   Settings,
@@ -44,22 +41,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -69,13 +55,8 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarRail,
-  useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+
 import {
   Tooltip,
   TooltipContent,
@@ -94,13 +75,9 @@ import {
   type ActiveSection,
   useSidebarSection,
 } from "@/contexts/sidebar-context";
-import { ConnectorsPopover } from "@/components/connectors-popover";
-import { HelpPopover } from "@/components/help-popover";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { toast } from "@/lib/toast";
 import { useBilling } from "@/hooks/useBilling";
-import { ServiceEvent } from "@x/shared/src/service-events.js";
-import z from "zod";
 
 interface TreeNode {
   path: string;
@@ -130,15 +107,6 @@ type RunListItem = {
   agentId: string;
 };
 
-type ServiceEventType = z.infer<typeof ServiceEvent>;
-
-const MAX_SYNC_EVENTS = 1000;
-const RUN_STALE_MS = 2 * 60 * 60 * 1000;
-
-const SERVICE_LABELS: Record<string, string> = {
-  voice_memo: "Processing voice memo",
-};
-
 type TasksActions = {
   onNewChat: () => void;
   onSelectRun: (runId: string) => void;
@@ -155,12 +123,12 @@ type SidebarContentPanelProps = {
   onToggleFolder?: (path: string) => void;
   knowledgeActions: KnowledgeActions;
   onVoiceNoteCreated?: (path: string) => void;
+  onOpenSearch?: () => void;
   runs?: RunListItem[];
   currentRunId?: string | null;
   processingRunIds?: Set<string>;
   tasksActions?: TasksActions;
   onNewChat?: () => void;
-  onOpenSearch?: () => void;
   onOpenIngestWindow?: () => void;
   isBrowserOpen?: boolean;
   onToggleBrowser?: () => void;
@@ -172,12 +140,6 @@ const sectionTabs: { id: ActiveSection; label: string }[] = [
   { id: "knowledge", label: "Knowledge" },
   { id: "tasks", label: "Chat" },
 ];
-
-function formatEventTime(ts: string): string {
-  const date = new Date(ts);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
 
 function formatRunTime(ts: string): string {
   const date = new Date(ts);
@@ -196,198 +158,6 @@ function formatRunTime(ts: string): string {
   if (diffDays < 7) return `${diffDays} d`;
   if (diffWeeks < 4) return `${diffWeeks} w`;
   return `${Math.max(1, diffMonths)} m`;
-}
-
-function SyncStatusBar() {
-  const { state } = useSidebar();
-  const [activeServices, setActiveServices] = useState<Map<string, string>>(
-    new Map(),
-  );
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [logEvents, setLogEvents] = useState<ServiceEventType[]>([]);
-  const [logLoading, setLogLoading] = useState(false);
-  const runTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map(),
-  );
-
-  // Track active runs from real-time events
-  useEffect(() => {
-    const cleanup = window.ipc.on("services:events", (event) => {
-      const nextEvent = event as ServiceEventType;
-      if (nextEvent.type === "run_start") {
-        setActiveServices((prev) => {
-          const next = new Map(prev);
-          next.set(nextEvent.runId, nextEvent.service);
-          return next;
-        });
-        const existingTimeout = runTimeoutsRef.current.get(nextEvent.runId);
-        if (existingTimeout) clearTimeout(existingTimeout);
-        const timeout = setTimeout(() => {
-          setActiveServices((prev) => {
-            if (!prev.has(nextEvent.runId)) return prev;
-            const next = new Map(prev);
-            next.delete(nextEvent.runId);
-            return next;
-          });
-          runTimeoutsRef.current.delete(nextEvent.runId);
-        }, RUN_STALE_MS);
-        runTimeoutsRef.current.set(nextEvent.runId, timeout);
-      } else if (nextEvent.type === "run_complete") {
-        setActiveServices((prev) => {
-          const next = new Map(prev);
-          next.delete(nextEvent.runId);
-          return next;
-        });
-        const existingTimeout = runTimeoutsRef.current.get(nextEvent.runId);
-        if (existingTimeout) {
-          clearTimeout(existingTimeout);
-          runTimeoutsRef.current.delete(nextEvent.runId);
-        }
-      }
-    });
-    return cleanup;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      runTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
-      runTimeoutsRef.current.clear();
-    };
-  }, []);
-
-  // Load logs from JSONL file when popover opens
-  useEffect(() => {
-    if (!popoverOpen) return;
-    let cancelled = false;
-    async function loadLogs() {
-      setLogLoading(true);
-      try {
-        const result = await window.ipc.invoke("workspace:readFile", {
-          path: "logs/services.jsonl",
-          encoding: "utf8",
-        });
-        if (cancelled) return;
-        const lines = result.data.trim().split("\n").filter(Boolean);
-        const parsed: ServiceEventType[] = [];
-        for (const line of lines) {
-          try {
-            parsed.push(JSON.parse(line));
-          } catch {
-            // skip malformed lines
-          }
-        }
-        // Newest first, limit to 1000
-        setLogEvents(parsed.reverse().slice(0, MAX_SYNC_EVENTS));
-      } catch {
-        if (!cancelled) setLogEvents([]);
-      } finally {
-        if (!cancelled) setLogLoading(false);
-      }
-    }
-    loadLogs();
-    return () => {
-      cancelled = true;
-    };
-  }, [popoverOpen]);
-
-  const isSyncing = activeServices.size > 0;
-  const isCollapsed = state === "collapsed";
-
-  // Build status label from active services
-  const activeServiceNames = [...new Set(activeServices.values())];
-  const statusLabel = isSyncing
-    ? activeServiceNames.map((s) => SERVICE_LABELS[s] || s).join(", ")
-    : "All caught up";
-
-  return (
-    <>
-      {isCollapsed && isSyncing && (
-        <div
-          className="fixed bottom-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm"
-          style={{ left: "0.5rem" }}
-          aria-label="Syncing"
-        >
-          <LoaderIcon className="h-4 w-4 animate-spin text-muted-foreground" />
-        </div>
-      )}
-      <SidebarFooter className="border-t border-sidebar-border px-2 py-2">
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-sidebar-accent"
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                {isSyncing ? (
-                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin" />
-                ) : (
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-                )}
-                <span className="truncate">{statusLabel}</span>
-              </span>
-              <ChevronRight className="h-3 w-3 shrink-0" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="end"
-            sideOffset={4}
-            className="w-96 p-0"
-          >
-            <div className="p-3 border-b">
-              <h4 className="font-semibold text-sm">Sync Activity</h4>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {isSyncing ? statusLabel : "All services up to date"}
-              </p>
-            </div>
-            <div className="max-h-80 overflow-y-auto p-2">
-              {logLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <LoaderIcon className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : logEvents.length === 0 ? (
-                <div className="py-4 text-center text-xs text-muted-foreground">
-                  No recent activity.
-                </div>
-              ) : (
-                <div className="space-y-0.5">
-                  {logEvents.map((event, idx) => (
-                    <div
-                      key={`${event.runId}-${event.ts}-${idx}`}
-                      className="flex items-start gap-2 rounded px-2 py-1 text-xs hover:bg-accent"
-                    >
-                      <span className="shrink-0 text-[10px] leading-4 text-muted-foreground/70">
-                        {formatEventTime(event.ts)}
-                      </span>
-                      <span className="shrink-0">
-                        <span
-                          className={cn(
-                            "inline-block rounded px-1 py-0.5 text-[10px] font-medium leading-none",
-                            event.level === "error"
-                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                              : event.level === "warn"
-                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {SERVICE_LABELS[event.service]
-                            ?.split(" ")
-                            .slice(-1)[0] || event.service}
-                        </span>
-                      </span>
-                      <span className="leading-4 text-foreground/80">
-                        {event.message}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-      </SidebarFooter>
-    </>
-  );
 }
 
 export function SidebarContentPanel({
@@ -413,12 +183,7 @@ export function SidebarContentPanel({
   ...props
 }: SidebarContentPanelProps) {
   const { activeSection, setActiveSection } = useSidebarSection();
-  const [hasOauthError, setHasOauthError] = useState(false);
-  const [showOauthAlert, setShowOauthAlert] = useState(true);
-  const [connectorsOpen, setConnectorsOpen] = useState(false);
-  const [openConnectorsAfterClose, setOpenConnectorsAfterClose] =
-    useState(false);
-  const connectorsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const showChatQuickActions = activeSection === "tasks";
   const [isRowboatConnected, setIsRowboatConnected] = useState(false);
   const [appUrl, setAppUrl] = useState<string | null>(null);
   const { billing } = useBilling(isRowboatConnected);
@@ -474,20 +239,13 @@ export function SidebarContentPanel({
   useEffect(() => {
     let mounted = true;
 
-    const refreshOauthError = async () => {
+    const refreshConnection = async () => {
       try {
         const result = await window.ipc.invoke("oauth:getState", null);
         const config = result.config || {};
-        const hasError = Object.values(config).some((entry) =>
-          Boolean(entry?.error),
-        );
         const connected = config["rowboat"]?.connected ?? false;
         if (mounted) {
-          setHasOauthError(hasError);
           setIsRowboatConnected(connected);
-          if (!hasError) {
-            setShowOauthAlert(true);
-          }
         }
         if (connected && mounted) {
           try {
@@ -500,16 +258,14 @@ export function SidebarContentPanel({
       } catch (error) {
         console.error("Failed to fetch OAuth state:", error);
         if (mounted) {
-          setHasOauthError(false);
           setIsRowboatConnected(false);
-          setShowOauthAlert(true);
         }
       }
     };
 
-    refreshOauthError();
+    refreshConnection();
     const cleanup = window.ipc.on("oauth:didConnect", () => {
-      refreshOauthError();
+      refreshConnection();
     });
 
     return () => {
@@ -524,7 +280,7 @@ export function SidebarContentPanel({
         {/* Top spacer to clear the traffic lights + fixed toggle row */}
         <div className="h-8" />
         {/* Tab switcher - centered below the traffic lights row */}
-        <div className="flex items-center px-2 py-1.5">
+        <div className="flex items-center px-2 py-0.5">
           <div className="titlebar-no-drag flex w-full rounded-lg bg-sidebar-accent/50 p-0.5">
             {sectionTabs.map((tab) => (
               <button
@@ -543,8 +299,8 @@ export function SidebarContentPanel({
           </div>
         </div>
         {/* Quick action buttons */}
-        <div className="titlebar-no-drag flex flex-col gap-0.5 px-2 pb-1">
-          {onNewChat && (
+        <div className="titlebar-no-drag flex flex-col gap-0 px-2 pt-0.5 pb-1">
+          {showChatQuickActions && onNewChat && (
             <button
               type="button"
               onClick={onNewChat}
@@ -554,7 +310,7 @@ export function SidebarContentPanel({
               <span>New chat</span>
             </button>
           )}
-          {onOpenSearch && (
+          {showChatQuickActions && onOpenSearch && (
             <button
               type="button"
               onClick={onOpenSearch}
@@ -564,7 +320,7 @@ export function SidebarContentPanel({
               <span>Search</span>
             </button>
           )}
-          {onToggleBrowser && (
+          {showChatQuickActions && onToggleBrowser && (
             <button
               type="button"
               onClick={onToggleBrowser}
@@ -579,7 +335,7 @@ export function SidebarContentPanel({
               <span>Run browser task</span>
             </button>
           )}
-          {onOpenSuggestedTopics && (
+          {showChatQuickActions && onOpenSuggestedTopics && (
             <button
               type="button"
               onClick={onOpenSuggestedTopics}
@@ -594,7 +350,7 @@ export function SidebarContentPanel({
               <span>Suggested Topics</span>
             </button>
           )}
-          {onOpenIngestWindow && (
+          {showChatQuickActions && onOpenIngestWindow && (
             <button
               type="button"
               onClick={onOpenIngestWindow}
@@ -615,6 +371,7 @@ export function SidebarContentPanel({
             onSelectFile={onSelectFile}
             onToggleFolder={onToggleFolder}
             actions={knowledgeActions}
+            onOpenSearch={onOpenSearch}
             onVoiceNoteCreated={onVoiceNoteCreated}
           />
         )}
@@ -676,86 +433,12 @@ export function SidebarContentPanel({
       {/* Bottom actions */}
       <div className="border-t border-sidebar-border px-2 py-2">
         <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <ConnectorsPopover
-              open={connectorsOpen}
-              onOpenChange={setConnectorsOpen}
-              mode="unconnected"
-            >
-              <button
-                ref={connectorsButtonRef}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-              >
-                <Plug className="size-4" />
-                <span>Connect Accounts</span>
-              </button>
-            </ConnectorsPopover>
-            {hasOauthError && (
-              <AlertDialog
-                open={showOauthAlert}
-                onOpenChange={setShowOauthAlert}
-              >
-                <AlertDialogTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center"
-                    aria-label="OAuth connection issues"
-                  >
-                    <AlertTriangle className="size-3 text-amber-500/90 animate-pulse" />
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent
-                  onCloseAutoFocus={(event) => {
-                    event.preventDefault();
-                    if (openConnectorsAfterClose) {
-                      setOpenConnectorsAfterClose(false);
-                      setConnectorsOpen(true);
-                    }
-                    connectorsButtonRef.current?.focus();
-                  }}
-                >
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Reconnect your accounts</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      One or more connected accounts need attention. Open
-                      Connected accounts to review the status and reconnect if
-                      needed.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel
-                      onClick={() => {
-                        setOpenConnectorsAfterClose(false);
-                        setShowOauthAlert(false);
-                      }}
-                    >
-                      Dismiss
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => {
-                        setOpenConnectorsAfterClose(true);
-                        setShowOauthAlert(false);
-                      }}
-                    >
-                      View connected accounts
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-          </div>
           <SettingsDialog>
             <button className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
               <Settings className="size-4" />
               <span>Settings</span>
             </button>
           </SettingsDialog>
-          <HelpPopover>
-            <button className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
-              <HelpCircle className="size-4" />
-              <span>Help</span>
-            </button>
-          </HelpPopover>
           {/* Vault Selector Button */}
           <button
             onClick={handleVaultSelect}
@@ -775,7 +458,6 @@ export function SidebarContentPanel({
           </button>
         </div>
       </div>
-      <SyncStatusBar />
       <SidebarRail />
     </Sidebar>
   );
@@ -863,17 +545,16 @@ function VoiceNoteButton({
       const timestamp = now.toISOString().replace(/[:.]/g, "-");
       const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
       const noteName = `voice-memo-${timestamp}`;
-      const notePath = `knowledge/Voice Memos/${dateStr}/${noteName}.md`;
+      const notePath = `Voice Memos/${dateStr}/${noteName}.md`;
 
       timestampRef.current = timestamp;
       notePathRef.current = notePath;
-      // Relative path for linking (from knowledge/ root, without .md extension)
       const relativePath = `Voice Memos/${dateStr}/${noteName}`;
       relativePathRef.current = relativePath;
 
       // Create the note immediately with a "Recording..." placeholder
       await window.ipc.invoke("workspace:mkdir", {
-        path: `knowledge/Voice Memos/${dateStr}`,
+        path: `Voice Memos/${dateStr}`,
         recursive: true,
       });
 
@@ -1055,6 +736,7 @@ function KnowledgeSection({
   onSelectFile,
   onToggleFolder,
   actions,
+  onOpenSearch,
   onVoiceNoteCreated,
 }: {
   tree: TreeNode[];
@@ -1063,6 +745,7 @@ function KnowledgeSection({
   onSelectFile: (path: string, kind: "file" | "dir") => void;
   onToggleFolder?: (path: string) => void;
   actions: KnowledgeActions;
+  onOpenSearch?: () => void;
   onVoiceNoteCreated?: (path: string) => void;
 }) {
   const isExpanded = expandedPaths.size > 0;
@@ -1100,6 +783,9 @@ function KnowledgeSection({
   }, [selectedPath, expandedPaths, tree]);
 
   const quickActions = [
+    ...(onOpenSearch
+      ? [{ icon: SearchIcon, label: "Search", action: onOpenSearch }]
+      : []),
     { icon: FilePlus, label: "New Note", action: () => actions.createNote() },
     {
       icon: FolderPlus,
@@ -1177,14 +863,6 @@ function KnowledgeSection({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  );
-}
-
-function countFiles(node: TreeNode): number {
-  if (node.kind === "file") return 1;
-  return (node.children ?? []).reduce(
-    (sum, child) => sum + countFiles(child),
-    0,
   );
 }
 
@@ -1348,7 +1026,8 @@ function Tree({
 
   // Top-level knowledge folders open bases view — render as flat items
   const parts = item.path.split("/");
-  const isBasesFolder = isDir && parts.length === 2 && parts[0] === "knowledge";
+  const isBasesFolder =
+    isDir && parts.length === 1 && isKnowledgeRelPath(parts[0] + "/");
 
   if (isBasesFolder) {
     return (
@@ -1357,12 +1036,7 @@ function Tree({
           <SidebarMenuItem className="group/file-item">
             <SidebarMenuButton onClick={() => onSelect(item.path, item.kind)}>
               <Folder className="size-4 shrink-0" />
-              <div className="flex w-full items-center gap-1 min-w-0">
-                <span className="min-w-0 flex-1 truncate">{displayName}</span>
-                <span className="text-xs text-sidebar-foreground/50 tabular-nums shrink-0">
-                  {countFiles(item)}
-                </span>
-              </div>
+              <span className="min-w-0 flex-1 truncate">{displayName}</span>
             </SidebarMenuButton>
             {onToggleFolder && (item.children?.length ?? 0) > 0 && (
               <SidebarMenuAction
@@ -1445,12 +1119,7 @@ function Tree({
             <CollapsibleTrigger asChild>
               <SidebarMenuButton>
                 <ChevronRight className="transition-transform size-4" />
-                <div className="flex w-full items-center gap-1 min-w-0">
-                  <span className="min-w-0 flex-1 truncate">{displayName}</span>
-                  <span className="text-xs text-sidebar-foreground/50 tabular-nums shrink-0">
-                    {countFiles(item)}
-                  </span>
-                </div>
+                <span className="min-w-0 flex-1 truncate">{displayName}</span>
               </SidebarMenuButton>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -1621,7 +1290,8 @@ function TasksSection({
           <DialogHeader>
             <DialogTitle>Clear chat history</DialogTitle>
             <DialogDescription>
-              Are you sure you want to clear all chat history? This action cannot be undone.
+              Are you sure you want to clear all chat history? This action
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

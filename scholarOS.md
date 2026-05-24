@@ -71,7 +71,7 @@ When you need to present, ScholarOS can turn a directory of wiki pages into a na
 
 ### 🃏 Intelligent Flashcard System with FSRS
 
-When new concepts are added to the wiki, ScholarOS automatically generates flashcards scheduled with the FSRS v6 algorithm — the current state of the art in spaced repetition. Cards are stored in per-course JSON files (`knowledge/courses/<course-name>/flashcards.json`), keeping your Markdown notes clean while maintaining tight links with your concepts.
+When new concepts are added to the wiki, ScholarOS automatically generates flashcards scheduled with the FSRS v6 algorithm — the current state of the art in spaced repetition. Cards are stored in per-course JSON files (`courses/<course-name>/flashcards.json`), keeping your Markdown notes clean while maintaining tight links with your concepts.
 
 Each flashcard includes structured metadata:
 
@@ -149,23 +149,22 @@ Combine with the agent's guidance for efficient knowledge exploration.
 │   │   └── slides-week1.pdf
 │   └── /assets           # Shared images and media
 │
-├── /knowledge            # LLM-generated and maintained Markdown (the wiki)
-│   ├── /courses          # Per-course folders containing all course materials
-│   │   ├── /Biology 101
-│   │   │   ├── index.md              # Course overview page
-│   │   │   ├── flashcards.json       # Course flashcards with FSRS metadata
-│   │   │   ├── /concepts             # Subject matter pages for this course
-│   │   │   │   ├── Photosynthesis.md
-│   │   │   │   └── Cell Respiration.md
-│   │   │   ├── /lectures             # Lecture notes and slides
-│   │   │   └── /assignments          # Assignments and grading
-│   │   └── /CS 201
-│   │       ├── index.md
-│   │       ├── flashcards.json
-│   │       └── /concepts
-│   ├── /papers           # Academic papers, research articles (cross-course)
-│   ├── /syntheses        # Comparison tables, cross-source summaries
-│   └── /resources        # URLs, tools, reference materials (cross-course)
+├── /courses              # Per-course folders containing all course materials
+│   ├── /Biology 101
+│   │   ├── index.md              # Course overview page
+│   │   ├── flashcards.json       # Course flashcards with FSRS metadata
+│   │   ├── /concepts             # Subject matter pages for this course
+│   │   │   ├── Photosynthesis.md
+│   │   │   └── Cell Respiration.md
+│   │   ├── /lectures             # Lecture notes and slides
+│   │   └── /assignments          # Assignments and grading
+│   └── /CS 201
+│       ├── index.md
+│       ├── flashcards.json
+│       └── /concepts
+├── /papers               # Academic papers, research articles (cross-course)
+├── /syntheses            # Comparison tables, cross-source summaries
+├── /resources            # URLs, tools, reference materials (cross-course)
 │
 ├── /meta
 │   └── CLAUDE.md         # The schema — instructs the agent on conventions and workflows
@@ -173,7 +172,7 @@ Combine with the agent's guidance for efficient knowledge exploration.
 └── /assets               # Diagrams and images referenced by wiki pages
 ```
 
-The `/raw` directory is your dump for study materials. During ingest, the agent organizes files into course subfolders based on content analysis, then processes them into the `/knowledge` wiki. The `/knowledge` directory is entirely AI-owned — you read it, the agent writes it. The `CLAUDE.md` schema is what makes the agent a disciplined wiki maintainer rather than a generic chatbot; you and the agent co-evolve it as you develop workflows that fit your discipline.
+The `/raw` directory is your dump for study materials. During ingest, the agent organizes files into course subfolders based on content analysis, then processes them into the wiki directories at the workspace root (`/courses`, `/papers`, `/syntheses`, `/resources`). These directories are entirely AI-owned — you read them, the agent writes them. The `CLAUDE.md` schema is what makes the agent a disciplined wiki maintainer rather than a generic chatbot; you and the agent co-evolve it as you develop workflows that fit your discipline.
 
 ---
 
@@ -191,7 +190,7 @@ Agent organizes files by course in /raw (e.g., /raw/Biology 101/)
 Agent reads each file and discusses key takeaways with you
         │
         ▼
-Agent writes concept pages in /knowledge/courses/<course>/concepts/
+Agent writes concept pages in /courses/<course>/concepts/
         │
         ▼
 Agent updates course index.md and appends to log.md
@@ -318,7 +317,7 @@ npm install
 4. The agent will:
    - Analyze files to determine which course/module they belong to
    - Move them into course subfolders (e.g., `/raw/Biology 101/`, `/raw/CS 201/`)
-   - Extract metadata and create concept pages under `/knowledge/courses/<course-name>/concepts/`
+   - Extract metadata and create concept pages under `/courses/<course-name>/concepts/`
    - Update the course index page with links to all materials
    - Identify suitable flashcard questions from the source (if any), update the course-specific flashcard JSON file
 5. Watch the wiki update in Obsidian in real time

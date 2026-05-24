@@ -16,7 +16,6 @@ import {
   stopRunsWatcher,
   stopServicesWatcher,
   stopWorkspaceWatcher,
-  killAllPtyProcesses,
 } from "./ipc.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname } from "node:path";
@@ -315,7 +314,6 @@ app.on("before-quit", () => {
   stopWorkspaceWatcher();
   stopRunsWatcher();
   stopServicesWatcher();
-  killAllPtyProcesses();
   shutdownLocalSites().catch((error) => {
     console.error("[LocalSites] Failed to shut down cleanly:", error);
   });

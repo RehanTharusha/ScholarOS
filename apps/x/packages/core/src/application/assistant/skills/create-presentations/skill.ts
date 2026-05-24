@@ -78,7 +78,7 @@ Map each point to a slide layout from the Available Layout Types below. For a ty
 
 ## Workflow
 
-1. Use workspace-readFile to check knowledge/ for relevant context about the company, product, team, etc.
+1. Use workspace-readFile to check the knowledge base for relevant context about the company, product, team, etc.
 2. Ensure Playwright is installed: \`npm install playwright && npx playwright install chromium\`
 3. Use workspace-getRoot to get the workspace root path.
 4. Plan the narrative arc and slide outline (see Content Planning above).

@@ -11,7 +11,7 @@ interface CommitInfo {
 }
 
 interface VersionHistoryPanelProps {
-  path: string // knowledge-relative file path (e.g. "knowledge/People/John.md")
+  path: string // workspace-relative file path (e.g. "People/John.md")
   onClose: () => void
   onSelectVersion: (oid: string | null, content: string) => void // null = current
   onRestore: (oid: string) => void
@@ -35,14 +35,11 @@ export function VersionHistoryPanel({
   const [selectedOid, setSelectedOid] = useState<string | null>(null) // null = current/latest
   const [error, setError] = useState<string | null>(null)
 
-  // Strip "knowledge/" prefix for IPC calls
-  const relPath = path.startsWith('knowledge/') ? path.slice('knowledge/'.length) : path
-
   const loadHistory = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await window.ipc.invoke('knowledge:history', { path: relPath })
+      const result = await window.ipc.invoke('knowledge:history', { path })
       setCommits(result.commits)
     } catch (err) {
       console.error('Failed to load version history:', err)
@@ -78,12 +75,12 @@ export function VersionHistoryPanel({
 
     setSelectedOid(oid)
     try {
-      const result = await window.ipc.invoke('knowledge:fileAtCommit', { path: relPath, oid })
+      const result = await window.ipc.invoke('knowledge:fileAtCommit', { path, oid })
       onSelectVersion(oid, result.content)
     } catch (err) {
       console.error('Failed to load file at commit:', err)
     }
-  }, [path, relPath, onSelectVersion])
+  }, [path, onSelectVersion])
 
   const handleRestore = useCallback(() => {
     if (selectedOid) {

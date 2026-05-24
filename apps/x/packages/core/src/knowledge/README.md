@@ -2,6 +2,8 @@
 
 This directory contains the knowledge graph building system that processes emails and meeting transcripts to create an Obsidian-style knowledge base.
 
+> **Note:** The knowledge directories (courses/, papers/, syntheses/, resources/) now live at the workspace root alongside raw/, meta/, and assets/. The Knowledge Graph System works with workspace-relative paths.
+
 ## Components
 
 ### `build_graph.ts`
@@ -13,7 +15,7 @@ Main orchestrator that:
 ### `graph_state.ts`
 State management module that tracks which files have been processed:
 - Uses hybrid mtime + hash approach for change detection
-- Stores state in `WorkDir/knowledge_graph_state.json`
+- Stores state in \`WorkDir/knowledge_graph_state.json\`
 - Provides modular functions for state operations
 
 ### `sync_gmail.ts` & `sync_fireflies.ts`
@@ -69,7 +71,7 @@ This is efficient (only hashes potentially changed files) and reliable (confirms
 
 3. **Agent processes batch**
    - Extracts entities (people, orgs, projects, topics)
-   - Creates/updates notes in `WorkDir/knowledge/`
+   - Creates/updates notes in the workspace root (courses/, People/, etc.)
    - Merges information for entities appearing in multiple files
 
 ## Replacing the Change Detection Logic

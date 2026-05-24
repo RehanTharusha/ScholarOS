@@ -1,15 +1,10 @@
 import * as React from "react";
-import { X, SquarePen, Monitor } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type ChatTab = {
   id: string;
   runId: string | null;
-  mode: "agent" | "terminal";
-  terminalConfig?: {
-    command: string;
-    cwd?: string;
-  };
 };
 
 export type FileTab = {
@@ -25,7 +20,6 @@ interface TabBarProps<T> {
   isProcessing?: (tab: T) => boolean;
   onSwitchTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
-  onSwitchMode?: (tabId: string, mode: "agent" | "terminal") => void;
   layout?: "fill" | "scroll";
   allowSingleTabClose?: boolean;
 }
@@ -37,7 +31,6 @@ export function TabBar<T>({
   getTabId,
   onSwitchTab,
   onCloseTab,
-  onSwitchMode,
   layout = "fill",
   allowSingleTabClose = false,
 }: TabBarProps<T>) {
@@ -54,7 +47,6 @@ export function TabBar<T>({
         const tabId = getTabId(tab);
         const isActive = tabId === activeTabId;
         const title = getTabTitle(tab);
-        const mode = (tab as any).mode as "agent" | "terminal" | undefined;
 
         return (
           <React.Fragment key={tabId}>
@@ -80,33 +72,7 @@ export function TabBar<T>({
                 layout === "scroll" ? { flex: "0 0 auto" } : { flex: "1 1 0px" }
               }
             >
-              {mode === "terminal" && (
-                <Monitor className="size-3 shrink-0 text-muted-foreground" />
-              )}
-              {mode === "agent" && (
-                <SquarePen className="size-3 shrink-0 text-muted-foreground" />
-              )}
               <span className="truncate flex-1 text-left">{title}</span>
-              {onSwitchMode && (
-                <span
-                  role="button"
-                  className="shrink-0 flex items-center justify-center rounded-sm p-0.5 opacity-0 group-hover/tab:opacity-60 hover:opacity-100! hover:bg-foreground/10 transition-all"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSwitchMode(
-                      tabId,
-                      mode === "agent" ? "terminal" : "agent",
-                    );
-                  }}
-                  aria-label="Switch tab mode"
-                >
-                  {mode === "terminal" ? (
-                    <SquarePen className="size-3" />
-                  ) : (
-                    <Monitor className="size-3" />
-                  )}
-                </span>
-              )}
               {(allowSingleTabClose || tabs.length > 1) && (
                 <span
                   role="button"

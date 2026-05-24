@@ -12,7 +12,7 @@ interface SearchResult {
   path: string;
 }
 
-const KNOWLEDGE_DIR = path.join(WorkDir, 'knowledge');
+const KNOWLEDGE_DIR = WorkDir;
 const RUNS_DIR = path.join(WorkDir, 'runs');
 
 type SearchType = 'knowledge' | 'chat';

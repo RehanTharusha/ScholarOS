@@ -34,8 +34,8 @@ module.exports = {
     // to analyze/copy node_modules, which fails with pnpm's symlinked workspaces.
     prune: false,
     ignore: [
-      /src\//,
-      /node_modules\//,
+      /^src\//,
+      /^node_modules\//, // Only root node_modules, not .package/dist/node_modules/
       /.gitignore/,
       /bundle\.mjs/,
       /tsconfig.json/,
@@ -175,31 +175,25 @@ module.exports = {
 
       // Copy pdf worker assets into staging for local PDF parsing.
       // This is critical for the PDF parser to work in packaged builds.
+      // bundle.mjs already copies the worker to .package/dist/ during the
+      // esbuild step above; this is an additional safety net.
       console.log("Copying pdf.worker.mjs...");
       
+      const { createRequire } = require("module");
       const pdfWorkerCandidates = [
-        // Primary: pdfjs-dist (now a direct dependency in core package)
+        // Primary: pdfjs-dist (dependency of @x/core, resolved from core)
         (() => {
           try {
-            return path.join(
-              path.dirname(require.resolve("pdfjs-dist/package.json")),
-              "build/pdf.worker.mjs",
+            const coreReq = createRequire(
+              path.join(__dirname, "../../packages/core/package.json"),
             );
+            return coreReq.resolve("pdfjs-dist/build/pdf.worker.mjs");
           } catch (e) {
             return null;
           }
         })(),
-        // Secondary: pdf-parse's bundled worker
-        (() => {
-          try {
-            return path.join(
-              path.dirname(require.resolve("pdf-parse/package.json")),
-              "dist/worker/pdf.worker.mjs",
-            );
-          } catch (e) {
-            return null;
-          }
-        })(),
+        // Already copied by bundle.mjs to .package/dist/
+        path.join(__dirname, ".package", "dist", "pdf.worker.mjs"),
         // Fallback: react-pdf worker
         path.join(
           __dirname,

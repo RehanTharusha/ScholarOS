@@ -22,7 +22,7 @@ await esbuild.build({
   platform: "node",
   target: "node20",
   outfile: "./.package/dist/main.cjs",
-  external: ["electron"], // Provided by Electron runtime
+  external: ["electron"],
   // Use CommonJS format - many dependencies use require() which doesn't work
   // well with esbuild's ESM shim. CJS handles dynamic requires natively.
   format: "cjs",
@@ -37,3 +37,30 @@ await esbuild.build({
 });
 
 console.log("✅ Main process bundled to .package/dist/main.cjs");
+
+// Copy pdf.worker.mjs alongside the bundle so pdf-parse / pdfjs-dist can
+// find it at runtime. This is needed in both dev mode (npm run dev) and
+// packaging (forge generateAssets hooks into bundle.mjs).
+//
+// pdfjs-dist is a dependency of @x/core, not apps/main. We resolve it
+// from the core package's node_modules.
+try {
+  const { createRequire } = await import("module");
+  const { copyFileSync, mkdirSync } = await import("fs");
+  const { join, dirname, resolve } = await import("path");
+
+  // Resolve from @x/core so pnpm's module resolution finds pdfjs-dist
+  const corePkg = resolve("../../packages/core/package.json");
+  const coreReq = createRequire(corePkg);
+  const workerPath = coreReq.resolve("pdfjs-dist/build/pdf.worker.mjs");
+
+  const destDir = join(".package", "dist");
+  mkdirSync(dirname(destDir), { recursive: true });
+
+  const dest = join(destDir, "pdf.worker.mjs");
+  copyFileSync(workerPath, dest);
+  console.log("✅ pdf.worker.mjs copied to .package/dist/");
+} catch (e) {
+  console.error("❌ Failed to copy pdf.worker.mjs:", e.message);
+}
+

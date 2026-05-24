@@ -12,7 +12,7 @@ ScholarOS reads your study materials — lecture PDFs, papers, slides, transcrip
 Add any study material to the `/raw` folder, organized by course or unorganized — the agent sorts it out.
 
 **Run the ingest**
-Point your AI agent at the vault and say: _"Ingest all materials in /raw."_ It reads each file, writes concept pages into `/knowledge`, and cross-references everything.
+Point your AI agent at the vault and say: _"Ingest all materials in /raw."_ It reads each file, writes concept pages into the workspace root, and cross-references everything.
 
 **Browse in Obsidian**
 Open the vault in Obsidian to explore the wiki, follow backlinks, and see the graph of your knowledge grow with every ingest.
@@ -23,7 +23,10 @@ Open the vault in Obsidian to explore the wiki, follow backlinks, and see the gr
 
 ```
 /raw          ← Drop study materials here (PDFs, slides, notes)
-/knowledge    ← AI-generated wiki (concepts, courses, syntheses)
+/courses/     ← Per-course concept pages, lectures, assignments
+/papers/      → Academic papers and research articles
+/syntheses/   → Cross-concept summaries and comparisons
+/resources/   → URLs, tools, and reference materials
 /meta         ← CLAUDE.md schema that guides the agent
 /assets       ← Images and diagrams
 ```

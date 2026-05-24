@@ -2,23 +2,32 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const WIKI_LINK_REGEX = /\[\[([^[\]]+)\]\]/g;
-const KNOWLEDGE_PREFIX = 'knowledge/';
 const MARKDOWN_EXTENSION = '.md';
+const NON_KNOWLEDGE_DIRS = ['raw/', 'meta/', 'assets/'];
+const LEGACY_KNOWLEDGE_PREFIX = 'knowledge/';
 
 function normalizeRelPath(relPath: string): string {
   return relPath.replace(/\\/g, '/');
 }
 
-function isKnowledgeMarkdownPath(relPath: string): boolean {
+function isKnowledgeRelPath(relPath: string): boolean {
   const normalized = normalizeRelPath(relPath).replace(/^\/+/, '');
   const lower = normalized.toLowerCase();
-  return lower.startsWith(KNOWLEDGE_PREFIX) && lower.endsWith(MARKDOWN_EXTENSION);
+  for (const dir of NON_KNOWLEDGE_DIRS) {
+    if (lower.startsWith(dir)) return false;
+  }
+  return true;
 }
 
-function stripKnowledgePrefix(relPath: string): string {
-  const normalized = normalizeRelPath(relPath).replace(/^\/+/, '');
-  if (!normalized.toLowerCase().startsWith(KNOWLEDGE_PREFIX)) return normalized;
-  return normalized.slice(KNOWLEDGE_PREFIX.length);
+function stripLegacyKnowledgePrefix(relPath: string): string {
+  const lower = relPath.toLowerCase();
+  return lower.startsWith(LEGACY_KNOWLEDGE_PREFIX)
+    ? relPath.slice(LEGACY_KNOWLEDGE_PREFIX.length)
+    : relPath;
+}
+
+function isKnowledgeMarkdownPath(relPath: string): boolean {
+  return isKnowledgeRelPath(relPath) && relPath.toLowerCase().endsWith(MARKDOWN_EXTENSION);
 }
 
 function stripMarkdownExtension(wikiPath: string): string {
@@ -29,15 +38,6 @@ function stripMarkdownExtension(wikiPath: string): string {
 
 function toWikiPathCompareKey(wikiPath: string): string {
   return stripMarkdownExtension(wikiPath).toLowerCase();
-}
-
-function splitWikiPathPrefix(rawPath: string): { pathWithoutPrefix: string; hadKnowledgePrefix: boolean } {
-  let normalized = rawPath.trim().replace(/^\/+/, '').replace(/^\.\//, '');
-  const hadKnowledgePrefix = /^knowledge\//i.test(normalized);
-  if (hadKnowledgePrefix) {
-    normalized = normalized.slice(KNOWLEDGE_PREFIX.length);
-  }
-  return { pathWithoutPrefix: normalized, hadKnowledgePrefix };
 }
 
 function rewriteWikiLinksInMarkdown(
@@ -65,8 +65,9 @@ function rewriteWikiLinksInMarkdown(
     const rawPath = pathPart.trim();
     if (!rawPath) return fullMatch;
 
-    const { pathWithoutPrefix, hadKnowledgePrefix } = splitWikiPathPrefix(rawPath);
-    if (!pathWithoutPrefix) return fullMatch;
+      const normalizedPath = rawPath.trim().replace(/^\/+/, '').replace(/^\.\//, '');
+      const pathWithoutPrefix = stripLegacyKnowledgePrefix(normalizedPath);
+      if (!pathWithoutPrefix) return fullMatch;
 
     const matchesFullPath = toWikiPathCompareKey(pathWithoutPrefix) === fromCompareKey;
     const isBareTarget = !pathWithoutPrefix.includes('/');
@@ -82,26 +83,17 @@ function rewriteWikiLinksInMarkdown(
     }
 
     const preserveMarkdownExtension = rawPath.toLowerCase().endsWith(MARKDOWN_EXTENSION);
-    const rewrittenPath = matchesBareSelfName
+    const finalPath = matchesBareSelfName
       ? (preserveMarkdownExtension ? `${toBaseName}.md` : toBaseName)
       : (preserveMarkdownExtension ? toWikiPath : toWikiPathWithoutExtension);
-    const finalPath = hadKnowledgePrefix ? `${KNOWLEDGE_PREFIX}${rewrittenPath}` : rewrittenPath;
 
     return `[[${leadingWhitespace}${finalPath}${trailingWhitespace}${anchorSuffix}${aliasSuffix}]]`;
   });
 }
 
 async function collectKnowledgeMarkdownFiles(workspaceRoot: string): Promise<string[]> {
-  const knowledgeRoot = path.join(workspaceRoot, 'knowledge');
-  try {
-    const stat = await fs.lstat(knowledgeRoot);
-    if (!stat.isDirectory()) return [];
-  } catch {
-    return [];
-  }
-
   const markdownFiles: string[] = [];
-  const pendingDirectories: string[] = [knowledgeRoot];
+  const pendingDirectories: string[] = [workspaceRoot];
 
   while (pendingDirectories.length > 0) {
     const currentDirectory = pendingDirectories.pop();
@@ -113,6 +105,8 @@ async function collectKnowledgeMarkdownFiles(workspaceRoot: string): Promise<str
 
       const absolutePath = path.join(currentDirectory, entry.name);
       if (entry.isDirectory()) {
+        const relativeDir = normalizeRelPath(path.relative(workspaceRoot, absolutePath));
+        if (!isKnowledgeRelPath(relativeDir + '/')) continue;
         pendingDirectories.push(absolutePath);
         continue;
       }
@@ -139,8 +133,8 @@ export async function rewriteWikiLinksForRenamedKnowledgeFile(
     return 0;
   }
 
-  const fromWikiPath = stripKnowledgePrefix(normalizedFrom);
-  const toWikiPath = stripKnowledgePrefix(normalizedTo);
+  const fromWikiPath = normalizedFrom;
+  const toWikiPath = normalizedTo;
   if (toWikiPathCompareKey(fromWikiPath) === toWikiPathCompareKey(toWikiPath)) return 0;
 
   const markdownFiles = await collectKnowledgeMarkdownFiles(workspaceRoot);

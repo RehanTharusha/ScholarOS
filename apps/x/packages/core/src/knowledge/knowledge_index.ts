@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { WorkDir } from '../config/config.js';
 
-const KNOWLEDGE_DIR = path.join(WorkDir, 'knowledge');
+const KNOWLEDGE_DIR = WorkDir;
 
 /**
  * Index entry for a course note

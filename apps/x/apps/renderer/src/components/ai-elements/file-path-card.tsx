@@ -3,7 +3,7 @@ import { BookOpen, FileIcon, FileText, Image, Music, Pause, Play, Video } from '
 import { Button } from '@/components/ui/button'
 import { useFileCard } from '@/contexts/file-card-context'
 import { useSidebarSection } from '@/contexts/sidebar-context'
-import { wikiLabel } from '@/lib/wiki-links'
+import { wikiLabel, isKnowledgeRelPath } from '@/lib/wiki-links'
 
 const AUDIO_EXTENSIONS = new Set(['.wav', '.mp3', '.m4a', '.ogg', '.flac', '.aac'])
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico'])
@@ -218,7 +218,7 @@ function SystemFileCard({ filePath }: { filePath: string }) {
 export function FilePathCard({ filePath }: { filePath: string }) {
   const trimmed = filePath.trim()
 
-  if (trimmed.startsWith('knowledge/')) {
+  if (isKnowledgeRelPath(trimmed)) {
     return <KnowledgeFileCard filePath={trimmed} />
   }
 

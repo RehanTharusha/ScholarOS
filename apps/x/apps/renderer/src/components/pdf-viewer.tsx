@@ -3,16 +3,25 @@
 import * as React from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2, Plus, Minus, Maximize } from "lucide-react";
+import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-pdfjs.GlobalWorkerOptions.workerSrc = "pdf.worker.min.mjs";
+pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64);
+  const binaryString = atob(base64.replace(/\s/g, ""));
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes;
+}
+
+function tryBase64ToUint8Array(base64: string): Uint8Array | null {
+  try {
+    return base64ToUint8Array(base64);
+  } catch {
+    return null;
+  }
 }
 
 const MIN_SCALE = 0.25;
@@ -29,10 +38,10 @@ export function PdfViewer({ base64Data }: { base64Data: string }) {
   const [scale, setScale] = React.useState(1);
   const [fitScale, setFitScale] = React.useState<number | null>(null);
 
-  const pdfFile = React.useMemo(
-    () => ({ data: base64ToUint8Array(base64Data) }),
-    [base64Data],
-  );
+  const pdfFile = React.useMemo(() => {
+    const bytes = tryBase64ToUint8Array(base64Data);
+    return bytes ? { data: bytes } : null;
+  }, [base64Data]);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
