@@ -1094,7 +1094,7 @@ export async function* streamAgent({
     }
     if (searchEnabled) {
       loopLogger.log("search enabled, injecting search prompt");
-      instructionsWithDateTime += `\n\n# Search\nThe user has requested a search. Use the web-search tool to answer their query.`;
+      instructionsWithDateTime += `\n\n# Search\nThe user has enabled search for this message. Call the \`web-search\` tool once with their query. The tool handles all browser interaction internally — navigate, read page, extract content. Do NOT narrate the process. Do NOT say "let me open the browser" or "I'll search now" — just call the tool silently. Wait for the results, then answer the question naturally.`;
     }
     let streamError: string | null = null;
     for await (const event of streamLlm(

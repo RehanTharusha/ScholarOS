@@ -1,22 +1,25 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 
-export type ActiveSection = "knowledge" | "tasks"
+export type ActiveSection = "knowledge" | "tasks";
 
 type SidebarSectionContextProps = {
-  activeSection: ActiveSection
-  setActiveSection: (section: ActiveSection) => void
-}
+  activeSection: ActiveSection;
+  setActiveSection: (section: ActiveSection) => void;
+};
 
-const SidebarSectionContext = React.createContext<SidebarSectionContextProps | null>(null)
+const SidebarSectionContext =
+  React.createContext<SidebarSectionContextProps | null>(null);
 
 export function useSidebarSection() {
-  const context = React.useContext(SidebarSectionContext)
+  const context = React.useContext(SidebarSectionContext);
   if (!context) {
-    throw new Error("useSidebarSection must be used within a SidebarSectionProvider.")
+    throw new Error(
+      "useSidebarSection must be used within a SidebarSectionProvider.",
+    );
   }
-  return context
+  return context;
 }
 
 export function SidebarSectionProvider({
@@ -24,33 +27,32 @@ export function SidebarSectionProvider({
   onSectionChange,
   children,
 }: {
-  defaultSection?: ActiveSection
-  onSectionChange?: (section: ActiveSection) => void
-  children: React.ReactNode
+  defaultSection?: ActiveSection;
+  onSectionChange?: (section: ActiveSection) => void;
+  children: React.ReactNode;
 }) {
-  const [activeSection, setActiveSectionState] = React.useState<ActiveSection>(defaultSection)
+  const [activeSection, setActiveSectionState] =
+    React.useState<ActiveSection>(defaultSection);
 
-  React.useEffect(() => {
-    onSectionChange?.(defaultSection)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const setActiveSection = React.useCallback((section: ActiveSection) => {
-    setActiveSectionState(section)
-    onSectionChange?.(section)
-  }, [onSectionChange])
+  const setActiveSection = React.useCallback(
+    (section: ActiveSection) => {
+      setActiveSectionState(section);
+      onSectionChange?.(section);
+    },
+    [onSectionChange],
+  );
 
   const contextValue = React.useMemo<SidebarSectionContextProps>(
     () => ({
       activeSection,
       setActiveSection,
     }),
-    [activeSection, setActiveSection]
-  )
+    [activeSection, setActiveSection],
+  );
 
   return (
     <SidebarSectionContext.Provider value={contextValue}>
       {children}
     </SidebarSectionContext.Provider>
-  )
+  );
 }

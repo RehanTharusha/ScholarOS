@@ -24,6 +24,7 @@ import {
   Message,
   MessageContent,
   MessageResponse,
+  StreamingMessageBody,
 } from "@/components/ai-elements/message";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
@@ -53,6 +54,7 @@ import {
 } from "@/components/chat-input-with-mentions";
 import { ChatMessageAttachments } from "@/components/chat-message-attachments";
 import { wikiLabel } from "@/lib/wiki-links";
+import { useSmoothedText } from "@/hooks/useSmoothedText";
 import {
   type ChatViewportAnchorState,
   type ChatTabViewState,
@@ -72,6 +74,19 @@ import {
 } from "@/lib/chat-conversation";
 
 const streamdownComponents = { pre: MarkdownPreOverride };
+
+function SmoothStreamingMessage({
+  text,
+  components,
+}: {
+  text: string;
+  components: typeof streamdownComponents;
+}) {
+  const smoothText = useSmoothedText(text);
+  return (
+    <MessageResponse components={components}>{smoothText}</MessageResponse>
+  );
+}
 
 // Render user messages with markdown so bullets, bold, links, etc. survive the
 // round-trip from the input textarea. `remarkBreaks` turns single newlines
@@ -182,6 +197,7 @@ interface ChatSidebarProps {
   onOpenFullScreen?: () => void;
   conversation: ConversationItem[];
   currentAssistantMessage: string;
+  currentToolDraftActive?: boolean;
   chatTabStates?: Record<string, ChatTabViewState>;
   viewportAnchors?: Record<string, ChatViewportAnchorState>;
   isProcessing: boolean;
@@ -258,6 +274,7 @@ export function ChatSidebar({
   onOpenFullScreen,
   conversation,
   currentAssistantMessage,
+  currentToolDraftActive = false,
   chatTabStates = {},
   viewportAnchors = {},
   isProcessing,
@@ -397,6 +414,7 @@ export function ChatSidebar({
       runId: runId ?? null,
       conversation,
       currentAssistantMessage,
+      currentToolDraftActive,
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
@@ -405,6 +423,7 @@ export function ChatSidebar({
       runId,
       conversation,
       currentAssistantMessage,
+      currentToolDraftActive,
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
@@ -423,7 +442,8 @@ export function ChatSidebar({
   );
   const hasConversation =
     activeTabState.conversation.length > 0 ||
-    Boolean(activeTabState.currentAssistantMessage);
+    Boolean(activeTabState.currentAssistantMessage) ||
+    activeTabState.currentToolDraftActive;
 
   const renderConversationItem = (item: ConversationItem, tabId: string) => {
     if (isChatMessage(item)) {
@@ -673,7 +693,8 @@ export function ChatSidebar({
                   const tabState = getTabState(tab.id);
                   const tabHasConversation =
                     tabState.conversation.length > 0 ||
-                    Boolean(tabState.currentAssistantMessage);
+                    Boolean(tabState.currentAssistantMessage) ||
+                    tabState.currentToolDraftActive;
                   return (
                     <div
                       key={tab.id}
@@ -784,21 +805,33 @@ export function ChatSidebar({
                                   />
                                 ))}
 
-                              {tabState.currentAssistantMessage && (
+                              {tabState.currentToolDraftActive && (
                                 <Message from="assistant">
                                   <MessageContent>
-                                    <MessageResponse
-                                      components={streamdownComponents}
-                                    >
-                                      {tabState.currentAssistantMessage}
-                                    </MessageResponse>
+                                    <StreamingMessageBody />
                                   </MessageContent>
                                 </Message>
                               )}
 
+                              {!tabState.currentToolDraftActive &&
+                                tabState.currentAssistantMessage && (
+                                  <Message from="assistant">
+                                    <MessageContent>
+                                      <SmoothStreamingMessage
+                                        text={tabState.currentAssistantMessage.replace(
+                                          /<\/?voice>/g,
+                                          "",
+                                        )}
+                                        components={streamdownComponents}
+                                      />
+                                    </MessageContent>
+                                  </Message>
+                                )}
+
                               {isActive &&
                                 isProcessing &&
-                                !tabState.currentAssistantMessage && (
+                                !tabState.currentAssistantMessage &&
+                                !tabState.currentToolDraftActive && (
                                   <Message from="assistant">
                                     <MessageContent>
                                       <Shimmer duration={1}>

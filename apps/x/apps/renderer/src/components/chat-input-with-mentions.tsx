@@ -311,32 +311,10 @@ function ChatInputInner({
     return () => window.removeEventListener("models-config-changed", handler);
   }, [loadModelConfig]);
 
-  // Check search tool availability (exa or signed-in via gateway)
+  // Search is always available via the embedded browser
   useEffect(() => {
-    const checkSearch = async () => {
-      if (isRowboatConnected) {
-        setSearchAvailable(true);
-        return;
-      }
-      let available = false;
-      try {
-        const { exists } = await window.ipc.invoke("workspace:exists", {
-          path: "config/exa-search.json",
-        });
-        if (exists) {
-          const raw = await window.ipc.invoke("workspace:readFile", {
-            path: "config/exa-search.json",
-          });
-          const config = JSON.parse(raw.data);
-          if (config.apiKey) available = true;
-        }
-      } catch {
-        /* not configured */
-      }
-      setSearchAvailable(available);
-    };
-    checkSearch();
-  }, [isActive, isRowboatConnected]);
+    setSearchAvailable(true);
+  }, []);
 
   // Selecting a model affects only the *next* run created from this tab.
   // Once a run exists, model is frozen on the run and the dropdown is read-only.

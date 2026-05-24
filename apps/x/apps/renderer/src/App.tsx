@@ -51,6 +51,7 @@ import {
   Message,
   MessageContent,
   MessageResponse,
+  StreamingMessageBody,
 } from "@/components/ai-elements/message";
 import {
   type PromptInputMessage,
@@ -235,7 +236,10 @@ const WIKI_LINK_TOKEN_REGEX = /\[\[([^[\]]+)\]\]/g;
 const NON_KNOWLEDGE_DIR_NAMES = ["raw/", "meta/", "assets/"];
 
 const isKnowledgeRelPath = (relPath: string) => {
-  const normalized = relPath.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
+  const normalized = relPath
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .toLowerCase();
   for (const dir of NON_KNOWLEDGE_DIR_NAMES) {
     if (normalized.startsWith(dir)) return false;
   }
@@ -293,7 +297,10 @@ const rewriteWikiLinksForRenamedFileInMarkdown = (
       const rawPath = pathPart.trim();
       if (!rawPath) return fullMatch;
 
-      const pathWithoutPrefix = rawPath.trim().replace(/^\/+/, "").replace(/^\.\//, "");
+      const pathWithoutPrefix = rawPath
+        .trim()
+        .replace(/^\/+/, "")
+        .replace(/^\.\//, "");
       if (!pathWithoutPrefix) return fullMatch;
 
       const matchesFullPath =
@@ -758,6 +765,7 @@ function App() {
   const [presetMessage, setPresetMessage] = useState<string | undefined>(
     undefined,
   );
+  const [currentToolDraftActive, setCurrentToolDraftActive] = useState(false);
 
   // Voice mode state
   const [voiceAvailable, setVoiceAvailable] = useState(false);
@@ -1075,6 +1083,7 @@ function App() {
       runId,
       conversation,
       currentAssistantMessage,
+      currentToolDraftActive,
       pendingAskHumanRequests: new Map(pendingAskHumanRequests),
       allPermissionRequests: new Map(allPermissionRequests),
       permissionResponses: new Map(permissionResponses),
@@ -1085,6 +1094,7 @@ function App() {
     runId,
     conversation,
     currentAssistantMessage,
+    currentToolDraftActive,
     pendingAskHumanRequests,
     allPermissionRequests,
     permissionResponses,
@@ -2058,6 +2068,7 @@ function App() {
           setIsProcessing(false);
           setIsStopping(false);
           setStopClickedAt(null);
+          setCurrentToolDraftActive(false);
           break;
 
         case "start":
@@ -2070,6 +2081,7 @@ function App() {
           if (!isActiveRun) return;
           setIsProcessing(true);
           setCurrentAssistantMessage("");
+          setCurrentToolDraftActive(false);
           setModelUsage(null);
           break;
 
@@ -2093,6 +2105,7 @@ function App() {
             if (llmEvent.type === "text-delta" && llmEvent.delta) {
               appendStreamingBuffer(event.runId, llmEvent.delta);
               setCurrentAssistantMessage((prev) => prev + llmEvent.delta);
+              setCurrentToolDraftActive(false);
 
               // Extract <voice> tags and send to TTS when enabled
               voiceTextBufferRef.current += llmEvent.delta;
@@ -2110,6 +2123,11 @@ function App() {
                 spokenIndexRef.current +=
                   voiceMatch.index + voiceMatch[0].length;
               }
+            } else if (
+              llmEvent.type === "tool-input-start" ||
+              llmEvent.type === "tool-input-delta"
+            ) {
+              setCurrentToolDraftActive(true);
             } else if (llmEvent.type === "tool-call") {
               setConversation((prev) => [
                 ...prev,
@@ -2178,6 +2196,7 @@ function App() {
                 }
                 return "";
               });
+              setCurrentToolDraftActive(false);
               clearStreamingBuffer(event.runId);
             }
           }
@@ -2327,6 +2346,7 @@ function App() {
           setIsProcessing(false);
           setIsStopping(false);
           setStopClickedAt(null);
+          setCurrentToolDraftActive(false);
           // Clear pending requests since they've been aborted
           setPendingPermissionRequests(new Map());
           setPendingAskHumanRequests(new Map());
@@ -2358,6 +2378,7 @@ function App() {
           setIsProcessing(false);
           setIsStopping(false);
           setStopClickedAt(null);
+          setCurrentToolDraftActive(false);
           setConversation((prev) => [
             ...prev,
             {
@@ -2702,6 +2723,7 @@ function App() {
     loadRunRequestIdRef.current += 1;
     setConversation([]);
     setCurrentAssistantMessage("");
+    setCurrentToolDraftActive(false);
     setRunId(null);
     setMessage("");
     setModelUsage(null);
@@ -2726,6 +2748,7 @@ function App() {
         loadRunRequestIdRef.current += 1;
         setConversation([]);
         setCurrentAssistantMessage("");
+        setCurrentToolDraftActive(false);
         setRunId(null);
         setMessage("");
         setModelUsage(null);
@@ -2751,6 +2774,7 @@ function App() {
       setRunId(resolvedRunId);
       setConversation(cached.conversation);
       setCurrentAssistantMessage(cached.currentAssistantMessage);
+      setCurrentToolDraftActive(cached.currentToolDraftActive);
 
       const pendingPermissions = new Map<
         string,
@@ -2793,10 +2817,7 @@ function App() {
         return;
       }
       const id = newChatTabId();
-      setChatTabs((prev) => [
-        ...prev,
-        { id, runId: targetRunId },
-      ]);
+      setChatTabs((prev) => [...prev, { id, runId: targetRunId }]);
       setActiveChatTabId(id);
       loadRun(targetRunId);
     },
@@ -3082,93 +3103,87 @@ function App() {
     [activeFileTabId, fileTabs, removeEditorCacheForPath],
   );
 
-  const handleNewChatTab = useCallback(
-    () => {
-      // If there's already an empty "New chat" tab, switch to it
-      const emptyTab = chatTabs.find((t) => !t.runId);
-      let newTabId: string | null = null;
-      if (emptyTab) {
-        if (emptyTab.id !== activeChatTabId) {
-          setActiveChatTabId(emptyTab.id);
-        }
-      } else {
-        // Create a new tab
-        newTabId = newChatTabId();
-        setChatTabs((prev) => [
-          ...prev,
-          {
-            id: newTabId!,
-            runId: null,
-          },
-        ]);
-        setActiveChatTabId(newTabId);
+  const handleNewChatTab = useCallback(() => {
+    // If there's already an empty "New chat" tab, switch to it
+    const emptyTab = chatTabs.find((t) => !t.runId);
+    let newTabId: string | null = null;
+    if (emptyTab) {
+      if (emptyTab.id !== activeChatTabId) {
+        setActiveChatTabId(emptyTab.id);
       }
+    } else {
+      // Create a new tab
+      newTabId = newChatTabId();
+      setChatTabs((prev) => [
+        ...prev,
+        {
+          id: newTabId!,
+          runId: null,
+        },
+      ]);
+      setActiveChatTabId(newTabId);
+    }
 
-      const targetTabId = emptyTab?.id ?? newTabId;
-      if (targetTabId && selectedPathRef.current) {
-        const currentPath = selectedPathRef.current;
-        if (currentPath.endsWith(".pdf")) {
-          initialChatContextByTabRef.current.set(targetTabId, {
-            kind: "file",
-            path: currentPath,
-          });
-        } else if (currentPath.endsWith(".md")) {
-          initialChatContextByTabRef.current.set(targetTabId, {
-            kind: "file",
-            path: currentPath,
-            content: editorContentRef.current ?? "",
-          });
-        } else if (fileContent) {
-          initialChatContextByTabRef.current.set(targetTabId, {
-            kind: "file",
-            path: currentPath,
-            content: fileContent,
-          });
-        }
-      }
-
-      handleNewChat();
-      // Left-pane "new chat" should always open full chat view.
-      if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
-        setExpandedFrom({
-          path: selectedPath,
-          graph: isGraphOpen,
-          suggestedTopics: isSuggestedTopicsOpen,
+    const targetTabId = emptyTab?.id ?? newTabId;
+    if (targetTabId && selectedPathRef.current) {
+      const currentPath = selectedPathRef.current;
+      if (currentPath.endsWith(".pdf")) {
+        initialChatContextByTabRef.current.set(targetTabId, {
+          kind: "file",
+          path: currentPath,
         });
-      } else {
-        setExpandedFrom(null);
+      } else if (currentPath.endsWith(".md")) {
+        initialChatContextByTabRef.current.set(targetTabId, {
+          kind: "file",
+          path: currentPath,
+          content: editorContentRef.current ?? "",
+        });
+      } else if (fileContent) {
+        initialChatContextByTabRef.current.set(targetTabId, {
+          kind: "file",
+          path: currentPath,
+          content: fileContent,
+        });
       }
-      setIsRightPaneMaximized(false);
-      setSelectedPath(null);
-      setIsGraphOpen(false);
-      setIsSuggestedTopicsOpen(false);
-    },
-    [chatTabs, activeChatTabId, handleNewChat],
-  );
+    }
+
+    handleNewChat();
+    // Left-pane "new chat" should always open full chat view.
+    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
+      setExpandedFrom({
+        path: selectedPath,
+        graph: isGraphOpen,
+        suggestedTopics: isSuggestedTopicsOpen,
+      });
+    } else {
+      setExpandedFrom(null);
+    }
+    setIsRightPaneMaximized(false);
+    setSelectedPath(null);
+    setIsGraphOpen(false);
+    setIsSuggestedTopicsOpen(false);
+  }, [chatTabs, activeChatTabId, handleNewChat]);
 
   // Sidebar variant: create/switch chat tab without leaving file/graph context.
-  const handleNewChatTabInSidebar = useCallback(
-    () => {
-      const emptyTab = chatTabs.find((t) => !t.runId);
-      if (emptyTab) {
-        if (emptyTab.id !== activeChatTabId) {
-          setActiveChatTabId(emptyTab.id);
-        }
-      } else {
-        const id = newChatTabId();
-        setChatTabs((prev) => [
-          ...prev,
-          {
-            id,
-            runId: null,
-          },
-        ]);
-        setActiveChatTabId(id);
+  const handleNewChatTabInSidebar = useCallback(() => {
+    const emptyTab = chatTabs.find((t) => !t.runId);
+    if (emptyTab) {
+      if (emptyTab.id !== activeChatTabId) {
+        setActiveChatTabId(emptyTab.id);
       }
-      handleNewChat();
-    },
-    [chatTabs, activeChatTabId, handleNewChat],
-  );
+    } else {
+      const id = newChatTabId();
+      setChatTabs((prev) => [
+        ...prev,
+        {
+          id,
+          runId: null,
+        },
+      ]);
+      setActiveChatTabId(id);
+    }
+    handleNewChat();
+  }, [chatTabs, activeChatTabId, handleNewChat]);
 
   // Palette → sidebar submission. Opens the sidebar (if closed), forces a fresh chat tab,
   // queues the message; the pending-submit effect (below) flushes it once state has settled
@@ -3311,12 +3326,7 @@ function App() {
     if (selectedPath) return { type: "file", path: selectedPath };
     if (isGraphOpen) return { type: "graph" };
     return { type: "chat", runId };
-  }, [
-    isSuggestedTopicsOpen,
-    selectedPath,
-    isGraphOpen,
-    runId,
-  ]);
+  }, [isSuggestedTopicsOpen, selectedPath, isGraphOpen, runId]);
 
   const appendUnique = useCallback((stack: ViewState[], entry: ViewState) => {
     const last = stack[stack.length - 1];
@@ -3757,10 +3767,7 @@ function App() {
 
   // Keyboard shortcut: Ctrl+L to toggle main chat view
   const isFullScreenChat =
-    !selectedPath &&
-    !isGraphOpen &&
-    !isSuggestedTopicsOpen &&
-    !isBrowserOpen;
+    !selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isBrowserOpen;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "l") {
@@ -3964,11 +3971,7 @@ function App() {
           }),
         },
       }));
-      if (
-        !selectedPath &&
-        !isGraphOpen &&
-        !isSuggestedTopicsOpen
-      ) {
+      if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
         setIsChatSidebarOpen(false);
         setIsRightPaneMaximized(false);
       }
@@ -4092,22 +4095,14 @@ function App() {
         }
       },
       openGraph: () => {
-        if (
-          !selectedPath &&
-          !isGraphOpen &&
-          !isSuggestedTopicsOpen
-        ) {
+        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "graph" });
       },
       openBases: () => {
-        if (
-          !selectedPath &&
-          !isGraphOpen &&
-          !isSuggestedTopicsOpen
-        ) {
+        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
@@ -4632,6 +4627,7 @@ function App() {
       runId,
       conversation,
       currentAssistantMessage,
+      currentToolDraftActive,
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
@@ -4640,6 +4636,7 @@ function App() {
       runId,
       conversation,
       currentAssistantMessage,
+      currentToolDraftActive,
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
@@ -4663,7 +4660,8 @@ function App() {
   );
   const hasConversation =
     activeChatTabState.conversation.length > 0 ||
-    activeChatTabState.currentAssistantMessage;
+    activeChatTabState.currentAssistantMessage ||
+    activeChatTabState.currentToolDraftActive;
   const isRightPaneContext = Boolean(
     selectedPath || isGraphOpen || isSuggestedTopicsOpen || isBrowserOpen,
   );
@@ -4689,14 +4687,7 @@ function App() {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <SidebarSectionProvider
-        defaultSection="knowledge"
-        onSectionChange={(section) => {
-          if (section === "knowledge" && !selectedPath && !isGraphOpen) {
-            void navigateToView({ type: "file", path: BASES_DEFAULT_TAB_PATH });
-          }
-        }}
-      >
+      <SidebarSectionProvider defaultSection="knowledge">
         <div className="flex h-svh w-full overflow-hidden">
           {/* Content sidebar with SidebarProvider for collapse functionality */}
           <SidebarProvider
@@ -4889,13 +4880,12 @@ function App() {
                     getTabId={(t) => t.id}
                     onSwitchTab={switchFileTab}
                     onCloseTab={closeFileTab}
-                      allowSingleTabClose={
-                        fileTabs.length === 1 &&
-                        (isGraphOpen ||
-                          isSuggestedTopicsOpen ||
-                          (selectedPath != null &&
-                            isBaseFilePath(selectedPath)))
-                      }
+                    allowSingleTabClose={
+                      fileTabs.length === 1 &&
+                      (isGraphOpen ||
+                        isSuggestedTopicsOpen ||
+                        (selectedPath != null && isBaseFilePath(selectedPath)))
+                    }
                   />
                 ) : (
                   <TabBar
@@ -5228,7 +5218,10 @@ function App() {
                 ) : selectedPath.endsWith(".pdf") && fileContent ? (
                   <PdfViewer base64Data={fileContent} />
                 ) : /\.html?$/i.test(selectedPath) && fileContent ? (
-                  <HtmlViewer htmlContent={fileContent} fileName={getBaseName(selectedPath)} />
+                  <HtmlViewer
+                    htmlContent={fileContent}
+                    fileName={getBaseName(selectedPath)}
+                  />
                 ) : /\.(docx?|xlsx?|pptx?)$/i.test(selectedPath) ? (
                   <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
                     <div className="text-muted-foreground text-sm">
@@ -5298,113 +5291,118 @@ function App() {
                             aria-hidden={!isActive}
                           >
                             <Conversation
-                                anchorMessageId={
-                                  chatViewportAnchorByTab[tab.id]?.messageId
-                                }
-                                anchorRequestKey={
-                                  chatViewportAnchorByTab[tab.id]?.requestKey
-                                }
-                                className="relative flex-1"
+                              anchorMessageId={
+                                chatViewportAnchorByTab[tab.id]?.messageId
+                              }
+                              anchorRequestKey={
+                                chatViewportAnchorByTab[tab.id]?.requestKey
+                              }
+                              className="relative flex-1"
+                            >
+                              <ConversationContent
+                                className={tabConversationContentClassName}
                               >
-                                <ConversationContent
-                                  className={tabConversationContentClassName}
-                                >
-                                  {!tabHasConversation ? (
-                                    <ConversationEmptyState className="h-auto">
-                                      <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
-                                        What are we working on?
-                                      </div>
-                                    </ConversationEmptyState>
-                                  ) : (
-                                    <>
-                                      {tabState.conversation.map((item) => {
-                                        const rendered = renderConversationItem(
-                                          item,
-                                          tab.id,
-                                        );
-                                        if (isToolCall(item)) {
-                                          const permRequest =
-                                            tabState.allPermissionRequests.get(
+                                {!tabHasConversation ? (
+                                  <ConversationEmptyState className="h-auto">
+                                    <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
+                                      What are we working on?
+                                    </div>
+                                  </ConversationEmptyState>
+                                ) : (
+                                  <>
+                                    {tabState.conversation.map((item) => {
+                                      const rendered = renderConversationItem(
+                                        item,
+                                        tab.id,
+                                      );
+                                      if (isToolCall(item)) {
+                                        const permRequest =
+                                          tabState.allPermissionRequests.get(
+                                            item.id,
+                                          );
+                                        if (permRequest) {
+                                          const response =
+                                            tabState.permissionResponses.get(
                                               item.id,
-                                            );
-                                          if (permRequest) {
-                                            const response =
-                                              tabState.permissionResponses.get(
-                                                item.id,
-                                              ) || null;
-                                            return (
-                                              <React.Fragment key={item.id}>
-                                                {rendered}
-                                                <PermissionRequest
-                                                  toolCall={
+                                            ) || null;
+                                          return (
+                                            <React.Fragment key={item.id}>
+                                              {rendered}
+                                              <PermissionRequest
+                                                toolCall={permRequest.toolCall}
+                                                onApprove={() =>
+                                                  handlePermissionResponse(
                                                     permRequest.toolCall
-                                                  }
-                                                  onApprove={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "approve",
-                                                    )
-                                                  }
-                                                  onApproveSession={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "approve",
-                                                      "session",
-                                                    )
-                                                  }
-                                                  onApproveAlways={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "approve",
-                                                      "always",
-                                                    )
-                                                  }
-                                                  onDeny={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "deny",
-                                                    )
-                                                  }
-                                                  isProcessing={
-                                                    isActive && isProcessing
-                                                  }
-                                                  response={response}
-                                                />
-                                              </React.Fragment>
-                                            );
-                                          }
+                                                      .toolCallId,
+                                                    permRequest.subflow,
+                                                    "approve",
+                                                  )
+                                                }
+                                                onApproveSession={() =>
+                                                  handlePermissionResponse(
+                                                    permRequest.toolCall
+                                                      .toolCallId,
+                                                    permRequest.subflow,
+                                                    "approve",
+                                                    "session",
+                                                  )
+                                                }
+                                                onApproveAlways={() =>
+                                                  handlePermissionResponse(
+                                                    permRequest.toolCall
+                                                      .toolCallId,
+                                                    permRequest.subflow,
+                                                    "approve",
+                                                    "always",
+                                                  )
+                                                }
+                                                onDeny={() =>
+                                                  handlePermissionResponse(
+                                                    permRequest.toolCall
+                                                      .toolCallId,
+                                                    permRequest.subflow,
+                                                    "deny",
+                                                  )
+                                                }
+                                                isProcessing={
+                                                  isActive && isProcessing
+                                                }
+                                                response={response}
+                                              />
+                                            </React.Fragment>
+                                          );
                                         }
-                                        return rendered;
-                                      })}
+                                      }
+                                      return rendered;
+                                    })}
 
-                                      {Array.from(
-                                        tabState.pendingAskHumanRequests.values(),
-                                      ).map((request) => (
-                                        <AskHumanRequest
-                                          key={request.toolCallId}
-                                          query={request.query}
-                                          onResponse={(response) =>
-                                            handleAskHumanResponse(
-                                              request.toolCallId,
-                                              request.subflow,
-                                              response,
-                                            )
-                                          }
-                                          isProcessing={
-                                            isActive && isProcessing
-                                          }
-                                        />
-                                      ))}
+                                    {Array.from(
+                                      tabState.pendingAskHumanRequests.values(),
+                                    ).map((request) => (
+                                      <AskHumanRequest
+                                        key={request.toolCallId}
+                                        query={request.query}
+                                        onResponse={(response) =>
+                                          handleAskHumanResponse(
+                                            request.toolCallId,
+                                            request.subflow,
+                                            response,
+                                          )
+                                        }
+                                        isProcessing={isActive && isProcessing}
+                                      />
+                                    ))}
 
-                                      {tabState.currentAssistantMessage && (
+                                    {tabState.currentToolDraftActive && (
+                                      <Message from="assistant">
+                                        <MessageContent>
+                                          <StreamingMessageBody />
+                                        </MessageContent>
+                                      </Message>
+                                    )}
+
+                                    {!tabState.currentToolDraftActive &&
+                                      tabState.currentAssistantMessage && (
                                         <Message from="assistant">
                                           <MessageContent>
                                             <SmoothStreamingMessage
@@ -5418,22 +5416,23 @@ function App() {
                                         </Message>
                                       )}
 
-                                      {isActive &&
-                                        isProcessing &&
-                                        !tabState.currentAssistantMessage && (
-                                          <Message from="assistant">
-                                            <MessageContent>
-                                              <Shimmer duration={1}>
-                                                Thinking...
-                                              </Shimmer>
-                                            </MessageContent>
-                                          </Message>
-                                        )}
-                                    </>
-                                  )}
-                                </ConversationContent>
-                                <ConversationScrollButton />
-                              </Conversation>
+                                    {isActive &&
+                                      isProcessing &&
+                                      !tabState.currentAssistantMessage &&
+                                      !tabState.currentToolDraftActive && (
+                                        <Message from="assistant">
+                                          <MessageContent>
+                                            <Shimmer duration={1}>
+                                              Thinking...
+                                            </Shimmer>
+                                          </MessageContent>
+                                        </Message>
+                                      )}
+                                  </>
+                                )}
+                              </ConversationContent>
+                              <ConversationScrollButton />
+                            </Conversation>
                           </div>
                         );
                       })}
@@ -5557,6 +5556,7 @@ function App() {
                 onOpenFullScreen={toggleRightPaneMaximize}
                 conversation={conversation}
                 currentAssistantMessage={currentAssistantMessage}
+                currentToolDraftActive={currentToolDraftActive}
                 chatTabStates={chatViewStateByTab}
                 viewportAnchors={chatViewportAnchorByTab}
                 isProcessing={isProcessing}

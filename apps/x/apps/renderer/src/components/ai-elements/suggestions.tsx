@@ -1,4 +1,4 @@
-import { Mail, Calendar, FolderOpen, FileText, Presentation } from 'lucide-react'
+import { FolderOpen, FileText, Presentation, BookOpen, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface Suggestion {
@@ -10,22 +10,22 @@ export interface Suggestion {
 
 const defaultSuggestions: Suggestion[] = [
   {
-    id: 'email-draft',
-    label: 'Draft an email',
-    prompt: "Let's draft an email response to [name]",
-    icon: <Mail className="h-4 w-4" />,
-  },
-  {
-    id: 'meeting-prep',
-    label: 'Prep for a meeting',
-    prompt: 'Help me prep for my next meeting with [name]',
-    icon: <Calendar className="h-4 w-4" />,
-  },
-  {
-    id: 'doc-collab',
+    id: 'docx',
     label: 'Work on a document',
-    prompt: "Let's work on [document name]",
+    prompt: "Let's create a Word document (.docx) for [document name]",
     icon: <FileText className="h-4 w-4" />,
+  },
+  {
+    id: 'revision-doc',
+    label: 'Create A Revision Doc',
+    prompt: 'Create a revision guide for [module/subject]',
+    icon: <BookOpen className="h-4 w-4" />,
+  },
+  {
+    id: 'search-web',
+    label: 'Search the web',
+    prompt: 'Search the web for [topic]',
+    icon: <Search className="h-4 w-4" />,
   },
   {
     id: 'organize-files',
@@ -36,7 +36,7 @@ const defaultSuggestions: Suggestion[] = [
   {
     id: 'create-presentation',
     label: 'Create a presentation',
-    prompt: 'Create a pdf presentation on [topic]',
+    prompt: 'Create a PowerPoint presentation on [topic]',
     icon: <Presentation className="h-4 w-4" />,
   },
 ]

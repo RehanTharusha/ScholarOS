@@ -9,6 +9,7 @@ import { glob } from "glob";
 import { executeCommand, executeCommandAbortable } from "./command-executor.js";
 import { resolveSkill, availableSkills } from "../assistant/skills/index.js";
 import { executeTool, listServers, listTools } from "../../mcp/mcp.js";
+import * as anki from "../../anki/service.js";
 import container from "../../di/container.js";
 import { IMcpConfigRepo } from "../..//mcp/repo.js";
 import { McpServerDefinition } from "@x/shared/dist/mcp.js";
@@ -36,9 +37,6 @@ import {
   getDefaultModelAndProvider,
   resolveProviderConfig,
 } from "../../models/defaults.js";
-import { isSignedIn } from "../../account/account.js";
-import { getAccessToken } from "../../auth/tokens.js";
-import { API_URL } from "../../config/env.js";
 import type { IBrowserControlService } from "../browser-control/service.js";
 
 // Statically import parser libraries so esbuild can bundle them
@@ -2001,149 +1999,88 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
 
   "web-search": {
     description:
-      "Search the web for articles, blog posts, papers, companies, people, news, or explore a topic in depth. Returns rich results with full text, highlights, and metadata.",
+      "Search the web using the embedded browser. Opens the browser pane, navigates to a search engine, reads the results page, and returns the page content so you can answer the user's question. Call this once — it handles all browser interaction internally.",
     inputSchema: z.object({
       query: z.string().describe("The search query"),
-      numResults: z
-        .number()
-        .optional()
-        .describe("Number of results to return (default: 5, max: 20)"),
-      category: z
-        .enum([
-          "general",
-          "company",
-          "research paper",
-          "news",
-          "tweet",
-          "personal site",
-          "financial report",
-          "people",
-        ])
-        .optional()
-        .describe(
-          'Search category. Defaults to "general" which searches the entire web. Only use a specific category when the query is clearly about that type (e.g. "research paper" for academic papers, "company" for company info). For everyday queries like weather, restaurants, prices, how-to, etc., use "general" or omit entirely.',
-        ),
     }),
     isAvailable: async () => {
-      if (await isSignedIn()) return true;
       try {
-        const exaConfigPath = path.join(WorkDir, "config", "exa-search.json");
-        const raw = await fs.readFile(exaConfigPath, "utf8");
-        const config = JSON.parse(raw);
-        return !!config.apiKey;
+        container.resolve<IBrowserControlService>("browserControlService");
+        return true;
       } catch {
         return false;
       }
     },
-    execute: async ({
-      query,
-      numResults,
-      category,
-    }: {
-      query: string;
-      numResults?: number;
-      category?: string;
-    }) => {
+    execute: async (
+      { query }: { query: string },
+      ctx?: ToolContext,
+    ) => {
       try {
-        const resultCount = Math.min(Math.max(numResults || 5, 1), 20);
+        const browserControlService =
+          container.resolve<IBrowserControlService>("browserControlService");
 
-        const reqBody: Record<string, unknown> = {
-          query,
-          numResults: resultCount,
-          type: "auto",
-          contents: {
-            text: { maxCharacters: 1000 },
-            highlights: true,
-          },
-        };
-        if (category && category !== "general") {
-          reqBody.category = category;
-        }
-
-        let response: Response;
-
-        if (await isSignedIn()) {
-          // Use proxy
-          const accessToken = await getAccessToken();
-          response = await fetch(`${API_URL}/v1/search/exa`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(reqBody),
-          });
-        } else {
-          // Read API key from config
-          const exaConfigPath = path.join(WorkDir, "config", "exa-search.json");
-
-          let apiKey: string;
-          try {
-            const raw = await fs.readFile(exaConfigPath, "utf8");
-            const config = JSON.parse(raw);
-            apiKey = config.apiKey;
-          } catch {
-            return {
-              success: false,
-              error: `Exa Search API key not configured. Create ${exaConfigPath} with { "apiKey": "<your-key>" }`,
-            };
-          }
-
-          if (!apiKey) {
-            return {
-              success: false,
-              error: `Exa Search API key is empty. Set "apiKey" in ${exaConfigPath}`,
-            };
-          }
-
-          response = await fetch("https://api.exa.ai/search", {
-            method: "POST",
-            headers: {
-              "x-api-key": apiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(reqBody),
-          });
-        }
-
-        if (!response.ok) {
-          const text = await response.text();
+        // Open the browser pane
+        const openResult = await browserControlService.execute(
+          { action: "open" },
+          { signal: ctx?.signal },
+        );
+        if (!openResult.success) {
           return {
             success: false,
-            error: `Exa Search API error (${response.status}): ${text}`,
+            error: "Could not open the embedded browser for search.",
           };
         }
 
-        const data = (await response.json()) as {
-          results?: Array<{
-            title?: string;
-            url?: string;
-            publishedDate?: string;
-            author?: string;
-            highlights?: string[];
-            text?: string;
-          }>;
-        };
+        // Navigate to Google with the search query
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en`;
+        const navResult = await browserControlService.execute(
+          { action: "navigate", target: searchUrl },
+          { signal: ctx?.signal },
+        );
+        if (!navResult.success) {
+          return {
+            success: false,
+            error: `Failed to load search results: ${navResult.error || "navigation failed"}`,
+          };
+        }
 
-        const results = (data.results || []).map((r) => ({
-          title: r.title || "",
-          url: r.url || "",
-          publishedDate: r.publishedDate || "",
-          author: r.author || "",
-          highlights: r.highlights || [],
-          text: r.text || "",
-        }));
+        // Wait for the results page to render
+        await browserControlService.execute(
+          { action: "wait", ms: 2000 },
+          { signal: ctx?.signal },
+        );
+
+        // Read the page
+        const readResult = await browserControlService.execute(
+          { action: "read-page", maxTextLength: 10000 },
+          { signal: ctx?.signal },
+        );
+
+        if (!readResult.success || !readResult.page) {
+          return {
+            success: false,
+            error: "Could not read the search results page.",
+          };
+        }
 
         return {
           success: true,
           query,
-          results,
-          count: results.length,
+          results: [
+            {
+              title: readResult.page.title,
+              url: readResult.page.url,
+              description: readResult.page.text.slice(0, 2000),
+            },
+          ],
+          rawText: readResult.page.text,
+          count: 1,
         };
       } catch (error) {
         return {
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error:
+            error instanceof Error ? error.message : "Web search failed",
         };
       }
     },
@@ -2172,6 +2109,189 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         success: true,
         message: `Saved to memory: ${note}`,
       };
+    },
+  },
+
+  // ========================================================================
+  // Anki / Flashcard Tools
+  // ========================================================================
+
+  "anki-checkConnect": {
+    description:
+      "Check if Anki is running with AnkiConnect add-on installed. Returns true if AnkiConnect is reachable at localhost:8765. Always call this first before using other anki-* tools.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      try {
+        const connected = await anki.checkConnect();
+        return { connected };
+      } catch (error) {
+        return {
+          connected: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+          hint: "Make sure Anki is running and the AnkiConnect add-on (code 2055492159) is installed.",
+        };
+      }
+    },
+  },
+
+  "anki-deckNames": {
+    description: "List all Anki deck names. Returns an array of deck names.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      try {
+        const names = await anki.deckNames();
+        return { deckNames: names, count: names.length };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "anki-createDeck": {
+    description: "Create a new Anki deck with the given name.",
+    inputSchema: z.object({
+      deck: z.string().min(1).describe("Name of the deck to create (e.g., 'Computer Science::Algorithms')"),
+    }),
+    execute: async ({ deck }: { deck: string }) => {
+      try {
+        await anki.createDeck(deck);
+        return { success: true, deck };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "anki-modelNames": {
+    description: "List all available Anki note types (models) like 'Basic', 'Cloze', 'Basic (and reversed card)', etc. Use this to discover what note types are available before adding cards.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      try {
+        const names = await anki.modelNames();
+        return { modelNames: names, count: names.length };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "anki-modelFieldNames": {
+    description: "Get the field names for a specific Anki note type. Use this before adding cards to know what fields to fill.",
+    inputSchema: z.object({
+      modelName: z.string().min(1).describe("The note type name (e.g., 'Basic', 'Cloze')"),
+    }),
+    execute: async ({ modelName }: { modelName: string }) => {
+      try {
+        const fields = await anki.modelFieldNames(modelName);
+        return { modelName, fields };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "anki-addNotes": {
+    description:
+      "Add multiple flashcard notes to Anki in a single batch. Each note requires deckName, modelName, and fields. Use 'anki-modelNames' first to discover available note types, then 'anki-modelFieldNames' to see which fields each type needs. Standard 'Basic' type has 'Front' and 'Back' fields. 'Cloze' type has 'Text' and 'Back Extra' fields.",
+    inputSchema: z.object({
+      notes: z
+        .array(
+          z.object({
+            deckName: z.string().min(1).describe("Target deck name"),
+            modelName: z.string().min(1).describe("Note type (e.g., 'Basic', 'Cloze')"),
+            fields: z
+              .record(z.string(), z.string())
+              .describe("Field values (e.g., {'Front': 'question', 'Back': 'answer'} for Basic type)"),
+            tags: z
+              .array(z.string())
+              .optional()
+              .describe("Optional tags to add to the note"),
+          }),
+        )
+        .min(1)
+        .max(100)
+        .describe("Array of notes to create (1-100)"),
+    }),
+    execute: async ({
+      notes,
+    }: {
+      notes: Array<{
+        deckName: string;
+        modelName: string;
+        fields: Record<string, string>;
+        tags?: string[];
+      }>;
+    }) => {
+      try {
+        const result = await anki.addNotes(notes);
+        // result is an array of note IDs (null for failed)
+        const succeeded = result.filter((id) => id !== null).length;
+        const failed = result.filter((id) => id === null).length;
+        return {
+          success: true,
+          noteIds: result,
+          total: result.length,
+          succeeded,
+          failed,
+          message: `Added ${succeeded}/${result.length} notes to Anki${failed > 0 ? ` (${failed} failed — likely duplicates)` : ""}.`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "anki-canAddNotes": {
+    description:
+      "Check if notes can be added to Anki without creating duplicates. Returns an array of booleans matching the input order. Use this before 'anki-addNotes' to preview which notes are new and which already exist.",
+    inputSchema: z.object({
+      notes: z
+        .array(
+          z.object({
+            deckName: z.string().min(1),
+            modelName: z.string().min(1),
+            fields: z.record(z.string(), z.string()),
+            tags: z.array(z.string()).optional(),
+          }),
+        )
+        .min(1)
+        .max(100),
+    }),
+    execute: async ({
+      notes,
+    }: {
+      notes: Array<{
+        deckName: string;
+        modelName: string;
+        fields: Record<string, string>;
+        tags?: string[];
+      }>;
+    }) => {
+      try {
+        const result = await anki.canAddNotes(notes);
+        const addable = result.filter(Boolean).length;
+        return {
+          results: result,
+          addable,
+          total: result.length,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
     },
   },
 

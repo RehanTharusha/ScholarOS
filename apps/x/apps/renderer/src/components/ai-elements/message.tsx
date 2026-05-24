@@ -1,10 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupText,
-} from "@/components/ui/button-group";
+import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import {
   Tooltip,
   TooltipContent,
@@ -19,6 +16,7 @@ import {
   PaperclipIcon,
   XIcon,
 } from "lucide-react";
+import { motion } from "motion/react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -32,7 +30,7 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
     className={cn(
       "group flex w-full max-w-[95%] flex-col gap-2",
       from === "user" ? "is-user ml-auto justify-end" : "is-assistant",
-      className
+      className,
     )}
     {...props}
   />
@@ -51,7 +49,7 @@ export const MessageContent = ({
       "is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden text-sm",
       "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
       "group-[.is-assistant]:w-full group-[.is-assistant]:text-foreground",
-      className
+      className,
     )}
     {...props}
   >
@@ -117,7 +115,7 @@ type MessageBranchContextType = {
 };
 
 const MessageBranchContext = createContext<MessageBranchContextType | null>(
-  null
+  null,
 );
 
 const useMessageBranch = () => {
@@ -125,7 +123,7 @@ const useMessageBranch = () => {
 
   if (!context) {
     throw new Error(
-      "MessageBranch components must be used within MessageBranch"
+      "MessageBranch components must be used within MessageBranch",
     );
   }
 
@@ -202,7 +200,7 @@ export const MessageBranchContent = ({
     <div
       className={cn(
         "grid gap-2 overflow-hidden [&>div]:pb-0",
-        index === currentBranch ? "block" : "hidden"
+        index === currentBranch ? "block" : "hidden",
       )}
       key={branch.key}
       {...props}
@@ -232,7 +230,7 @@ export const MessageBranchSelector = ({
     <ButtonGroup
       className={cn(
         "[&>*:not(:first-child)]:rounded-l-md [&>*:not(:last-child)]:rounded-r-md",
-        className
+        className,
       )}
       data-from={from}
       orientation="horizontal"
@@ -301,7 +299,7 @@ export const MessageBranchPage = ({
     <ButtonGroupText
       className={cn(
         "border-none bg-transparent text-muted-foreground shadow-none",
-        className
+        className,
       )}
       {...props}
     >
@@ -317,15 +315,83 @@ export const MessageResponse = memo(
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        className
+        className,
       )}
       {...props}
     />
   ),
-  (prevProps, nextProps) => prevProps.children === nextProps.children
+  (prevProps, nextProps) => prevProps.children === nextProps.children,
 );
 
 MessageResponse.displayName = "MessageResponse";
+
+export type StreamingMessageBodyProps = {
+  label?: string;
+  className?: string;
+} & Omit<MessageResponseProps, "children">;
+
+export function StreamingMessageBody({
+  label = "Creating Document...",
+  className,
+}: StreamingMessageBodyProps) {
+  return (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl border border-border bg-muted/35 px-4 py-4 shadow-sm",
+        className,
+      )}
+    >
+      <motion.div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/35 to-transparent"
+        animate={{ x: ["-40%", "140%"] }}
+        transition={{
+          duration: 2.8,
+          ease: "linear",
+          repeat: Number.POSITIVE_INFINITY,
+        }}
+      />
+
+      <div className="flex min-h-16 items-center gap-3 border-b border-border/60 pb-4">
+        <span className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+          {label}
+        </span>
+        <span className="ml-auto flex items-center gap-1.5">
+          <motion.span
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            className="size-2 rounded-full bg-primary"
+            transition={{
+              duration: 1.2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              delay: 0,
+            }}
+          />
+          <motion.span
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            className="size-2 rounded-full bg-primary"
+            transition={{
+              duration: 1.2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              delay: 0.2,
+            }}
+          />
+          <motion.span
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            className="size-2 rounded-full bg-primary"
+            transition={{
+              duration: 1.2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              delay: 0.4,
+            }}
+          />
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export type MessageAttachmentProps = HTMLAttributes<HTMLDivElement> & {
   data: FileUIPart;
@@ -349,7 +415,7 @@ export function MessageAttachment({
     <div
       className={cn(
         "group relative size-24 overflow-hidden rounded-lg",
-        className
+        className,
       )}
       {...props}
     >
@@ -426,7 +492,7 @@ export function MessageAttachments({
     <div
       className={cn(
         "ml-auto flex w-fit flex-wrap items-start gap-2",
-        className
+        className,
       )}
       {...props}
     >
@@ -445,7 +511,7 @@ export const MessageToolbar = ({
   <div
     className={cn(
       "mt-4 flex w-full items-center justify-between gap-4",
-      className
+      className,
     )}
     {...props}
   >

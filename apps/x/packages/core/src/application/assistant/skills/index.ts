@@ -17,6 +17,7 @@ import { skill as pptxSkill } from "./pptx/skill.js";
 import { skill as docxSkill } from "./docx/skill.js";
 import { skill as xlsxSkill } from "./xlsx/skill.js";
 import { skill as webArtifactsBuilderSkill } from "./web-artifacts-builder/skill.js";
+import { skill as ankiFlashcardsSkill } from "./anki-flashcards/skill.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_PREFIX = "src/application/assistant/skills";
@@ -148,6 +149,13 @@ const definitions: SkillDefinition[] = [
     summary:
       "Find real YouTube video links for topics using search scraping to fix broken or placeholder video IDs in supplement files.",
     content: youtubeVideoWorkflowSkill,
+  },
+  {
+    id: "anki-flashcards",
+    title: "Anki Flashcards",
+    summary:
+      "Create, manage, and push Anki flashcards from course materials. Generates high-quality Q&A and cloze-deletion cards and syncs them to the user's Anki desktop app via AnkiConnect.",
+    content: ankiFlashcardsSkill,
   },
 ];
 

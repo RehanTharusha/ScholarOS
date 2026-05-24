@@ -37,7 +37,7 @@ export const skill = [
   "",
   "### Step 3.5: Map diagrams to topics (if applicable)",
   "",
-  "For modules with visual/spatial concepts (economics, networks, databases, maths, etc.), map each topic to the relevant SVG diagram. Read " + BT + "references/diagrams.md" + BT + " for the full template library.",
+  "For modules with visual/spatial concepts (economics, networks, databases, maths, etc.), map each topic to the relevant SVG diagram. See the diagram mapping tables below for reference.",
   "",
   "**Economics diagram mapping (microeconomics):**",
   "",

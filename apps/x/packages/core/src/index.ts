@@ -12,3 +12,6 @@ export * as versionHistory from './knowledge/version_history.js';
 
 // Voice mode (config + TTS)
 export * as voice from './voice/voice.js';
+
+// AnkiConnect flashcard service
+export * as anki from './anki/service.js';
