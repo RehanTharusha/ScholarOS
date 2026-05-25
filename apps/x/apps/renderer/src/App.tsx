@@ -4985,7 +4985,10 @@ function App() {
                       </TooltipContent>
                     </Tooltip>
                   )}
-                {(selectedPath || isGraphOpen || isSuggestedTopicsOpen) && (
+                {(selectedPath ||
+                  isGraphOpen ||
+                  isSuggestedTopicsOpen ||
+                  isBrowserOpen) && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
@@ -4994,7 +4997,9 @@ function App() {
                         className="titlebar-no-drag flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors -mr-1 self-center shrink-0"
                         aria-label={
                           isChatSidebarOpen
-                            ? "Maximize knowledge view"
+                            ? isBrowserOpen
+                              ? "Maximize browser view"
+                              : "Maximize knowledge view"
                             : "Restore two-pane view"
                         }
                       >
@@ -5007,7 +5012,9 @@ function App() {
                     </TooltipTrigger>
                     <TooltipContent side="bottom">
                       {isChatSidebarOpen
-                        ? "Maximize knowledge view"
+                        ? isBrowserOpen
+                          ? "Maximize browser view"
+                          : "Maximize knowledge view"
                         : "Restore two-pane view"}
                     </TooltipContent>
                   </Tooltip>
