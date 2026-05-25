@@ -184,6 +184,7 @@ export function SidebarContentPanel({
 }: SidebarContentPanelProps) {
   const { activeSection, setActiveSection } = useSidebarSection();
   const showChatQuickActions = activeSection === "tasks";
+  const showKnowledgeNewChat = activeSection === "knowledge";
   const [isRowboatConnected, setIsRowboatConnected] = useState(false);
   const [appUrl, setAppUrl] = useState<string | null>(null);
   const { billing } = useBilling(isRowboatConnected);
@@ -298,8 +299,20 @@ export function SidebarContentPanel({
             ))}
           </div>
         </div>
+        {showKnowledgeNewChat && onNewChat && (
+          <div className="titlebar-no-drag px-2 pt-0.5 pb-0">
+            <button
+              type="button"
+              onClick={onNewChat}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <SquarePen className="size-4" />
+              <span>New chat</span>
+            </button>
+          </div>
+        )}
         {/* Quick action buttons */}
-        <div className="titlebar-no-drag flex flex-col gap-0 px-2 pt-0.5 pb-1">
+        <div className="titlebar-no-drag flex flex-col gap-0 px-2 -mt-1 pt-0 pb-1">
           {showChatQuickActions && onNewChat && (
             <button
               type="button"

@@ -337,7 +337,7 @@ export function StreamingMessageBody({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-border bg-muted/35 px-4 py-4 shadow-sm",
+        "relative overflow-hidden rounded-2xl border border-border bg-muted/35 shadow-sm",
         className,
       )}
     >
@@ -352,7 +352,7 @@ export function StreamingMessageBody({
         }}
       />
 
-      <div className="flex min-h-16 items-center gap-3 border-b border-border/60 pb-4">
+      <div className="flex items-center gap-3 px-4 py-3">
         <span className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
           {label}
         </span>
