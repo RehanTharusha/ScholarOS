@@ -14,6 +14,7 @@ import {
   FolderOpen,
   FolderPlus,
   Globe,
+  Library,
   Mic,
   Network,
   Pencil,
@@ -134,6 +135,7 @@ type SidebarContentPanelProps = {
   onToggleBrowser?: () => void;
   isSuggestedTopicsOpen?: boolean;
   onOpenSuggestedTopics?: () => void;
+  onOpenArtifacts?: () => void;
 } & React.ComponentProps<typeof Sidebar>;
 
 const sectionTabs: { id: ActiveSection; label: string }[] = [
@@ -180,6 +182,7 @@ export function SidebarContentPanel({
   onToggleBrowser,
   isSuggestedTopicsOpen = false,
   onOpenSuggestedTopics,
+  onOpenArtifacts,
   ...props
 }: SidebarContentPanelProps) {
   const { activeSection, setActiveSection } = useSidebarSection();
@@ -244,13 +247,13 @@ export function SidebarContentPanel({
       try {
         const result = await window.ipc.invoke("oauth:getState", null);
         const config = result.config || {};
-        const connected = config["rowboat"]?.connected ?? false;
+        const connected = config["scholaros"]?.connected ?? false;
         if (mounted) {
           setIsRowboatConnected(connected);
         }
         if (connected && mounted) {
           try {
-            const account = await window.ipc.invoke("account:getRowboat", null);
+            const account = await window.ipc.invoke("account:getAccount", null);
             if (mounted) setAppUrl(account.config?.appUrl ?? null);
           } catch {
             /* ignore */
@@ -373,21 +376,32 @@ export function SidebarContentPanel({
               <span>Ingest materials</span>
             </button>
           )}
+          {showChatQuickActions && onOpenArtifacts && (
+            <button
+              type="button"
+              onClick={onOpenArtifacts}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <Library className="size-4" />
+              <span>Artifacts</span>
+            </button>
+          )}
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {activeSection === "knowledge" && (
-          <KnowledgeSection
-            tree={tree}
-            selectedPath={selectedPath}
-            expandedPaths={expandedPaths}
-            onSelectFile={onSelectFile}
-            onToggleFolder={onToggleFolder}
-            actions={knowledgeActions}
-            onOpenSearch={onOpenSearch}
-            onVoiceNoteCreated={onVoiceNoteCreated}
-          />
-        )}
+          {activeSection === "knowledge" && (
+            <KnowledgeSection
+              tree={tree}
+              selectedPath={selectedPath}
+              expandedPaths={expandedPaths}
+              onSelectFile={onSelectFile}
+              onToggleFolder={onToggleFolder}
+              actions={knowledgeActions}
+              onOpenSearch={onOpenSearch}
+              onVoiceNoteCreated={onVoiceNoteCreated}
+              onOpenArtifacts={onOpenArtifacts}
+            />
+          )}
         {activeSection === "tasks" && (
           <TasksSection
             runs={runs}
@@ -437,7 +451,7 @@ export function SidebarContentPanel({
                 ? "Subscribe"
                 : billing.subscriptionPlan === "starter"
                   ? "Upgrade"
-                  : "Manage"}
+                  : "Manage billing"}
             </button>
           </div>
         </div>
@@ -751,6 +765,7 @@ function KnowledgeSection({
   actions,
   onOpenSearch,
   onVoiceNoteCreated,
+  onOpenArtifacts,
 }: {
   tree: TreeNode[];
   selectedPath: string | null;
@@ -760,6 +775,7 @@ function KnowledgeSection({
   actions: KnowledgeActions;
   onOpenSearch?: () => void;
   onVoiceNoteCreated?: (path: string) => void;
+  onOpenArtifacts?: () => void;
 }) {
   const isExpanded = expandedPaths.size > 0;
   const treeContainerRef = React.useRef<HTMLDivElement | null>(null);
@@ -807,6 +823,9 @@ function KnowledgeSection({
     },
     { icon: Network, label: "Graph View", action: () => actions.openGraph() },
     { icon: Table2, label: "Bases", action: () => actions.openBases() },
+    ...(onOpenArtifacts
+      ? [{ icon: Library, label: "Artifacts", action: onOpenArtifacts }]
+      : []),
   ];
 
   return (

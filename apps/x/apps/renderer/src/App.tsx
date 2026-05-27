@@ -40,6 +40,7 @@ import {
 import { useDebounce } from "./hooks/use-debounce";
 import { SidebarContentPanel } from "@/components/sidebar-content";
 import { SuggestedTopicsView } from "@/components/suggested-topics-view";
+import { ArtifactsView } from "@/components/artifacts-view";
 import { SidebarSectionProvider } from "@/contexts/sidebar-context";
 import {
   Conversation,
@@ -193,6 +194,7 @@ const TITLEBAR_BUTTONS_COLLAPSED = 1;
 const TITLEBAR_BUTTON_GAPS_COLLAPSED = 0;
 const GRAPH_TAB_PATH = "__scholaros_graph_view__";
 const SUGGESTED_TOPICS_TAB_PATH = "__scholar_suggested_topics__";
+const ARTIFACTS_TAB_PATH = "__scholaros_artifacts__";
 const BASES_DEFAULT_TAB_PATH = "__scholaros_bases_default__";
 
 const INGEST_TAB_PATH = "__scholar_ingest__";
@@ -340,6 +342,7 @@ const getAncestorDirectoryPaths = (path: string): string[] => {
 const isGraphTabPath = (path: string) => path === GRAPH_TAB_PATH;
 const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
+const isArtifactsTabPath = (path: string) => path === ARTIFACTS_TAB_PATH;
 
 const isBaseFilePath = (path: string) =>
   path.endsWith(".base") || path === BASES_DEFAULT_TAB_PATH;
@@ -547,7 +550,8 @@ type ViewState =
   | { type: "chat"; runId: string | null }
   | { type: "file"; path: string }
   | { type: "graph" }
-  | { type: "suggested-topics" };
+  | { type: "suggested-topics" }
+  | { type: "artifacts" };
 
 function viewStatesEqual(a: ViewState, b: ViewState): boolean {
   if (a.type !== b.type) return false;
@@ -664,6 +668,7 @@ function App() {
   const [isGraphOpen, setIsGraphOpen] = useState(false);
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [isSuggestedTopicsOpen, setIsSuggestedTopicsOpen] = useState(false);
+  const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
   const [isIngestProcessing, setIsIngestProcessing] = useState(false);
   const [expandedFrom, setExpandedFrom] = useState<{
     path: string | null;
@@ -794,10 +799,10 @@ function App() {
       window.ipc.invoke("oauth:getState", null),
     ])
       .then(([config, oauthState]) => {
-        const rowboatConnected = oauthState.config?.rowboat?.connected ?? false;
-        const hasVoice = !!config.deepgram || rowboatConnected;
+        const scholarosConnected = oauthState.config?.scholaros?.connected ?? false;
+        const hasVoice = !!config.deepgram || scholarosConnected;
         setVoiceAvailable(hasVoice);
-        setTtsAvailable(!!config.elevenlabs || rowboatConnected);
+        setTtsAvailable(!!config.elevenlabs || scholarosConnected);
         // Pre-cache auth details so mic click skips IPC round-trips
         if (hasVoice) {
           voice.warmup();
@@ -1047,6 +1052,7 @@ function App() {
   const getFileTabTitle = useCallback((tab: FileTab) => {
     if (isGraphTabPath(tab.path)) return "Graph View";
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
+    if (isArtifactsTabPath(tab.path)) return "Artifacts";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
     if (tab.path.endsWith(".base"))
       return (
@@ -3030,10 +3036,19 @@ function App() {
         setSelectedPath(null);
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(true);
+        setIsArtifactsOpen(false);
+        return;
+      }
+      if (isArtifactsTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(true);
         return;
       }
       setIsGraphOpen(false);
       setIsSuggestedTopicsOpen(false);
+      setIsArtifactsOpen(false);
       setSelectedPath(tab.path);
     },
     [fileTabs, isRightPaneMaximized],
@@ -3069,6 +3084,7 @@ function App() {
           setSelectedPath(null);
           setIsGraphOpen(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
           return [];
         }
         const idx = prev.findIndex((t) => t.id === tabId);
@@ -3082,13 +3098,21 @@ function App() {
             setSelectedPath(null);
             setIsGraphOpen(true);
             setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
           } else if (isSuggestedTopicsTabPath(newActiveTab.path)) {
             setSelectedPath(null);
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(true);
+            setIsArtifactsOpen(false);
+          } else if (isArtifactsTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(true);
           } else {
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
             setSelectedPath(newActiveTab.path);
           }
         }
@@ -3325,10 +3349,11 @@ function App() {
 
   const currentViewState = React.useMemo<ViewState>(() => {
     if (isSuggestedTopicsOpen) return { type: "suggested-topics" };
+    if (isArtifactsOpen) return { type: "artifacts" };
     if (selectedPath) return { type: "file", path: selectedPath };
     if (isGraphOpen) return { type: "graph" };
     return { type: "chat", runId };
-  }, [isSuggestedTopicsOpen, selectedPath, isGraphOpen, runId]);
+  }, [isSuggestedTopicsOpen, isArtifactsOpen, selectedPath, isGraphOpen, runId]);
 
   const appendUnique = useCallback((stack: ViewState[], entry: ViewState) => {
     const last = stack[stack.length - 1];
@@ -3394,6 +3419,17 @@ function App() {
     setActiveFileTabId(id);
   }, [fileTabs]);
 
+  const ensureArtifactsFileTab = useCallback(() => {
+    const existing = fileTabs.find((tab) => isArtifactsTabPath(tab.path));
+    if (existing) {
+      setActiveFileTabId(existing.id);
+      return;
+    }
+    const id = newFileTabId();
+    setFileTabs((prev) => [...prev, { id, path: ARTIFACTS_TAB_PATH }]);
+    setActiveFileTabId(id);
+  }, [fileTabs]);
+
   const applyViewState = useCallback(
     async (view: ViewState) => {
       switch (view.type) {
@@ -3401,6 +3437,7 @@ function App() {
           setIsGraphOpen(false);
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
           setExpandedFrom(null);
           if (isRightPaneMaximized) {
             setIsRightPaneMaximized(false);
@@ -3412,6 +3449,7 @@ function App() {
           setSelectedPath(null);
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
           setExpandedFrom(null);
           setIsGraphOpen(true);
           ensureGraphFileTab();
@@ -3425,8 +3463,19 @@ function App() {
           setIsBrowserOpen(false);
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
+          setIsArtifactsOpen(false);
           setIsSuggestedTopicsOpen(true);
           ensureSuggestedTopicsFileTab();
+          return;
+        case "artifacts":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsArtifactsOpen(true);
+          ensureArtifactsFileTab();
           return;
         case "chat":
           setSelectedPath(null);
@@ -3434,6 +3483,7 @@ function App() {
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
           if (view.runId) {
             await loadRun(view.runId);
           } else {
@@ -3446,6 +3496,7 @@ function App() {
       ensureFileTabForPath,
       ensureGraphFileTab,
       ensureSuggestedTopicsFileTab,
+      ensureArtifactsFileTab,
       handleNewChat,
       isRightPaneMaximized,
       loadRun,
@@ -3958,6 +4009,10 @@ function App() {
 
     // Top-level knowledge folders open as a bases view with folder filter
     const parts = path.split("/");
+    if (path === "artifacts") {
+      void navigateToView({ type: "artifacts" });
+      return;
+    }
     if (parts.length === 1 && isKnowledgeRelPath(parts[0] + "/")) {
       const folderName = parts[0];
       const folderCfg = FOLDER_BASE_CONFIGS[folderName];
@@ -4848,6 +4903,9 @@ function App() {
               onOpenIngestWindow={() => {
                 void navigateToView({ type: "file", path: INGEST_TAB_PATH });
               }}
+              onOpenArtifacts={() => {
+                void navigateToView({ type: "artifacts" });
+              }}
             />
             <SidebarInset
               className={cn(
@@ -4873,7 +4931,7 @@ function App() {
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
               >
-                {(selectedPath || isGraphOpen || isSuggestedTopicsOpen) &&
+                {(selectedPath || isGraphOpen || isSuggestedTopicsOpen || isArtifactsOpen) &&
                 fileTabs.length >= 1 ? (
                   <TabBar
                     tabs={fileTabs}
@@ -4882,12 +4940,7 @@ function App() {
                     getTabId={(t) => t.id}
                     onSwitchTab={switchFileTab}
                     onCloseTab={closeFileTab}
-                    allowSingleTabClose={
-                      fileTabs.length === 1 &&
-                      (isGraphOpen ||
-                        isSuggestedTopicsOpen ||
-                        (selectedPath != null && isBaseFilePath(selectedPath)))
-                    }
+                    allowSingleTabClose={true}
                   />
                 ) : (
                   <TabBar
@@ -5023,6 +5076,13 @@ function App() {
 
               {isBrowserOpen ? (
                 <BrowserPane onClose={handleCloseBrowser} />
+              ) : isArtifactsOpen ? (
+                <ArtifactsView
+                  onOpenArtifact={(path) => {
+                    void loadDirectory();
+                    navigateToFile(path === "artifacts" ? "artifacts" : path);
+                  }}
+                />
               ) : selectedPath === INGEST_TAB_PATH ? (
                 <IngestWindow
                   onProcessIngest={handleIngestProcess}
