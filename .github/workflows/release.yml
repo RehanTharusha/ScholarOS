@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+          - ubuntu-latest
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/x/pnpm-lock.yaml
+
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            dpkg-dev \
+            rpm
+          sudo apt-get install -y fakeroot
+
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: apps/x
+
+      - name: Build distributables
+        run: npm run make
+        working-directory: apps/x/apps/main
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ runner.os }}
+          path: apps/x/apps/main/out/make/
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts-Linux
+          path: artifacts/Linux
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts-macOS
+          path: artifacts/macOS
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifacts-Windows
+          path: artifacts/Windows
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag || echo "Release exists, uploading assets..."
+
+          find artifacts -type f \( \
+            -name "*.dmg" -o \
+            -name "*.zip" -o \
+            -name "*.exe" -o \
+            -name "*.deb" -o \
+            -name "*.rpm" -o \
+            -name "*.tar.gz" \
+          \) -exec gh release upload "$TAG" {} --clobber \;
