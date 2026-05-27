@@ -4799,7 +4799,7 @@ function App() {
                       } else {
                         // Only one tab, reset it to new chat
                         setChatTabs([
-                          { id: tabForRun.id, runId: null, mode: "agent" },
+                          { id: tabForRun.id, runId: null },
                         ]);
                         if (
                           selectedPath ||

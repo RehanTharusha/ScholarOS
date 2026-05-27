@@ -47,7 +47,7 @@ export function VersionHistoryPanel({
     } finally {
       setLoading(false)
     }
-  }, [relPath])
+  }, [path])
 
   useEffect(() => {
     loadHistory()

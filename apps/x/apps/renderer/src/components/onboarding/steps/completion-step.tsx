@@ -20,7 +20,7 @@ interface CompletionStepProps {
 function Particles() {
   const dots = useMemo(
     () =>
-      Array.from({ length: 20 }, (_, i) => ({
+      Array.from({ length: 20 }, (_, _i) => ({
         x: Math.random() * 100,
         y: Math.random() * 100,
         size: Math.random() * 3 + 1,

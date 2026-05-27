@@ -361,6 +361,7 @@ const ipcSchemas = {
     req: z.null(),
     res: z.object({
       showOnboarding: z.boolean(),
+      devOverride: z.boolean().optional(),
     }),
   },
   "onboarding:markComplete": {

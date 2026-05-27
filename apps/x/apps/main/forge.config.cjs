@@ -17,18 +17,22 @@ module.exports = {
       NSAudioCaptureUsageDescription:
         "ScholarOS needs access to system audio to transcribe meetings from other apps (Zoom, Meet, etc.)",
     },
-    osxSign: {
-      batchCodesignCalls: true,
-      optionsForFile: () => ({
-        entitlements: path.join(__dirname, "entitlements.plist"),
-        "entitlements-inherit": path.join(__dirname, "entitlements.plist"),
-      }),
-    },
-    osxNotarize: {
-      appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_PASSWORD,
-      teamId: process.env.APPLE_TEAM_ID,
-    },
+    osxSign: process.env.APPLE_ID
+      ? {
+          batchCodesignCalls: true,
+          optionsForFile: () => ({
+            entitlements: path.join(__dirname, "entitlements.plist"),
+            "entitlements-inherit": path.join(__dirname, "entitlements.plist"),
+          }),
+        }
+      : false,
+    osxNotarize: process.env.APPLE_ID
+      ? {
+          appleId: process.env.APPLE_ID,
+          appleIdPassword: process.env.APPLE_PASSWORD,
+          teamId: process.env.APPLE_TEAM_ID,
+        }
+      : false,
     // Since we bundle everything with esbuild, we don't need node_modules at all.
     // These settings prevent Forge's dependency walker (flora-colossus) from trying
     // to analyze/copy node_modules, which fails with pnpm's symlinked workspaces.
@@ -46,7 +50,7 @@ module.exports = {
       name: "@electron-forge/maker-dmg",
       config: (arch) => ({
         format: "ULFO",
-        name: `ScholarOS-darwin-${arch}-${pkg.version}`, // Architecture-specific name to avoid conflicts
+        name: `ScholarOS-${pkg.version}`, // Must be ≤27 chars for DMG volume name
       }),
     },
     {
