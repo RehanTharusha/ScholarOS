@@ -109,6 +109,7 @@ import { FileCardProvider } from "@/contexts/file-card-context";
 import { IngestWindow } from "@/components/ingest-window";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { HtmlViewer } from "@/components/html-viewer";
+import { AnimatePresence, motion } from "motion/react";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
@@ -4742,6 +4743,21 @@ function App() {
     return markdownTabs;
   }, [fileTabs, selectedPath]);
 
+  const viewKey = React.useMemo(() => {
+    if (isBrowserOpen) return "browser";
+    if (isArtifactsOpen) return "artifacts";
+    if (selectedPath === INGEST_TAB_PATH) return "ingest";
+    if (isSuggestedTopicsOpen) return "suggested-topics";
+    if (selectedPath && isBaseFilePath(selectedPath)) return `bases:${selectedPath}`;
+    if (isGraphOpen) return "graph";
+    if (selectedPath) {
+      if (selectedPath.endsWith(".md")) return `md:${selectedPath}`;
+      if (selectedPath.endsWith(".pdf")) return `pdf:${selectedPath}`;
+      return `file:${selectedPath}`;
+    }
+    return "chat";
+  }, [isBrowserOpen, isArtifactsOpen, selectedPath, isSuggestedTopicsOpen, isGraphOpen]);
+
   return (
     <TooltipProvider delayDuration={0}>
       <SidebarSectionProvider defaultSection="knowledge">
@@ -5074,6 +5090,7 @@ function App() {
                 )}
               </ContentHeader>
 
+              <div key={viewKey} className="flex-1 flex flex-col min-h-0 overflow-hidden animate-[enter-fade_0.15s_ease-out]">
               {isBrowserOpen ? (
                 <BrowserPane onClose={handleCloseBrowser} />
               ) : isArtifactsOpen ? (
@@ -5389,15 +5406,21 @@ function App() {
                                           tabState.allPermissionRequests.get(
                                             item.id,
                                           );
-                                        if (permRequest) {
-                                          const response =
-                                            tabState.permissionResponses.get(
-                                              item.id,
-                                            ) || null;
-                                          return (
-                                            <React.Fragment key={item.id}>
-                                              {rendered}
-                                              <PermissionRequest
+                                          if (permRequest) {
+                                            const response =
+                                              tabState.permissionResponses.get(
+                                                item.id,
+                                              ) || null;
+                                            return (
+                                              <React.Fragment key={item.id}>
+                                                <motion.div
+                                                  initial={{ opacity: 0, y: 6 }}
+                                                  animate={{ opacity: 1, y: 0 }}
+                                                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                                                >
+                                                  {rendered}
+                                                </motion.div>
+                                                <PermissionRequest
                                                 toolCall={permRequest.toolCall}
                                                 onApprove={() =>
                                                   handlePermissionResponse(
@@ -5442,7 +5465,16 @@ function App() {
                                           );
                                         }
                                       }
-                                      return rendered;
+                                      return (
+                                        <motion.div
+                                          key={item.id}
+                                          initial={{ opacity: 0, y: 6 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                                        >
+                                          {rendered}
+                                        </motion.div>
+                                      );
                                     })}
 
                                     {Array.from(
@@ -5607,6 +5639,7 @@ function App() {
                   </div>
                 </FileCardProvider>
               )}
+              </div>
             </SidebarInset>
 
             {/* Chat sidebar - shown when viewing files/graph */}
