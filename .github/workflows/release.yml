@@ -50,7 +50,18 @@ jobs:
         run: pnpm install
         working-directory: apps/x
 
-      - name: Build distributables
+      - name: Build distributables (Linux)
+        if: runner.os == 'Linux'
+        run: npm run make -- --targets=@electron-forge/maker-zip
+        working-directory: apps/x/apps/main
+
+      - name: Build distributables (macOS)
+        if: runner.os == 'macOS'
+        run: npm run make
+        working-directory: apps/x/apps/main
+
+      - name: Build distributables (Windows)
+        if: runner.os == 'Windows'
         run: npm run make
         working-directory: apps/x/apps/main
 
