@@ -5096,8 +5096,14 @@ function App() {
               ) : isArtifactsOpen ? (
                 <ArtifactsView
                   onOpenArtifact={(path) => {
-                    void loadDirectory();
-                    navigateToFile(path === "artifacts" ? "artifacts" : path);
+                    if (path === "artifacts") {
+                      setPresetMessage("create a document on ");
+                      handleNewChatTab();
+                      void navigateToView({ type: "chat", runId: null });
+                    } else {
+                      void loadDirectory();
+                      navigateToFile(path);
+                    }
                   }}
                 />
               ) : selectedPath === INGEST_TAB_PATH ? (
