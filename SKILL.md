@@ -1,4 +1,4 @@
-# HumanizerPro · Web Design Skill
+# Kami Web Design Skill
 
 **Kami philosophy, adapted for the browser.** Warm parchment canvas, ink-blue accent, serif-led hierarchy, tight editorial rhythm — translated from print to Next.js + Tailwind CSS v4.
 
@@ -37,9 +37,9 @@ Map these to `@theme` in `globals.css`. All values are the source of truth.
   --color-deep-dark: #141413;
 
   /* Brand */
-  --color-brand: #1B365D;
-  --color-brand-light: #2D5A8A;
-  --color-brand-tint: #EEF2F7;
+  --color-brand: #1b365d;
+  --color-brand-light: #2d5a8a;
+  --color-brand-tint: #eef2f7;
 
   /* Text */
   --color-near-black: #141413;
@@ -98,28 +98,30 @@ const inter = Inter({
 
 **Type scale** (web px, mapped from print pt):
 
-| Role | Size | Weight | Line-height | Tailwind class |
-|---|---|---|---|---|
-| Display (hero) | 64–96px | 500 | 1.10 | `text-6xl`–`text-8xl` + custom |
-| H1 Section | 32–40px | 500 | 1.20 | `text-3xl`–`text-4xl` |
-| H2 | 24–28px | 500 | 1.25 | `text-2xl`–`text-3xl` |
-| H3 | 18–20px | 500 | 1.30 | `text-lg`–`text-xl` |
-| Body Lead | 18–20px | 400 | 1.55 | `text-lg`–`text-xl` |
-| Body | 16px | 400 | 1.60 | `text-base` |
-| Body Dense | 14px | 400 | 1.45 | `text-sm` |
-| Caption | 13px | 400 | 1.45 | `text-xs`–`text-sm` |
-| Label / Tag | 12px | 600 | 1.35 | `text-xs` |
-| Tiny / Meta | 12px | 400 | 1.40 | `text-xs` |
+| Role           | Size    | Weight | Line-height | Tailwind class                 |
+| -------------- | ------- | ------ | ----------- | ------------------------------ |
+| Display (hero) | 64–96px | 500    | 1.10        | `text-6xl`–`text-8xl` + custom |
+| H1 Section     | 32–40px | 500    | 1.20        | `text-3xl`–`text-4xl`          |
+| H2             | 24–28px | 500    | 1.25        | `text-2xl`–`text-3xl`          |
+| H3             | 18–20px | 500    | 1.30        | `text-lg`–`text-xl`            |
+| Body Lead      | 18–20px | 400    | 1.55        | `text-lg`–`text-xl`            |
+| Body           | 16px    | 400    | 1.60        | `text-base`                    |
+| Body Dense     | 14px    | 400    | 1.45        | `text-sm`                      |
+| Caption        | 13px    | 400    | 1.45        | `text-xs`–`text-sm`            |
+| Label / Tag    | 12px    | 600    | 1.35        | `text-xs`                      |
+| Tiny / Meta    | 12px    | 400    | 1.40        | `text-xs`                      |
 
 **Minimum floor**: 12px for any readable text.
 
 **Font family rules**:
+
 - Headlines: `font-serif` (Charter)
 - Body: `font-serif` (Charter) — serif carries authority
 - UI chrome (nav, tags, buttons, labels): `font-latin-ui` (Inter)
 - Code: `font-mono`
 
 **Weight rules**:
+
 - Serif: only 400 and 500. Never `font-bold` (700) on serif text
 - Use `font-medium` (500) for serif emphasis
 - Sans UI: 400, 500, 600 allowed
@@ -128,15 +130,15 @@ const inter = Inter({
 
 Base unit: 4px. All spacing snaps to this grid.
 
-| Tier | Value | Use |
-|---|---|---|
-| xs | 2–4px | Inline adjacent elements |
-| sm | 4–8px | Tag padding, dense layout |
-| md | 8–12px | Component interior |
-| lg | 16–24px | Between components / card padding |
-| xl | 24–40px | Section margins |
-| 2xl | 40–80px | Between major sections |
-| 3xl | 80–120px | Between chapters / page sections |
+| Tier | Value    | Use                               |
+| ---- | -------- | --------------------------------- |
+| xs   | 2–4px    | Inline adjacent elements          |
+| sm   | 4–8px    | Tag padding, dense layout         |
+| md   | 8–12px   | Component interior                |
+| lg   | 16–24px  | Between components / card padding |
+| xl   | 24–40px  | Section margins                   |
+| 2xl  | 40–80px  | Between major sections            |
+| 3xl  | 80–120px | Between chapters / page sections  |
 
 **Container**: `max-w-[1120px]` centered. Section padding: `py-20 px-8` (80px vertical, 32px horizontal).
 
@@ -167,6 +169,7 @@ Scale: `2px → 4px → 6px → 8px (default) → 12px → 16px → 24px → 999
 ### Button
 
 **Primary**:
+
 ```tsx
 <button className="bg-brand text-ivory font-latin-ui text-sm font-medium px-6 py-3 rounded-full border border-brand min-w-[158px] transition-all hover:bg-brand-light hover:-translate-y-0.5">
   {children}
@@ -174,6 +177,7 @@ Scale: `2px → 4px → 6px → 8px (default) → 12px → 16px → 24px → 999
 ```
 
 **Ghost**:
+
 ```tsx
 <button className="bg-transparent text-brand font-latin-ui text-sm font-medium px-6 py-3 rounded-full border border-brand min-w-[158px] transition-all hover:bg-brand-tint hover:-translate-y-0.5">
   {children}
@@ -263,13 +267,18 @@ Scale: `2px → 4px → 6px → 8px (default) → 12px → 16px → 24px → 999
       {/* icon */}
     </div>
     <div>
-      <h4 className="font-serif text-lg font-medium text-near-black">{brand}</h4>
+      <h4 className="font-serif text-lg font-medium text-near-black">
+        {brand}
+      </h4>
       <p className="text-sm text-olive">{tagline}</p>
     </div>
   </div>
   <div className="text-sm text-dark-warm">
-    <a href="/docs">Docs</a> &middot; <a href="/pricing">Pricing</a> &middot; <a href="/blog">Blog</a>
-    <p className="mt-2 font-serif text-sm text-olive italic max-w-sm">{ethos}</p>
+    <a href="/docs">Docs</a> &middot; <a href="/pricing">Pricing</a> &middot;{" "}
+    <a href="/blog">Blog</a>
+    <p className="mt-2 font-serif text-sm text-olive italic max-w-sm">
+      {ethos}
+    </p>
   </div>
 </footer>
 ```
@@ -319,6 +328,7 @@ For visual rhythm, alternate light/dark sections:
 ```
 
 Dark section text:
+
 - Headings: `text-ivory`
 - Body: `text-warm-silver`
 - Accent: `text-brand-light`
@@ -327,18 +337,18 @@ Dark section text:
 
 ## Anti-Patterns (What Not To Do)
 
-| Pattern | Why | Fix |
-|---|---|---|
-| `bg-white` as page background | Breaks parchment warmth | Use `bg-parchment` |
-| `shadow-lg`, `shadow-xl` | Hard shadows feel digital, not paper | Use `shadow-[0_4px_24px_rgba(0,0,0,0.05)]` |
-| `font-bold` on serif text | Synthetic bold on Charter looks heavy | Use `font-medium` (500) |
-| Cool grays (`zinc`, `gray`, `slate`) | Wrong undertone, feels sterile | Use warm tokens (`stone`, `olive`, custom) |
-| Multiple chromatic colors | Breaks single-accent discipline | Ink-blue only, vary opacity not hue |
-| `bg-zinc-50` / `bg-gray-100` | Cool-tone surfaces | Use `bg-ivory` or `bg-warm-sand` |
-| `rounded-3xl` on small elements | Over-rounded, feels playful not editorial | Match radius to element scale |
-| `tracking-tight` on body text | Reduces readability | Only on large display headings |
-| `leading-loose` on body | Web rhythm, not editorial | Use `leading-relaxed` (1.625) or custom 1.55 |
-| Inventing metrics or fake data | Breaks trust | Use real numbers or omit |
+| Pattern                              | Why                                       | Fix                                          |
+| ------------------------------------ | ----------------------------------------- | -------------------------------------------- |
+| `bg-white` as page background        | Breaks parchment warmth                   | Use `bg-parchment`                           |
+| `shadow-lg`, `shadow-xl`             | Hard shadows feel digital, not paper      | Use `shadow-[0_4px_24px_rgba(0,0,0,0.05)]`   |
+| `font-bold` on serif text            | Synthetic bold on Charter looks heavy     | Use `font-medium` (500)                      |
+| Cool grays (`zinc`, `gray`, `slate`) | Wrong undertone, feels sterile            | Use warm tokens (`stone`, `olive`, custom)   |
+| Multiple chromatic colors            | Breaks single-accent discipline           | Ink-blue only, vary opacity not hue          |
+| `bg-zinc-50` / `bg-gray-100`         | Cool-tone surfaces                        | Use `bg-ivory` or `bg-warm-sand`             |
+| `rounded-3xl` on small elements      | Over-rounded, feels playful not editorial | Match radius to element scale                |
+| `tracking-tight` on body text        | Reduces readability                       | Only on large display headings               |
+| `leading-loose` on body              | Web rhythm, not editorial                 | Use `leading-relaxed` (1.625) or custom 1.55 |
+| Inventing metrics or fake data       | Breaks trust                              | Use real numbers or omit                     |
 
 ---
 
@@ -377,7 +387,9 @@ Dark section text:
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -389,13 +401,14 @@ Dark section text:
 
 ## Responsive Strategy
 
-| Breakpoint | Width | Behavior |
-|---|---|---|
-| Default | > 880px | Full layout, two-column grids |
-| Tablet | ≤ 880px | Single column, reduced padding (`py-16 px-6`) |
-| Phone | ≤ 480px | Compact padding (`py-12 px-4`), hero title scales down |
+| Breakpoint | Width   | Behavior                                               |
+| ---------- | ------- | ------------------------------------------------------ |
+| Default    | > 880px | Full layout, two-column grids                          |
+| Tablet     | ≤ 880px | Single column, reduced padding (`py-16 px-6`)          |
+| Phone      | ≤ 480px | Compact padding (`py-12 px-4`), hero title scales down |
 
 **Hero title scaling**:
+
 - Desktop: `text-7xl` (72px)
 - Tablet: `text-5xl` (48px)
 - Phone: `text-4xl` (36px)
@@ -414,20 +427,20 @@ Dark section text:
 
 ## Quick Decisions
 
-| Need | Use |
-|---|---|
-| Big headline | `font-serif font-medium text-4xl+ leading-tight` |
-| Reading body | `font-serif text-base leading-relaxed text-dark-warm` |
-| UI label / tag | `font-latin-ui text-xs font-semibold uppercase tracking-wide` |
-| Emphasize a number | `text-brand font-serif font-medium tabular-nums` |
-| Divide sections | `border-l-2 border-brand` or `border-b border-border-soft` |
-| Quote | `border-l-2 border-brand pl-4 text-olive` |
-| Code | `font-mono text-sm bg-ivory border border-border rounded-md p-4` |
-| Primary CTA | `bg-brand text-ivory rounded-full` (pill) |
-| Secondary CTA | `border border-brand text-brand rounded-full` (ghost) |
-| Card hover | whisper shadow only, no ring overlay |
-| Section opener | eyebrow dot + uppercase label + serif heading |
-| Dark section | `bg-deep-dark` + `text-warm-silver` body + `text-ivory` headings |
+| Need               | Use                                                              |
+| ------------------ | ---------------------------------------------------------------- |
+| Big headline       | `font-serif font-medium text-4xl+ leading-tight`                 |
+| Reading body       | `font-serif text-base leading-relaxed text-dark-warm`            |
+| UI label / tag     | `font-latin-ui text-xs font-semibold uppercase tracking-wide`    |
+| Emphasize a number | `text-brand font-serif font-medium tabular-nums`                 |
+| Divide sections    | `border-l-2 border-brand` or `border-b border-border-soft`       |
+| Quote              | `border-l-2 border-brand pl-4 text-olive`                        |
+| Code               | `font-mono text-sm bg-ivory border border-border rounded-md p-4` |
+| Primary CTA        | `bg-brand text-ivory rounded-full` (pill)                        |
+| Secondary CTA      | `border border-brand text-brand rounded-full` (ghost)            |
+| Card hover         | whisper shadow only, no ring overlay                             |
+| Section opener     | eyebrow dot + uppercase label + serif heading                    |
+| Dark section       | `bg-deep-dark` + `text-warm-silver` body + `text-ivory` headings |
 
 Not on this table → return to first principles: **serif carries authority, sans carries utility, warm gray carries rhythm, ink-blue carries focus**.
 
@@ -443,4 +456,4 @@ Not on this table → return to first principles: **serif carries authority, san
 
 ---
 
-*This skill adapts the Kami print design system (warm parchment, ink-blue, serif-led, editorial rhythm) for web delivery via Next.js + Tailwind CSS v4. The philosophy is identical; the medium changes from A4 to viewport.*
+_This skill adapts the Kami print design system (warm parchment, ink-blue, serif-led, editorial rhythm) for web delivery via Next.js + Tailwind CSS v4. The philosophy is identical; the medium changes from A4 to viewport._

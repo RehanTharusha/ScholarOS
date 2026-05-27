@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { useEffect, useState } from "react";
 import { Search, FileText, File as FileIcon } from "lucide-react";
 
@@ -104,7 +103,7 @@ export function ArtifactsView({
             try {
               const fileResult = await window.ipc.invoke("workspace:readFile", {
                 path: entry.path,
-                encoding: "utf-8",
+                encoding: "utf8",
               });
               preview = extractPreview(fileResult.data, ext);
             } catch {

@@ -82,7 +82,7 @@ const providerDisplayNames: Record<string, string> = {
   openrouter: "OpenRouter",
   aigateway: "AI Gateway",
   "openai-compatible": "OpenAI-Compatible",
-  rowboat: "ScholarOS",
+  scholaros: "ScholarOS",
 };
 
 type ProviderName =
@@ -93,7 +93,7 @@ type ProviderName =
   | "aigateway"
   | "ollama"
   | "openai-compatible"
-  | "rowboat";
+  | "scholaros";
 
 interface ConfiguredModel {
   provider: ProviderName;
@@ -204,7 +204,7 @@ function ChatInputInner({
   const [lockedModel, setLockedModel] = useState<SelectedModel | null>(null);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [searchAvailable, setSearchAvailable] = useState(false);
-  const [isRowboatConnected, setIsRowboatConnected] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
 
   // When a run exists, freeze the dropdown to the run's resolved model+provider.
   useEffect(() => {
@@ -229,14 +229,14 @@ function ChatInputInner({
     };
   }, [runId]);
 
-  // Check Rowboat sign-in state
+  // Check ScholarOS sign-in state
   useEffect(() => {
     window.ipc
       .invoke("oauth:getState", null)
       .then((result) => {
-        setIsRowboatConnected(result.config?.rowboat?.connected ?? false);
+        setIsSignedIn(result.config?.scholaros?.connected ?? false);
       })
-      .catch(() => setIsRowboatConnected(false));
+      .catch(() => setIsSignedIn(false));
   }, [isActive]);
 
   // Update sign-in state when OAuth events fire
@@ -245,9 +245,9 @@ function ChatInputInner({
       window.ipc
         .invoke("oauth:getState", null)
         .then((result) => {
-          setIsRowboatConnected(result.config?.rowboat?.connected ?? false);
+          setIsSignedIn(result.config?.scholaros?.connected ?? false);
         })
-        .catch(() => setIsRowboatConnected(false));
+        .catch(() => setIsSignedIn(false));
     });
     return cleanup;
   }, []);
@@ -256,13 +256,13 @@ function ChatInputInner({
   // Signed-in: gateway model list. Signed-out: providers configured in models.json.
   const loadModelConfig = useCallback(async () => {
     try {
-      if (isRowboatConnected) {
+      if (isSignedIn) {
         const listResult = await window.ipc.invoke("models:list", null);
-        const rowboatProvider = listResult.providers?.find(
-          (p: { id: string }) => p.id === "rowboat",
+        const scholarosProvider = listResult.providers?.find(
+          (p: { id: string }) => p.id === "scholaros",
         );
-        const models: ConfiguredModel[] = (rowboatProvider?.models || []).map(
-          (m: { id: string }) => ({ provider: "rowboat", model: m.id }),
+        const models: ConfiguredModel[] = (scholarosProvider?.models || []).map(
+          (m: { id: string }) => ({ provider: "scholaros", model: m.id }),
         );
         setConfiguredModels(models);
       } else {
@@ -296,7 +296,7 @@ function ChatInputInner({
     } catch {
       // No config yet
     }
-  }, [isRowboatConnected]);
+  }, [isSignedIn]);
 
   useEffect(() => {
     loadModelConfig();

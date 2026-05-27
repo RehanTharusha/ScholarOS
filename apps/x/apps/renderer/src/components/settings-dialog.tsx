@@ -1119,10 +1119,10 @@ interface ToolkitInfo {
 
 function ToolsLibrarySettings({
   dialogOpen,
-  rowboatConnected,
+  scholarosConnected,
 }: {
   dialogOpen: boolean;
-  rowboatConnected: boolean;
+  scholarosConnected: boolean;
 }) {
   // API key state
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
@@ -1278,7 +1278,7 @@ function ToolsLibrarySettings({
   return (
     <div className="space-y-4">
       {/* Section A: API Key (only in BYOK mode) */}
-      {!rowboatConnected && (
+      {!scholarosConnected && (
         <div className="space-y-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Composio API Key
@@ -1484,10 +1484,10 @@ function RowboatModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       try {
         // Fetch gateway models
         const listResult = await window.ipc.invoke("models:list", null);
-        const rowboatProvider = listResult.providers?.find(
-          (p: { id: string }) => p.id === "rowboat",
+        const scholarosProvider = listResult.providers?.find(
+          (p: { id: string }) => p.id === "scholaros",
         );
-        const models = rowboatProvider?.models || [];
+        const models = scholarosProvider?.models || [];
         setGatewayModels(models);
 
         // Read current selection from config
@@ -1609,25 +1609,25 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rowboatConnected, setRowboatConnected] = useState(false);
+  const [scholarosConnected, setScholarOSConnected] = useState(false);
 
-  // Check if user is signed in to Rowboat
+  // Check if user is signed in to ScholarOS
   useEffect(() => {
     if (!open) return;
     window.ipc
       .invoke("oauth:getState", null)
       .then((result) => {
-        const connected = result.config?.rowboat?.connected ?? false;
-        setRowboatConnected(connected);
+        const connected = result.config?.scholaros?.connected ?? false;
+        setScholarOSConnected(connected);
       })
       .catch(() => {
-        setRowboatConnected(false);
+        setScholarOSConnected(false);
       });
   }, [open]);
 
   const visibleTabs = useMemo(
-    () => (rowboatConnected ? tabs.filter((t) => t.id !== "models") : tabs),
-    [rowboatConnected],
+    () => (scholarosConnected ? tabs.filter((t) => t.id !== "models") : tabs),
+    [scholarosConnected],
   );
 
   const activeTabConfig =
@@ -1748,7 +1748,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
             <div className="px-4 py-3 border-b">
               <h3 className="font-medium text-sm">{activeTabConfig.label}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {activeTab === "models" && rowboatConnected
+                {activeTab === "models" && scholarosConnected
                   ? "Select your default models"
                   : activeTabConfig.description}
               </p>
@@ -1771,7 +1771,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
               ) : activeTab === "connected-accounts" ? (
                 <ConnectedAccountsSettings dialogOpen={open} />
               ) : activeTab === "models" ? (
-                rowboatConnected ? (
+                scholarosConnected ? (
                   <RowboatModelSettings dialogOpen={open} />
                 ) : (
                   <ModelSettings dialogOpen={open} />
@@ -1781,7 +1781,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
               ) : activeTab === "tools" ? (
                 <ToolsLibrarySettings
                   dialogOpen={open}
-                  rowboatConnected={rowboatConnected}
+                  scholarosConnected={scholarosConnected}
                 />
               ) : loading ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">

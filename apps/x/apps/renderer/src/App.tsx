@@ -109,7 +109,7 @@ import { FileCardProvider } from "@/contexts/file-card-context";
 import { IngestWindow } from "@/components/ingest-window";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { HtmlViewer } from "@/components/html-viewer";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";

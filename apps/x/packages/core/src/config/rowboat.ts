@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { RowboatApiConfig } from "@x/shared/dist/rowboat-account.js";
+import { ScholarOSApiConfig } from "@x/shared/dist/rowboat-account.js";
 import { API_URL } from "./env.js";
 
-let cached: z.infer<typeof RowboatApiConfig> | null = null;
+let cached: z.infer<typeof ScholarOSApiConfig> | null = null;
 
-export async function getRowboatConfig(): Promise<z.infer<typeof RowboatApiConfig>> {
+export async function getScholarOSConfig(): Promise<z.infer<typeof ScholarOSApiConfig>> {
   if (cached) {
     return cached;
   }
   const response = await fetch(`${API_URL}/v1/config`);
-  const data = RowboatApiConfig.parse(await response.json());
+  const data = ScholarOSApiConfig.parse(await response.json());
   cached = data;
   return data;
 }

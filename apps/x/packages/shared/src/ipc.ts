@@ -23,7 +23,7 @@ import { LlmModelConfig } from "./models.js";
 import { ServiceEvent } from "./service-events.js";
 
 import { UserMessageContent } from "./message.js";
-import { RowboatApiConfig } from "./rowboat-account.js";
+import { ScholarOSApiConfig } from "./rowboat-account.js";
 import { ZListToolkitsResponse } from "./composio.js";
 import { BrowserStateSchema } from "./browser-control.js";
 // ============================================================================
@@ -317,12 +317,12 @@ const ipcSchemas = {
       ),
     }),
   },
-  "account:getRowboat": {
+  "account:getAccount": {
     req: z.null(),
     res: z.object({
       signedIn: z.boolean(),
       accessToken: z.string().nullable(),
-      config: RowboatApiConfig.nullable(),
+      config: ScholarOSApiConfig.nullable(),
     }),
   },
   "oauth:didConnect": {

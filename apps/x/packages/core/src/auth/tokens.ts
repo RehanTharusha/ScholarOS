@@ -1,6 +1,5 @@
 import container from '../di/container.js';
 import { IOAuthRepo } from './repo.js';
-import { IClientRegistrationRepo } from './client-repo.js';
 import { getProviderConfig } from './providers.js';
 import * as oauthClient from './oauth-client.js';
 import { OAuthTokens } from './types.js';
@@ -8,25 +7,23 @@ import { OAuthTokens } from './types.js';
 let refreshInFlight: Promise<OAuthTokens> | null = null;
 
 async function performRefresh(tokens: OAuthTokens): Promise<OAuthTokens> {
-    console.log("Refreshing rowboat access token");
+    console.log("Refreshing scholaros access token");
     if (!tokens.refresh_token) {
-        throw new Error('Rowboat token expired and no refresh token available. Please sign in again.');
+        throw new Error('ScholarOS token expired and no refresh token available. Please sign in again.');
     }
 
-    const providerConfig = await getProviderConfig('rowboat');
-    if (providerConfig.discovery.mode !== 'issuer') {
-        throw new Error('Rowboat provider requires issuer discovery mode');
+    const providerConfig = await getProviderConfig('scholaros');
+    if (providerConfig.discovery.mode !== 'static') {
+        throw new Error('ScholarOS provider requires static endpoint mode');
+    }
+    if (providerConfig.client.mode !== 'static') {
+        throw new Error('ScholarOS provider requires static client mode');
     }
 
-    const clientRepo = container.resolve<IClientRegistrationRepo>('clientRegistrationRepo');
-    const registration = await clientRepo.getClientRegistration('rowboat');
-    if (!registration) {
-        throw new Error('Rowboat client not registered. Please sign in again.');
-    }
-
-    const config = await oauthClient.discoverConfiguration(
-        providerConfig.discovery.issuer,
-        registration.client_id,
+    const config = oauthClient.createStaticConfiguration(
+        providerConfig.discovery.authorizationEndpoint,
+        providerConfig.discovery.tokenEndpoint,
+        providerConfig.client.clientId || 'scholaros-desktop',
     );
 
     const refreshed = await oauthClient.refreshTokens(
@@ -36,16 +33,16 @@ async function performRefresh(tokens: OAuthTokens): Promise<OAuthTokens> {
     );
 
     const oauthRepo = container.resolve<IOAuthRepo>('oauthRepo');
-    await oauthRepo.upsert('rowboat', { tokens: refreshed });
+    await oauthRepo.upsert('scholaros', { tokens: refreshed });
 
     return refreshed;
 }
 
 export async function getAccessToken(): Promise<string> {
     const oauthRepo = container.resolve<IOAuthRepo>('oauthRepo');
-    const { tokens } = await oauthRepo.read('rowboat');
+    const { tokens } = await oauthRepo.read('scholaros');
     if (!tokens) {
-        throw new Error('Not signed into Rowboat');
+        throw new Error('Not signed into ScholarOS');
     }
 
     if (!oauthClient.isTokenExpired(tokens)) {

@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
-import { Loader2, User, CreditCard, LogOut, ExternalLink } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useCallback } from "react";
+import { Loader2, User, CreditCard, LogOut, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,103 +13,107 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Separator } from "@/components/ui/separator"
-import { useBilling } from "@/hooks/useBilling"
-import { toast } from "sonner"
+} from "@/components/ui/alert-dialog";
+import { Separator } from "@/components/ui/separator";
+import { useBilling } from "@/hooks/useBilling";
+import { useScholarOSAccount } from "@/hooks/useRowboatAccount";
+import { toast } from "sonner";
 
 interface AccountSettingsProps {
-  dialogOpen: boolean
+  dialogOpen: boolean;
 }
 
 export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
-  const [isRowboatConnected, setIsRowboatConnected] = useState(false)
-  const [connectionLoading, setConnectionLoading] = useState(true)
-  const [disconnecting, setDisconnecting] = useState(false)
-  const [connecting, setConnecting] = useState(false)
-  const [appUrl, setAppUrl] = useState<string | null>(null)
-  const { billing, isLoading: billingLoading } = useBilling(isRowboatConnected)
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [appUrl, setAppUrl] = useState<string | null>(null);
+  const account = useScholarOSAccount();
+  const { billing, isLoading: billingLoading } = useBilling(isConnected);
 
   const checkConnection = useCallback(async () => {
     try {
-      setConnectionLoading(true)
-      const result = await window.ipc.invoke('oauth:getState', null)
-      const connected = result.config?.rowboat?.connected ?? false
-      setIsRowboatConnected(connected)
+      setConnectionLoading(true);
+      const result = await window.ipc.invoke("oauth:getState", null);
+      const connected = result.config?.scholaros?.connected ?? false;
+      setIsConnected(connected);
     } catch {
-      setIsRowboatConnected(false)
+      setIsConnected(false);
     } finally {
-      setConnectionLoading(false)
+      setConnectionLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     if (dialogOpen) {
-      checkConnection()
+      checkConnection();
     }
-  }, [dialogOpen, checkConnection])
+  }, [dialogOpen, checkConnection]);
 
   useEffect(() => {
-    if (isRowboatConnected) {
-      window.ipc.invoke('account:getRowboat', null)
-        .then((account) => setAppUrl(account.config?.appUrl ?? null))
-        .catch(() => {})
+    if (isConnected && account.config) {
+      setAppUrl(account.config.appUrl ?? null);
     }
-  }, [isRowboatConnected])
+  }, [isConnected, account.config]);
 
   useEffect(() => {
-    const cleanup = window.ipc.on('oauth:didConnect', (event) => {
-      if (event.provider === 'rowboat') {
-        setIsRowboatConnected(event.success)
-        setConnecting(false)
+    const cleanup = window.ipc.on("oauth:didConnect", (event) => {
+      if (event.provider === "scholaros") {
+        setIsConnected(event.success);
+        setConnecting(false);
         if (event.success) {
-          toast.success('Logged in to ScholarOS')
+          toast.success("Logged in to ScholarOS");
         }
       }
-    })
-    return cleanup
-  }, [])
+    });
+    return cleanup;
+  }, []);
 
   const handleConnect = useCallback(async () => {
     try {
-      setConnecting(true)
-      const result = await window.ipc.invoke('oauth:connect', { provider: 'rowboat' })
+      setConnecting(true);
+      const result = await window.ipc.invoke("oauth:connect", {
+        provider: "scholaros",
+      });
       if (!result.success) {
-        toast.error(result.error || 'Failed to log in to ScholarOS')
-        setConnecting(false)
+        toast.error(result.error || "Failed to log in to ScholarOS");
+        setConnecting(false);
       }
     } catch {
-      toast.error('Failed to log in to ScholarOS')
-      setConnecting(false)
+      toast.error("Failed to log in to ScholarOS");
+      setConnecting(false);
     }
-  }, [])
+  }, []);
 
   const handleDisconnect = useCallback(async () => {
     try {
-      setDisconnecting(true)
-      const result = await window.ipc.invoke('oauth:disconnect', { provider: 'rowboat' })
+      setDisconnecting(true);
+      const result = await window.ipc.invoke("oauth:disconnect", {
+        provider: "scholaros",
+      });
       if (result.success) {
-        setIsRowboatConnected(false)
-        toast.success('Logged out of ScholarOS')
+        setIsConnected(false);
+        toast.success("Logged out of ScholarOS");
       } else {
-        toast.error('Failed to log out of ScholarOS')
+        toast.error("Failed to log out of ScholarOS");
       }
     } catch {
-      toast.error('Failed to log out of Rowboat')
+      toast.error("Failed to log out of ScholarOS");
     } finally {
-      setDisconnecting(false)
+      setDisconnecting(false);
     }
-  }, [])
+  }, []);
 
   if (connectionLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
-  if (!isRowboatConnected) {
+  if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-4">
         <div className="flex size-14 items-center justify-center rounded-full bg-muted">
@@ -117,14 +121,16 @@ export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
         </div>
         <div className="text-center space-y-1">
           <p className="text-sm font-medium">Not logged in</p>
-          <p className="text-xs text-muted-foreground">Log in to your ScholarOS account to access premium features</p>
+          <p className="text-xs text-muted-foreground">
+            Log in to your ScholarOS account to access premium features
+          </p>
         </div>
         <Button onClick={handleConnect} disabled={connecting}>
           {connecting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
           Log in to ScholarOS
         </Button>
       </div>
-    )
+    );
   }
 
   return (
@@ -137,7 +143,7 @@ export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
           </div>
           <div className="space-y-0.5">
             <p className="text-sm font-medium">
-              {billing?.userEmail ?? 'Loading...'}
+              {billing?.userEmail ?? "Loading..."}
             </p>
             <p className="text-xs text-muted-foreground">ScholarOS Account</p>
           </div>
@@ -163,29 +169,58 @@ export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium capitalize">
-                  {billing.subscriptionPlan ? `${billing.subscriptionPlan} Plan` : 'No Plan'}
+                  {billing.subscriptionPlan
+                    ? `${billing.subscriptionPlan} Plan`
+                    : "No Plan"}
                 </p>
-                {billing.subscriptionStatus === 'trialing' && billing.trialExpiresAt ? (() => {
-                  const days = Math.max(0, Math.ceil((new Date(billing.trialExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-                  return (
-                    <p className="text-xs text-muted-foreground">
-                      Trial · {days === 0 ? 'expires today' : days === 1 ? '1 day left' : `${days} days left`}
-                    </p>
-                  )
-                })() : billing.subscriptionStatus ? (
-                  <p className="text-xs text-muted-foreground capitalize">{billing.subscriptionStatus}</p>
+                {billing.subscriptionStatus === "trialing" &&
+                billing.trialExpiresAt ? (
+                  (() => {
+                    const days = Math.max(
+                      0,
+                      Math.ceil(
+                        (new Date(billing.trialExpiresAt).getTime() -
+                          Date.now()) /
+                          (1000 * 60 * 60 * 24),
+                      ),
+                    );
+                    return (
+                      <p className="text-xs text-muted-foreground">
+                        Trial ·{" "}
+                        {days === 0
+                          ? "expires today"
+                          : days === 1
+                            ? "1 day left"
+                            : `${days} days left`}
+                      </p>
+                    );
+                  })()
+                ) : billing.subscriptionStatus ? (
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {billing.subscriptionStatus}
+                  </p>
                 ) : null}
                 {!billing.subscriptionPlan && (
-                  <p className="text-xs text-muted-foreground">Subscribe to access AI features</p>
+                  <p className="text-xs text-muted-foreground">
+                    Subscribe to access AI features
+                  </p>
                 )}
               </div>
-              <Button variant="outline" size="sm" onClick={() => appUrl && window.open(`${appUrl}?intent=upgrade`)}>
-                {!billing.subscriptionPlan ? 'Subscribe' : 'Change plan'}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  appUrl && window.open(`${appUrl}?intent=upgrade`)
+                }
+              >
+                {!billing.subscriptionPlan ? "Subscribe" : "Change plan"}
               </Button>
             </div>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Unable to load plan details</p>
+          <p className="text-xs text-muted-foreground">
+            Unable to load plan details
+          </p>
         )}
       </div>
 
@@ -208,10 +243,12 @@ export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
           className="gap-1.5"
         >
           <ExternalLink className="size-3" />
-          Manage in Stripe
+          Manage billing
         </Button>
         {!billing?.subscriptionPlan && (
-          <p className="text-[11px] text-muted-foreground">Subscribe to a plan first</p>
+          <p className="text-[11px] text-muted-foreground">
+            Subscribe to a plan first
+          </p>
         )}
       </div>
 
@@ -224,19 +261,27 @@ export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
           <h4 className="text-sm font-medium">Log Out</h4>
         </div>
         <p className="text-xs text-muted-foreground">
-          Logging out will remove access to synced data and ScholarOS-provided models.
+          Logging out will remove access to synced data and ScholarOS-provided
+          models.
         </p>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+            >
               Log Out
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Log out of your ScholarOS account?</AlertDialogTitle>
+              <AlertDialogTitle>
+                Log out of your ScholarOS account?
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                This will remove access to synced data and ScholarOS-provided models. You can log back in at any time.
+                This will remove access to synced data and ScholarOS-provided
+                models. You can log back in at any time.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -246,7 +291,9 @@ export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
                 disabled={disconnecting}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                {disconnecting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                {disconnecting ? (
+                  <Loader2 className="size-4 animate-spin mr-2" />
+                ) : null}
                 Log Out
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -254,5 +301,5 @@ export function AccountSettings({ dialogOpen }: AccountSettingsProps) {
         </AlertDialog>
       </div>
     </div>
-  )
+  );
 }

@@ -95,8 +95,8 @@ module.exports = {
       name: "@electron-forge/publisher-github",
       config: {
         repository: {
-          owner: "scholaros",
-          name: "scholaros-app",
+          owner: "RehanTharusha",
+          name: "ScholarOS",
         },
         prerelease: true,
       },

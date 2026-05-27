@@ -64,7 +64,7 @@ export function createProvider(config: z.infer<typeof Provider>): ProviderV2 {
                 baseURL,
                 headers,
             }) as unknown as ProviderV2;
-        case "rowboat":
+        case "scholaros":
             return getGatewayProvider();
         default:
             throw new Error(`Unsupported provider flavor: ${config.flavor}`);

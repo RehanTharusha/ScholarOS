@@ -127,21 +127,13 @@ function matchBillingError(message: string) {
   );
 }
 
-interface BillingRowboatAccount {
-  config?: {
-    appUrl?: string | null;
-  } | null;
-}
-
 function BillingErrorCTA({ label }: { label: string }) {
   const [appUrl, setAppUrl] = useState<string | null>(null);
 
   useEffect(() => {
     window.ipc
-      .invoke("account:getRowboat", null)
-      .then((account: BillingRowboatAccount) =>
-        setAppUrl(account.config?.appUrl ?? null),
-      )
+      .invoke("account:getAccount", null)
+      .then((account) => setAppUrl(account.config?.appUrl ?? null))
       .catch(() => {});
   }, []);
 

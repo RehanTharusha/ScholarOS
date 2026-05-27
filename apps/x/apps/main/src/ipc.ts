@@ -50,7 +50,7 @@ import { search } from "@x/core/dist/search/search.js";
 import { versionHistory, voice } from "@x/core";
 import { getBillingInfo } from "@x/core/dist/billing/billing.js";
 import { getAccessToken } from "@x/core/dist/auth/tokens.js";
-import { getRowboatConfig } from "@x/core/dist/config/rowboat.js";
+import { getScholarOSConfig } from "@x/core/dist/config/rowboat.js";
 import {
   WorkDir,
   saveVaultPath,
@@ -620,13 +620,13 @@ export function setupIpcHandlers() {
       const config = await repo.getClientFacingConfig();
       return { config };
     },
-    "account:getRowboat": async () => {
+    "account:getAccount": async () => {
       const signedIn = await isSignedIn();
       if (!signedIn) {
         return { signedIn: false, accessToken: null, config: null };
       }
 
-      const config = await getRowboatConfig();
+      const config = await getScholarOSConfig();
 
       try {
         const accessToken = await getAccessToken();

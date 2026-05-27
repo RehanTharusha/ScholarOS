@@ -155,52 +155,111 @@ export function generateState(): string {
 }
 
 /**
- * Build authorization URL with PKCE
+ * Build authorization URL with PKCE.
+ * Uses manual URL construction to avoid openid-client's HTTPS-only restriction,
+ * which rejects http:// localhost URLs during development.
  */
 export function buildAuthorizationUrl(
   config: client.Configuration,
-  params: Record<string, string>
+  params: Record<string, string>,
 ): URL {
-  return client.buildAuthorizationUrl(config, {
-    code_challenge_method: 'S256',
-    ...params,
-  });
+  const metadata = config.serverMetadata();
+  const endpoint = metadata.authorization_endpoint;
+  if (!endpoint) {
+    throw new Error("Authorization server metadata missing authorization_endpoint");
+  }
+  const url = new URL(endpoint);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("code_challenge_method", "S256");
+  for (const [key, value] of Object.entries(params)) {
+    if (value) url.searchParams.set(key, value);
+  }
+  return url;
 }
 
 /**
  * Exchange authorization code for tokens
+ * Uses raw fetch to avoid openid-client's HTTPS-only restriction.
  */
 export async function exchangeCodeForTokens(
   config: client.Configuration,
   callbackUrl: URL,
   codeVerifier: string,
-  expectedState: string
 ): Promise<OAuthTokens> {
   console.log(`[OAuth] Exchanging authorization code for tokens...`);
 
-  const response = await client.authorizationCodeGrant(config, callbackUrl, {
-    pkceCodeVerifier: codeVerifier,
-    expectedState,
+  const code = callbackUrl.searchParams.get("code");
+  if (!code) {
+    throw new Error("Authorization callback missing code parameter");
+  }
+
+  const metadata = config.serverMetadata();
+  const tokenEndpoint = metadata.token_endpoint;
+  if (!tokenEndpoint) {
+    throw new Error("Server metadata missing token_endpoint");
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: callbackUrl.origin + callbackUrl.pathname,
+    code_verifier: codeVerifier,
+    client_id: (config as unknown as Record<string, unknown>).clientId as string ?? "",
   });
 
+  const response = await fetch(tokenEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Token exchange failed (${response.status}): ${text}`);
+  }
+
+  const data = await response.json();
   console.log(`[OAuth] Token exchange successful`);
-  return toOAuthTokens(response);
+  return toOAuthTokens(data);
 }
 
 /**
  * Refresh access token using refresh token
+ * Uses raw fetch to avoid openid-client's HTTPS-only restriction.
  * Preserves existing scopes if not returned by server
  */
 export async function refreshTokens(
   config: client.Configuration,
   refreshToken: string,
-  existingScopes?: string[]
+  existingScopes?: string[],
 ): Promise<OAuthTokens> {
   console.log(`[OAuth] Refreshing access token...`);
 
-  const response = await client.refreshTokenGrant(config, refreshToken);
+  const metadata = config.serverMetadata();
+  const tokenEndpoint = metadata.token_endpoint;
+  if (!tokenEndpoint) {
+    throw new Error("Server metadata missing token_endpoint");
+  }
 
-  const tokens = toOAuthTokens(response);
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: (config as unknown as Record<string, unknown>).clientId as string ?? "",
+  });
+
+  const response = await fetch(tokenEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Token refresh failed (${response.status}): ${text}`);
+  }
+
+  const data = await response.json();
+  const tokens = toOAuthTokens(data);
 
   // Preserve existing scopes if server didn't return them
   if (!tokens.scopes && existingScopes) {
