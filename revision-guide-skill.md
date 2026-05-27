@@ -93,7 +93,7 @@ Structure:
 
 ### Step 5: Generate the HTML revision page
 
-Create `college/{Module Name}/readings/revision-guide.html` — a fully self-contained, beautifully styled HTML file.
+Create `artifacts/{Module Name} Revision Guide.html` — a fully self-contained, beautifully styled HTML file.
 
 #### Required HTML design spec:
 
