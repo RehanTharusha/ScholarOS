@@ -201,6 +201,7 @@ export function SidebarContentPanel({
   const showChatQuickActions = activeSection === "tasks";
   const showKnowledgeNewChat = activeSection === "knowledge";
   const quickActionState = showChatQuickActions ? "open" : "closed";
+  const handleOpenCanvases = onOpenCanvases ?? knowledgeActions.openCanvas;
   const [isRowboatConnected, setIsRowboatConnected] = useState(false);
   const [appUrl, setAppUrl] = useState<string | null>(null);
   const { billing } = useBilling(isRowboatConnected);
@@ -326,6 +327,26 @@ export function SidebarContentPanel({
               <span>New chat</span>
             </button>
           )}
+          {showKnowledgeNewChat && onOpenArtifacts && (
+            <button
+              type="button"
+              onClick={onOpenArtifacts}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <Library className="size-4" />
+              <span>Artifacts</span>
+            </button>
+          )}
+          {showKnowledgeNewChat && handleOpenCanvases && (
+            <button
+              type="button"
+              onClick={handleOpenCanvases}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <LayoutGrid className="size-4" />
+              <span>Canvases</span>
+            </button>
+          )}
           <div
             className="sidebar-quick-actions"
             data-state={quickActionState}
@@ -432,8 +453,6 @@ export function SidebarContentPanel({
             actions={knowledgeActions}
             onOpenSearch={onOpenSearch}
             onVoiceNoteCreated={onVoiceNoteCreated}
-            onOpenArtifacts={onOpenArtifacts}
-            onOpenCanvases={onOpenCanvases}
           />
         )}
         {activeSection === "tasks" && (
@@ -799,8 +818,6 @@ function KnowledgeSection({
   actions,
   onOpenSearch,
   onVoiceNoteCreated,
-  onOpenArtifacts,
-  onOpenCanvases,
 }: {
   tree: TreeNode[];
   selectedPath: string | null;
@@ -810,8 +827,6 @@ function KnowledgeSection({
   actions: KnowledgeActions;
   onOpenSearch?: () => void;
   onVoiceNoteCreated?: (path: string) => void;
-  onOpenArtifacts?: () => void;
-  onOpenCanvases?: () => void;
 }) {
   const isExpanded = expandedPaths.size > 0;
   const treeContainerRef = React.useRef<HTMLDivElement | null>(null);
@@ -859,10 +874,6 @@ function KnowledgeSection({
     },
     { icon: Network, label: "Graph View", action: () => actions.openGraph() },
     { icon: Table2, label: "Bases", action: () => actions.openBases() },
-    { icon: LayoutGrid, label: "Canvas", action: () => actions.openCanvas() },
-    ...(onOpenArtifacts
-      ? [{ icon: Library, label: "Artifacts", action: onOpenArtifacts }]
-      : []),
   ];
 
   return (

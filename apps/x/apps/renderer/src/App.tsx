@@ -1325,7 +1325,7 @@ function App() {
       console.debug("[Renderer] loadDirectory: requesting root readdir");
       const rootEntries = await window.ipc.invoke("workspace:readdir", {
         path: "",
-        opts: { recursive: true, includeHidden: false, includeStats: true },
+        opts: { recursive: true, includeHidden: false, includeStats: false },
       });
       const visibleRootEntries = rootEntries.filter(
         (entry) => !isHiddenSidebarRootEntry(entry),
@@ -3293,7 +3293,13 @@ function App() {
 
     handleNewChat();
     // Left-pane "new chat" should always open full chat view.
-    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen) {
+    if (
+      selectedPath ||
+      isGraphOpen ||
+      isSuggestedTopicsOpen ||
+      isCanvasOpen ||
+      isCalendarOpen
+    ) {
       setExpandedFrom({
         path: selectedPath,
         graph: isGraphOpen,
@@ -3435,7 +3441,13 @@ function App() {
 
   const handleOpenFullScreenChat = useCallback(() => {
     // Remember where we came from so the close button can return
-    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen) {
+    if (
+      selectedPath ||
+      isGraphOpen ||
+      isSuggestedTopicsOpen ||
+      isCanvasOpen ||
+      isCalendarOpen
+    ) {
       setExpandedFrom({
         path: selectedPath,
         graph: isGraphOpen,
@@ -3448,7 +3460,13 @@ function App() {
     setIsSuggestedTopicsOpen(false);
     setIsCanvasOpen(false);
     setIsCalendarOpen(false);
-  }, [selectedPath, isGraphOpen, isSuggestedTopicsOpen, isCanvasOpen, isCalendarOpen]);
+  }, [
+    selectedPath,
+    isGraphOpen,
+    isSuggestedTopicsOpen,
+    isCanvasOpen,
+    isCalendarOpen,
+  ]);
 
   const handleCloseFullScreenChat = useCallback(() => {
     if (expandedFrom) {
@@ -4059,7 +4077,11 @@ function App() {
 
   // Keyboard shortcut: Ctrl+L to toggle main chat view
   const isFullScreenChat =
-    !selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isBrowserOpen && !isCanvasOpen;
+    !selectedPath &&
+    !isGraphOpen &&
+    !isSuggestedTopicsOpen &&
+    !isBrowserOpen &&
+    !isCanvasOpen;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "l") {
@@ -4147,7 +4169,11 @@ function App() {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
       const rightPaneAvailable = Boolean(
-        (selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen) &&
+        (selectedPath ||
+          isGraphOpen ||
+          isSuggestedTopicsOpen ||
+          isCanvasOpen ||
+          isCalendarOpen) &&
         isChatSidebarOpen,
       );
       const targetPane: ShortcutPane = rightPaneAvailable
@@ -4157,7 +4183,13 @@ function App() {
         : "left";
       const inFileView =
         targetPane === "left" &&
-        Boolean(selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen);
+        Boolean(
+          selectedPath ||
+          isGraphOpen ||
+          isSuggestedTopicsOpen ||
+          isCanvasOpen ||
+          isCalendarOpen,
+        );
       const selectedKnowledgePath = isGraphOpen
         ? GRAPH_TAB_PATH
         : isSuggestedTopicsOpen
@@ -4273,7 +4305,13 @@ function App() {
           }),
         },
       }));
-      if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isCanvasOpen && !isCalendarOpen) {
+      if (
+        !selectedPath &&
+        !isGraphOpen &&
+        !isSuggestedTopicsOpen &&
+        !isCanvasOpen &&
+        !isCalendarOpen
+      ) {
         setIsChatSidebarOpen(false);
         setIsRightPaneMaximized(false);
       }
@@ -4423,14 +4461,26 @@ function App() {
         }
       },
       openGraph: () => {
-        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isCanvasOpen && !isCalendarOpen) {
+        if (
+          !selectedPath &&
+          !isGraphOpen &&
+          !isSuggestedTopicsOpen &&
+          !isCanvasOpen &&
+          !isCalendarOpen
+        ) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "graph" });
       },
       openBases: () => {
-        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isCanvasOpen && !isCalendarOpen) {
+        if (
+          !selectedPath &&
+          !isGraphOpen &&
+          !isSuggestedTopicsOpen &&
+          !isCanvasOpen &&
+          !isCalendarOpen
+        ) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
@@ -5031,7 +5081,11 @@ function App() {
     activeChatTabState.currentAssistantMessage ||
     activeChatTabState.currentToolDraftActive;
   const isRightPaneContext = Boolean(
-    selectedPath || isGraphOpen || isSuggestedTopicsOpen || isBrowserOpen || isCanvasOpen,
+    selectedPath ||
+    isGraphOpen ||
+    isSuggestedTopicsOpen ||
+    isBrowserOpen ||
+    isCanvasOpen,
   );
   const isRightPaneOnlyMode =
     isRightPaneContext && isChatSidebarOpen && isRightPaneMaximized;
@@ -5440,7 +5494,9 @@ function App() {
                 ) : isCanvasesOpen ? (
                   <CanvasesView
                     onOpenCanvas={(path) => navigateToFile(path)}
-                    onNewCanvas={() => knowledgeActions.createCanvas("canvases")}
+                    onNewCanvas={() =>
+                      knowledgeActions.createCanvas("canvases")
+                    }
                     onDeleteCanvas={async (path) => {
                       await knowledgeActions.remove(path);
                       void navigateToView({ type: "canvases" });
@@ -5529,9 +5585,7 @@ function App() {
                     }}
                   />
                 ) : isCalendarOpen ? (
-                  <CalendarView
-                    onSelectFile={(path) => navigateToFile(path)}
-                  />
+                  <CalendarView onSelectFile={(path) => navigateToFile(path)} />
                 ) : selectedPath ? (
                   selectedPath.endsWith(".md") ? (
                     <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
@@ -5725,7 +5779,9 @@ function App() {
                         Open with default application
                       </button>
                     </div>
-                  ) : /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|tiff?)$/i.test(selectedPath) && fileContent ? (
+                  ) : /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|tiff?)$/i.test(
+                      selectedPath,
+                    ) && fileContent ? (
                     <div className="flex-1 overflow-hidden flex items-center justify-center p-4">
                       <img
                         src={`data:${getMimeFromExtension(getExtension(selectedPath))};base64,${fileContent}`}
