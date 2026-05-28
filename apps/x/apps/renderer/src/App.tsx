@@ -32,6 +32,14 @@ import {
   type GraphEdge,
   type GraphNode,
 } from "@/components/graph-view";
+import { CanvasView } from "@/components/canvas-view";
+import { CalendarView } from "@/components/calendar-view";
+import {
+  parseCanvas,
+  serializeCanvas,
+  createEmptyCanvas,
+  type CanvasData,
+} from "@/lib/canvas-utils";
 import {
   BasesView,
   type BaseConfig,
@@ -41,6 +49,7 @@ import { useDebounce } from "./hooks/use-debounce";
 import { SidebarContentPanel } from "@/components/sidebar-content";
 import { SuggestedTopicsView } from "@/components/suggested-topics-view";
 import { ArtifactsView } from "@/components/artifacts-view";
+import { CanvasesView } from "@/components/canvases-view";
 import { SidebarSectionProvider } from "@/contexts/sidebar-context";
 import {
   Conversation,
@@ -201,6 +210,9 @@ const ARTIFACTS_TAB_PATH = "__scholaros_artifacts__";
 const BASES_DEFAULT_TAB_PATH = "__scholaros_bases_default__";
 
 const INGEST_TAB_PATH = "__scholar_ingest__";
+const CANVAS_TAB_PATH = "__scholaros_canvas__";
+const CANVASES_TAB_PATH = "__scholaros_canvases__";
+const CALENDAR_TAB_PATH = "__scholaros_calendar__";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -346,6 +358,9 @@ const isGraphTabPath = (path: string) => path === GRAPH_TAB_PATH;
 const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
 const isArtifactsTabPath = (path: string) => path === ARTIFACTS_TAB_PATH;
+const isCanvasTabPath = (path: string) => path === CANVAS_TAB_PATH;
+const isCanvasesTabPath = (path: string) => path === CANVASES_TAB_PATH;
+const isCalendarTabPath = (path: string) => path === CALENDAR_TAB_PATH;
 
 const isBaseFilePath = (path: string) =>
   path.endsWith(".base") || path === BASES_DEFAULT_TAB_PATH;
@@ -560,12 +575,16 @@ type ViewState =
   | { type: "file"; path: string }
   | { type: "graph" }
   | { type: "suggested-topics" }
-  | { type: "artifacts" };
+  | { type: "artifacts" }
+  | { type: "canvases" }
+  | { type: "canvas"; path: string }
+  | { type: "calendar" };
 
 function viewStatesEqual(a: ViewState, b: ViewState): boolean {
   if (a.type !== b.type) return false;
   if (a.type === "chat" && b.type === "chat") return a.runId === b.runId;
   if (a.type === "file" && b.type === "file") return a.path === b.path;
+  if (a.type === "canvas" && b.type === "canvas") return a.path === b.path;
   return true;
 }
 
@@ -678,6 +697,12 @@ function App() {
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [isSuggestedTopicsOpen, setIsSuggestedTopicsOpen] = useState(false);
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
+  const [isCanvasesOpen, setIsCanvasesOpen] = useState(false);
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [canvasDataByPath, setCanvasDataByPath] = useState<
+    Record<string, CanvasData>
+  >({});
   const [isIngestProcessing, setIsIngestProcessing] = useState(false);
   const [expandedFrom, setExpandedFrom] = useState<{
     path: string | null;
@@ -1058,11 +1083,14 @@ function App() {
   );
   const fileTabIdCounterRef = useRef(0);
   const newFileTabId = () => `file-tab-${++fileTabIdCounterRef.current}`;
+  const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const getFileTabTitle = useCallback((tab: FileTab) => {
     if (isGraphTabPath(tab.path)) return "Graph View";
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
     if (isArtifactsTabPath(tab.path)) return "Artifacts";
+    if (isCalendarTabPath(tab.path)) return "Calendar";
+    if (isCanvasTabPath(tab.path)) return "Canvas";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
     if (tab.path.endsWith(".base"))
       return (
@@ -1487,6 +1515,41 @@ function App() {
               [selectedPath]: { ...DEFAULT_BASE_CONFIG },
             }));
           });
+      }
+      return;
+    }
+    if (selectedPath.endsWith(".canvas")) {
+      // Load canvas data from file
+      if (!canvasDataByPath[selectedPath]) {
+        window.ipc
+          .invoke("workspace:readFile", {
+            path: selectedPath,
+            encoding: "utf8",
+          })
+          .then((result: { data: string }) => {
+            const canvasData = parseCanvas(result.data);
+            setCanvasDataByPath((prev) => ({
+              ...prev,
+              [selectedPath]: canvasData,
+            }));
+            // Switch to canvas view
+            setIsCanvasOpen(true);
+            setSelectedPath(null);
+            ensureCanvasFileTab(selectedPath);
+          })
+          .catch(() => {
+            setCanvasDataByPath((prev) => ({
+              ...prev,
+              [selectedPath]: createEmptyCanvas(),
+            }));
+            setIsCanvasOpen(true);
+            setSelectedPath(null);
+            ensureCanvasFileTab(selectedPath);
+          });
+      } else {
+        setIsCanvasOpen(true);
+        setSelectedPath(null);
+        ensureCanvasFileTab(selectedPath);
       }
       return;
     }
@@ -3057,11 +3120,31 @@ function App() {
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(false);
         setIsArtifactsOpen(true);
+        setIsCanvasOpen(false);
+        return;
+      }
+      if (isCanvasTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasOpen(true);
+        return;
+      }
+      if (isCalendarTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasOpen(false);
+        setIsCalendarOpen(true);
         return;
       }
       setIsGraphOpen(false);
       setIsSuggestedTopicsOpen(false);
       setIsArtifactsOpen(false);
+      setIsCanvasOpen(false);
+      setIsCalendarOpen(false);
       setSelectedPath(tab.path);
     },
     [fileTabs, isRightPaneMaximized],
@@ -3098,6 +3181,8 @@ function App() {
           setIsGraphOpen(false);
           setIsSuggestedTopicsOpen(false);
           setIsArtifactsOpen(false);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(false);
           return [];
         }
         const idx = prev.findIndex((t) => t.id === tabId);
@@ -3112,20 +3197,40 @@ function App() {
             setIsGraphOpen(true);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(false);
+            setIsCalendarOpen(false);
           } else if (isSuggestedTopicsTabPath(newActiveTab.path)) {
             setSelectedPath(null);
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(true);
             setIsArtifactsOpen(false);
+            setIsCalendarOpen(false);
           } else if (isArtifactsTabPath(newActiveTab.path)) {
             setSelectedPath(null);
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(true);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(false);
+          } else if (isCalendarTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(true);
+          } else if (isCanvasTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasOpen(true);
+            setIsCalendarOpen(false);
           } else {
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(false);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(false);
             setSelectedPath(newActiveTab.path);
           }
         }
@@ -3188,7 +3293,7 @@ function App() {
 
     handleNewChat();
     // Left-pane "new chat" should always open full chat view.
-    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
+    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen) {
       setExpandedFrom({
         path: selectedPath,
         graph: isGraphOpen,
@@ -3201,6 +3306,7 @@ function App() {
     setSelectedPath(null);
     setIsGraphOpen(false);
     setIsSuggestedTopicsOpen(false);
+    setIsCalendarOpen(false);
   }, [chatTabs, activeChatTabId, handleNewChat]);
 
   // Sidebar variant: create/switch chat tab without leaving file/graph context.
@@ -3329,7 +3435,7 @@ function App() {
 
   const handleOpenFullScreenChat = useCallback(() => {
     // Remember where we came from so the close button can return
-    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
+    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen) {
       setExpandedFrom({
         path: selectedPath,
         graph: isGraphOpen,
@@ -3340,19 +3446,24 @@ function App() {
     setSelectedPath(null);
     setIsGraphOpen(false);
     setIsSuggestedTopicsOpen(false);
-  }, [selectedPath, isGraphOpen, isSuggestedTopicsOpen]);
+    setIsCanvasOpen(false);
+    setIsCalendarOpen(false);
+  }, [selectedPath, isGraphOpen, isSuggestedTopicsOpen, isCanvasOpen, isCalendarOpen]);
 
   const handleCloseFullScreenChat = useCallback(() => {
     if (expandedFrom) {
       if (expandedFrom.graph) {
         setIsGraphOpen(true);
         setIsSuggestedTopicsOpen(false);
+        setIsCalendarOpen(false);
       } else if (expandedFrom.suggestedTopics) {
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(true);
+        setIsCalendarOpen(false);
       } else if (expandedFrom.path) {
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(false);
+        setIsCalendarOpen(false);
         setSelectedPath(expandedFrom.path);
       }
       setExpandedFrom(null);
@@ -3363,15 +3474,25 @@ function App() {
   const currentViewState = React.useMemo<ViewState>(() => {
     if (isSuggestedTopicsOpen) return { type: "suggested-topics" };
     if (isArtifactsOpen) return { type: "artifacts" };
+    if (isCanvasesOpen) return { type: "canvases" };
+    if (isCalendarOpen) return { type: "calendar" };
+    if (isCanvasOpen) {
+      const canvasPath = fileTabs.find((t) => isCanvasTabPath(t.path))?.path;
+      return { type: "canvas", path: canvasPath ?? CANVAS_TAB_PATH };
+    }
     if (selectedPath) return { type: "file", path: selectedPath };
     if (isGraphOpen) return { type: "graph" };
     return { type: "chat", runId };
   }, [
     isSuggestedTopicsOpen,
     isArtifactsOpen,
+    isCanvasesOpen,
+    isCalendarOpen,
+    isCanvasOpen,
     selectedPath,
     isGraphOpen,
     runId,
+    fileTabs,
   ]);
 
   const appendUnique = useCallback((stack: ViewState[], entry: ViewState) => {
@@ -3449,6 +3570,43 @@ function App() {
     setActiveFileTabId(id);
   }, [fileTabs]);
 
+  const ensureCanvasFileTab = useCallback(
+    (path?: string) => {
+      const canvasPath = path ?? CANVAS_TAB_PATH;
+      const existing = fileTabs.find((tab) => tab.path === canvasPath);
+      if (existing) {
+        setActiveFileTabId(existing.id);
+        return;
+      }
+      const id = newFileTabId();
+      setFileTabs((prev) => [...prev, { id, path: canvasPath }]);
+      setActiveFileTabId(id);
+    },
+    [fileTabs],
+  );
+
+  const ensureCanvasesFileTab = useCallback(() => {
+    const existing = fileTabs.find((tab) => isCanvasesTabPath(tab.path));
+    if (existing) {
+      setActiveFileTabId(existing.id);
+      return;
+    }
+    const id = newFileTabId();
+    setFileTabs((prev) => [...prev, { id, path: CANVASES_TAB_PATH }]);
+    setActiveFileTabId(id);
+  }, [fileTabs]);
+
+  const ensureCalendarFileTab = useCallback(() => {
+    const existing = fileTabs.find((tab) => isCalendarTabPath(tab.path));
+    if (existing) {
+      setActiveFileTabId(existing.id);
+      return;
+    }
+    const id = newFileTabId();
+    setFileTabs((prev) => [...prev, { id, path: CALENDAR_TAB_PATH }]);
+    setActiveFileTabId(id);
+  }, [fileTabs]);
+
   const applyViewState = useCallback(
     async (view: ViewState) => {
       switch (view.type) {
@@ -3457,10 +3615,20 @@ function App() {
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
           setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCalendarOpen(false);
           setExpandedFrom(null);
           if (isRightPaneMaximized) {
             setIsRightPaneMaximized(false);
           }
+          // Canvas files get special handling
+          if (view.path.endsWith(".canvas")) {
+            setIsCanvasOpen(true);
+            setSelectedPath(null);
+            ensureCanvasFileTab(view.path);
+            return;
+          }
+          setIsCanvasOpen(false);
           setSelectedPath(view.path);
           ensureFileTabForPath(view.path);
           return;
@@ -3469,6 +3637,8 @@ function App() {
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
           setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCalendarOpen(false);
           setExpandedFrom(null);
           setIsGraphOpen(true);
           ensureGraphFileTab();
@@ -3483,6 +3653,8 @@ function App() {
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
           setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCalendarOpen(false);
           setIsSuggestedTopicsOpen(true);
           ensureSuggestedTopicsFileTab();
           return;
@@ -3491,10 +3663,52 @@ function App() {
           setIsGraphOpen(false);
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
+          setIsCanvasesOpen(false);
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
           setIsArtifactsOpen(true);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(false);
           ensureArtifactsFileTab();
+          return;
+        case "canvases":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsCanvasesOpen(true);
+          setIsCalendarOpen(false);
+          ensureCanvasesFileTab();
+          return;
+        case "canvas":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsCanvasOpen(true);
+          setIsCalendarOpen(false);
+          ensureCanvasFileTab(view.path);
+          return;
+        case "calendar":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(true);
+          ensureCalendarFileTab();
           return;
         case "chat":
           setSelectedPath(null);
@@ -3503,6 +3717,9 @@ function App() {
           setIsRightPaneMaximized(false);
           setIsSuggestedTopicsOpen(false);
           setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(false);
           if (view.runId) {
             await loadRun(view.runId);
           } else {
@@ -3516,6 +3733,9 @@ function App() {
       ensureGraphFileTab,
       ensureSuggestedTopicsFileTab,
       ensureArtifactsFileTab,
+      ensureCanvasesFileTab,
+      ensureCanvasFileTab,
+      ensureCalendarFileTab,
       handleNewChat,
       isRightPaneMaximized,
       loadRun,
@@ -3839,7 +4059,7 @@ function App() {
 
   // Keyboard shortcut: Ctrl+L to toggle main chat view
   const isFullScreenChat =
-    !selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isBrowserOpen;
+    !selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isBrowserOpen && !isCanvasOpen;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "l") {
@@ -3927,7 +4147,7 @@ function App() {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
       const rightPaneAvailable = Boolean(
-        (selectedPath || isGraphOpen || isSuggestedTopicsOpen) &&
+        (selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen) &&
         isChatSidebarOpen,
       );
       const targetPane: ShortcutPane = rightPaneAvailable
@@ -3937,12 +4157,14 @@ function App() {
         : "left";
       const inFileView =
         targetPane === "left" &&
-        Boolean(selectedPath || isGraphOpen || isSuggestedTopicsOpen);
+        Boolean(selectedPath || isGraphOpen || isSuggestedTopicsOpen || isCanvasOpen || isCalendarOpen);
       const selectedKnowledgePath = isGraphOpen
         ? GRAPH_TAB_PATH
         : isSuggestedTopicsOpen
           ? SUGGESTED_TOPICS_TAB_PATH
-          : selectedPath;
+          : isCanvasOpen
+            ? CANVAS_TAB_PATH
+            : selectedPath;
       const targetFileTabId =
         activeFileTabId ??
         (selectedKnowledgePath
@@ -4032,6 +4254,10 @@ function App() {
       void navigateToView({ type: "artifacts" });
       return;
     }
+    if (path === "canvases") {
+      void navigateToView({ type: "canvases" });
+      return;
+    }
     if (parts.length === 1 && isKnowledgeRelPath(parts[0] + "/")) {
       const folderName = parts[0];
       const folderCfg = FOLDER_BASE_CONFIGS[folderName];
@@ -4047,7 +4273,7 @@ function App() {
           }),
         },
       }));
-      if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
+      if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isCanvasOpen && !isCalendarOpen) {
         setIsChatSidebarOpen(false);
         setIsRightPaneMaximized(false);
       }
@@ -4170,19 +4396,48 @@ function App() {
           throw err;
         }
       },
+      createCanvas: async (parentPath: string = "canvases") => {
+        try {
+          const dir = parentPath || "canvases";
+          let index = 0;
+          let name = "untitled";
+          let fullPath = `${dir}/${name}.canvas`;
+          while (index < 1000) {
+            const exists = await window.ipc.invoke("workspace:exists", {
+              path: fullPath,
+            });
+            if (!exists.exists) break;
+            index += 1;
+            name = `untitled-${index}`;
+            fullPath = `${dir}/${name}.canvas`;
+          }
+          await window.ipc.invoke("workspace:writeFile", {
+            path: fullPath,
+            data: serializeCanvas(createEmptyCanvas()),
+            opts: { encoding: "utf8" },
+          });
+          navigateToFile(fullPath);
+        } catch (err) {
+          console.error("Failed to create canvas:", err);
+          throw err;
+        }
+      },
       openGraph: () => {
-        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
+        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isCanvasOpen && !isCalendarOpen) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "graph" });
       },
       openBases: () => {
-        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
+        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isCanvasOpen && !isCalendarOpen) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "file", path: BASES_DEFAULT_TAB_PATH });
+      },
+      openCanvas: () => {
+        void navigateToView({ type: "canvases" });
       },
       expandAll: () => setExpandedPaths(new Set(collectDirPaths(tree))),
       collapseAll: () => setExpandedPaths(new Set()),
@@ -4339,6 +4594,7 @@ function App() {
       tree,
       selectedPath,
       isGraphOpen,
+      isCanvasOpen,
       workspaceRoot,
       navigateToFile,
       navigateToView,
@@ -4775,7 +5031,7 @@ function App() {
     activeChatTabState.currentAssistantMessage ||
     activeChatTabState.currentToolDraftActive;
   const isRightPaneContext = Boolean(
-    selectedPath || isGraphOpen || isSuggestedTopicsOpen || isBrowserOpen,
+    selectedPath || isGraphOpen || isSuggestedTopicsOpen || isBrowserOpen || isCanvasOpen,
   );
   const isRightPaneOnlyMode =
     isRightPaneContext && isChatSidebarOpen && isRightPaneMaximized;
@@ -4802,6 +5058,10 @@ function App() {
     if (isArtifactsOpen) return "artifacts";
     if (selectedPath === INGEST_TAB_PATH) return "ingest";
     if (isSuggestedTopicsOpen) return "suggested-topics";
+    if (isCanvasOpen) {
+      const canvasPath = fileTabs.find((t) => isCanvasTabPath(t.path))?.path;
+      return `canvas:${canvasPath ?? CANVAS_TAB_PATH}`;
+    }
     if (selectedPath && isBaseFilePath(selectedPath))
       return `bases:${selectedPath}`;
     if (isGraphOpen) return "graph";
@@ -4981,6 +5241,10 @@ function App() {
               onOpenArtifacts={() => {
                 void navigateToView({ type: "artifacts" });
               }}
+              isCalendarOpen={isCalendarOpen}
+              onOpenCalendar={() => {
+                void navigateToView({ type: "calendar" });
+              }}
             />
             <SidebarInset
               className={cn(
@@ -5009,7 +5273,9 @@ function App() {
                 {(selectedPath ||
                   isGraphOpen ||
                   isSuggestedTopicsOpen ||
-                  isArtifactsOpen) &&
+                  isArtifactsOpen ||
+                  isCanvasOpen ||
+                  isCalendarOpen) &&
                 fileTabs.length >= 1 ? (
                   <TabBar
                     tabs={fileTabs}
@@ -5171,6 +5437,15 @@ function App() {
                       }
                     }}
                   />
+                ) : isCanvasesOpen ? (
+                  <CanvasesView
+                    onOpenCanvas={(path) => navigateToFile(path)}
+                    onNewCanvas={() => knowledgeActions.createCanvas("canvases")}
+                    onDeleteCanvas={async (path) => {
+                      await knowledgeActions.remove(path);
+                      void navigateToView({ type: "canvases" });
+                    }}
+                  />
                 ) : selectedPath === INGEST_TAB_PATH ? (
                   <IngestWindow
                     onProcessIngest={handleIngestProcess}
@@ -5225,6 +5500,38 @@ function App() {
                       }}
                     />
                   </div>
+                ) : isCanvasOpen ? (
+                  <CanvasView
+                    data={
+                      canvasDataByPath[
+                        fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
+                          CANVAS_TAB_PATH
+                      ] ?? createEmptyCanvas()
+                    }
+                    onDataChange={(newData) => {
+                      const canvasPath =
+                        fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
+                        CANVAS_TAB_PATH;
+                      setCanvasDataByPath((prev) => ({
+                        ...prev,
+                        [canvasPath]: newData,
+                      }));
+                      if (canvasSaveTimerRef.current) {
+                        clearTimeout(canvasSaveTimerRef.current);
+                      }
+                      canvasSaveTimerRef.current = setTimeout(() => {
+                        void window.ipc.invoke("workspace:writeFile", {
+                          path: canvasPath,
+                          data: serializeCanvas(newData),
+                          opts: { encoding: "utf8" },
+                        });
+                      }, 300);
+                    }}
+                  />
+                ) : isCalendarOpen ? (
+                  <CalendarView
+                    onSelectFile={(path) => navigateToFile(path)}
+                  />
                 ) : selectedPath ? (
                   selectedPath.endsWith(".md") ? (
                     <div className="flex-1 min-h-0 flex flex-row overflow-hidden">

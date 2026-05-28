@@ -682,6 +682,94 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
+  // Calendar / Tasks channels
+  "calendar:list": {
+    req: z.null(),
+    res: z.object({
+      tasks: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          due: z.string(),
+          dueTime: z.string().optional(),
+          type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+          status: z.enum(["pending", "done"]),
+          source: z.string().optional(),
+          description: z.string().optional(),
+          createdAt: z.string(),
+          updatedAt: z.string(),
+          completedAt: z.string().nullable(),
+        }),
+      ),
+    }),
+  },
+  "calendar:create": {
+    req: z.object({
+      title: z.string().min(1),
+      due: z.string(),
+      dueTime: z.string().optional(),
+      type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+      source: z.string().optional(),
+      description: z.string().optional(),
+    }),
+    res: z.object({
+      task: z.object({
+        id: z.string(),
+        title: z.string(),
+        due: z.string(),
+        dueTime: z.string().optional(),
+        type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+        status: z.enum(["pending", "done"]),
+        source: z.string().optional(),
+        description: z.string().optional(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        completedAt: z.string().nullable(),
+      }),
+    }),
+  },
+  "calendar:complete": {
+    req: z.object({ id: z.string() }),
+    res: z.object({
+      task: z.object({
+        id: z.string(),
+        title: z.string(),
+        due: z.string(),
+        dueTime: z.string().optional(),
+        type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+        status: z.enum(["pending", "done"]),
+        source: z.string().optional(),
+        description: z.string().optional(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        completedAt: z.string().nullable(),
+      }),
+    }),
+  },
+  "calendar:delete": {
+    req: z.object({ id: z.string() }),
+    res: z.object({ success: z.literal(true) }),
+  },
+  "calendar:upcoming": {
+    req: z.object({ days: z.number().optional() }),
+    res: z.object({
+      tasks: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          due: z.string(),
+          dueTime: z.string().optional(),
+          type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+          status: z.enum(["pending", "done"]),
+          source: z.string().optional(),
+          description: z.string().optional(),
+          createdAt: z.string(),
+          updatedAt: z.string(),
+          completedAt: z.string().nullable(),
+        }),
+      ),
+    }),
+  },
 } as const;
 
 // ============================================================================

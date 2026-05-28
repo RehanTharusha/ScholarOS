@@ -23,10 +23,12 @@ import {
   Table2,
   Lightbulb,
   LoaderIcon,
+  CalendarIcon,
   Settings,
   Square,
   Trash2,
   Inbox,
+  LayoutGrid,
 } from "lucide-react";
 
 import {
@@ -91,8 +93,10 @@ interface TreeNode {
 type KnowledgeActions = {
   createNote: (parentPath?: string) => void;
   createFolder: (parentPath?: string) => void;
+  createCanvas: (parentPath?: string) => void;
   openGraph: () => void;
   openBases: () => void;
+  openCanvas: () => void;
   expandAll: () => void;
   collapseAll: () => void;
   rename: (path: string, newName: string, isDir: boolean) => Promise<void>;
@@ -138,6 +142,9 @@ type SidebarContentPanelProps = {
   isSuggestedTopicsOpen?: boolean;
   onOpenSuggestedTopics?: () => void;
   onOpenArtifacts?: () => void;
+  onOpenCanvases?: () => void;
+  isCalendarOpen?: boolean;
+  onOpenCalendar?: () => void;
 } & React.ComponentProps<typeof Sidebar>;
 
 const sectionTabs: { id: ActiveSection; label: string }[] = [
@@ -185,6 +192,9 @@ export function SidebarContentPanel({
   isSuggestedTopicsOpen = false,
   onOpenSuggestedTopics,
   onOpenArtifacts,
+  onOpenCanvases,
+  isCalendarOpen = false,
+  onOpenCalendar,
   ...props
 }: SidebarContentPanelProps) {
   const { activeSection, setActiveSection } = useSidebarSection();
@@ -391,6 +401,23 @@ export function SidebarContentPanel({
                 <span>Artifacts</span>
               </button>
             )}
+            {onOpenCalendar && (
+              <button
+                type="button"
+                onClick={onOpenCalendar}
+                className={cn(
+                  "sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                  isCalendarOpen
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                )}
+                style={{ "--stagger": "200ms" } as React.CSSProperties}
+                tabIndex={showChatQuickActions ? 0 : -1}
+              >
+                <CalendarIcon className="size-4" />
+                <span>Calendar</span>
+              </button>
+            )}
           </div>
         </div>
       </SidebarHeader>
@@ -406,6 +433,7 @@ export function SidebarContentPanel({
             onOpenSearch={onOpenSearch}
             onVoiceNoteCreated={onVoiceNoteCreated}
             onOpenArtifacts={onOpenArtifacts}
+            onOpenCanvases={onOpenCanvases}
           />
         )}
         {activeSection === "tasks" && (
@@ -772,6 +800,7 @@ function KnowledgeSection({
   onOpenSearch,
   onVoiceNoteCreated,
   onOpenArtifacts,
+  onOpenCanvases,
 }: {
   tree: TreeNode[];
   selectedPath: string | null;
@@ -782,6 +811,7 @@ function KnowledgeSection({
   onOpenSearch?: () => void;
   onVoiceNoteCreated?: (path: string) => void;
   onOpenArtifacts?: () => void;
+  onOpenCanvases?: () => void;
 }) {
   const isExpanded = expandedPaths.size > 0;
   const treeContainerRef = React.useRef<HTMLDivElement | null>(null);
@@ -829,6 +859,7 @@ function KnowledgeSection({
     },
     { icon: Network, label: "Graph View", action: () => actions.openGraph() },
     { icon: Table2, label: "Bases", action: () => actions.openBases() },
+    { icon: LayoutGrid, label: "Canvas", action: () => actions.openCanvas() },
     ...(onOpenArtifacts
       ? [{ icon: Library, label: "Artifacts", action: onOpenArtifacts }]
       : []),
@@ -898,6 +929,10 @@ function KnowledgeSection({
         <ContextMenuItem onClick={() => actions.createFolder()}>
           <FolderPlus className="mr-2 size-4" />
           New Folder
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => actions.createCanvas()}>
+          <LayoutGrid className="mr-2 size-4" />
+          New Canvas
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -999,6 +1034,10 @@ function Tree({
           <ContextMenuItem onClick={() => actions.createFolder(item.path)}>
             <FolderPlus className="mr-2 size-4" />
             New Folder
+          </ContextMenuItem>
+          <ContextMenuItem onClick={() => actions.createCanvas(item.path)}>
+            <LayoutGrid className="mr-2 size-4" />
+            New Canvas
           </ContextMenuItem>
           <ContextMenuSeparator />
         </>
@@ -1142,6 +1181,11 @@ function Tree({
             className="group/file-item"
             data-knowledge-file-path={item.path}
             data-knowledge-active={isSelected ? "true" : "false"}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData("text/x-scholaros-path", item.path);
+              e.dataTransfer.effectAllowed = "copy";
+            }}
           >
             <SidebarMenuButton
               isActive={isSelected}

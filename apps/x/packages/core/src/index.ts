@@ -15,3 +15,8 @@ export * as voice from './voice/voice.js';
 
 // AnkiConnect flashcard service
 export * as anki from './anki/service.js';
+
+// Calendar / Tasks (from frontmatter + manual)
+export * as tasks from './calendar/repo.js';
+export * as taskTypes from './calendar/types.js';
+export * as taskScanner from './calendar/frontmatter-scanner.js';

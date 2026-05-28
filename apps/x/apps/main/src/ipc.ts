@@ -910,6 +910,43 @@ export function setupIpcHandlers() {
       saveVaultPath(args.path);
       return { success: true as const };
     },
+    // Calendar / Tasks handlers
+    "calendar:list": async () => {
+      const { getMergedTasks } = await import("@x/core/dist/calendar/frontmatter-scanner.js");
+      const tasks = await getMergedTasks();
+      return { tasks };
+    },
+    "calendar:create": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      const task = await repo.create({
+        title: args.title,
+        due: args.due,
+        dueTime: args.dueTime,
+        type: args.type,
+        source: args.source,
+        description: args.description,
+      });
+      return { task };
+    },
+    "calendar:complete": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      const task = await repo.complete(args.id);
+      return { task };
+    },
+    "calendar:delete": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      await repo.delete(args.id);
+      return { success: true as const };
+    },
+    "calendar:upcoming": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      const tasks = await repo.getUpcoming(args.days || 14);
+      return { tasks };
+    },
     // Embedded browser handlers (WebContentsView + navigation)
     ...browserIpcHandlers,
   });
