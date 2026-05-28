@@ -190,6 +190,7 @@ export function SidebarContentPanel({
   const { activeSection, setActiveSection } = useSidebarSection();
   const showChatQuickActions = activeSection === "tasks";
   const showKnowledgeNewChat = activeSection === "knowledge";
+  const quickActionState = showChatQuickActions ? "open" : "closed";
   const [isRowboatConnected, setIsRowboatConnected] = useState(false);
   const [appUrl, setAppUrl] = useState<string | null>(null);
   const { billing } = useBilling(isRowboatConnected);
@@ -315,66 +316,82 @@ export function SidebarContentPanel({
               <span>New chat</span>
             </button>
           )}
-          {showChatQuickActions && onOpenSearch && (
-            <button
-              type="button"
-              onClick={onOpenSearch}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            >
-              <SearchIcon className="size-4" />
-              <span>Search</span>
-            </button>
-          )}
-          {showChatQuickActions && onToggleBrowser && (
-            <button
-              type="button"
-              onClick={onToggleBrowser}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                isBrowserOpen
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              )}
-            >
-              <Globe className="size-4" />
-              <span>Run browser task</span>
-            </button>
-          )}
-          {showChatQuickActions && onOpenSuggestedTopics && (
-            <button
-              type="button"
-              onClick={onOpenSuggestedTopics}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                isSuggestedTopicsOpen
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              )}
-            >
-              <Lightbulb className="size-4" />
-              <span>Suggested Topics</span>
-            </button>
-          )}
-          {showChatQuickActions && onOpenIngestWindow && (
-            <button
-              type="button"
-              onClick={onOpenIngestWindow}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Inbox className="size-4" />
-              <span>Ingest materials</span>
-            </button>
-          )}
-          {showChatQuickActions && onOpenArtifacts && (
-            <button
-              type="button"
-              onClick={onOpenArtifacts}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Library className="size-4" />
-              <span>Artifacts</span>
-            </button>
-          )}
+          <div
+            className="sidebar-quick-actions"
+            data-state={quickActionState}
+            aria-hidden={!showChatQuickActions}
+          >
+            {onOpenSearch && (
+              <button
+                type="button"
+                onClick={onOpenSearch}
+                className="sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                style={{ "--stagger": "0ms" } as React.CSSProperties}
+                tabIndex={showChatQuickActions ? 0 : -1}
+              >
+                <SearchIcon className="size-4" />
+                <span>Search</span>
+              </button>
+            )}
+            {onToggleBrowser && (
+              <button
+                type="button"
+                onClick={onToggleBrowser}
+                className={cn(
+                  "sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                  isBrowserOpen
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                )}
+                style={{ "--stagger": "40ms" } as React.CSSProperties}
+                tabIndex={showChatQuickActions ? 0 : -1}
+              >
+                <Globe className="size-4" />
+                <span>Run browser task</span>
+              </button>
+            )}
+            {onOpenSuggestedTopics && (
+              <button
+                type="button"
+                onClick={onOpenSuggestedTopics}
+                className={cn(
+                  "sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                  isSuggestedTopicsOpen
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                )}
+                style={{ "--stagger": "80ms" } as React.CSSProperties}
+                tabIndex={showChatQuickActions ? 0 : -1}
+              >
+                <Lightbulb className="size-4" />
+                <span>Suggested Topics</span>
+              </button>
+            )}
+            {onOpenIngestWindow && (
+              <button
+                type="button"
+                onClick={onOpenIngestWindow}
+                className="sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                style={{ "--stagger": "120ms" } as React.CSSProperties}
+                tabIndex={showChatQuickActions ? 0 : -1}
+              >
+                <Inbox className="size-4" />
+                <span>Ingest materials</span>
+              </button>
+            )}
+            {onOpenArtifacts && (
+              <button
+                type="button"
+                onClick={onOpenArtifacts}
+                className="sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                style={{ "--stagger": "160ms" } as React.CSSProperties}
+                tabIndex={showChatQuickActions ? 0 : -1}
+              >
+                <Library className="size-4" />
+                <span>Artifacts</span>
+              </button>
+            )}
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -1069,42 +1086,47 @@ function Tree({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <SidebarMenuItem className="group/file-item">
-            <SidebarMenuButton onClick={() => onSelect(item.path, item.kind)}>
-              <Folder className="size-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{displayName}</span>
-            </SidebarMenuButton>
-            {onToggleFolder && (item.children?.length ?? 0) > 0 && (
-              <SidebarMenuAction
-                showOnHover
-                aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFolder(item.path);
-                }}
-              >
-                <ChevronRight
-                  className={cn(
-                    "transition-transform",
-                    isExpanded && "rotate-90",
-                  )}
-                />
-              </SidebarMenuAction>
-            )}
-            {isExpanded && (
-              <SidebarMenuSub>
-                {(item.children ?? []).map((subItem, index) => (
-                  <Tree
-                    key={index}
-                    item={subItem}
-                    selectedPath={selectedPath}
-                    expandedPaths={expandedPaths}
-                    onSelect={onSelect}
-                    onToggleFolder={onToggleFolder}
-                    actions={actions}
+            <Collapsible
+              open={isExpanded}
+              className="sidebar-folder-collapsible"
+            >
+              <SidebarMenuButton onClick={() => onSelect(item.path, item.kind)}>
+                <Folder className="size-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{displayName}</span>
+              </SidebarMenuButton>
+              {onToggleFolder && (item.children?.length ?? 0) > 0 && (
+                <SidebarMenuAction
+                  showOnHover
+                  aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFolder(item.path);
+                  }}
+                >
+                  <ChevronRight
+                    className={cn(
+                      "transition-transform",
+                      isExpanded && "rotate-90",
+                    )}
                   />
-                ))}
-              </SidebarMenuSub>
-            )}
+                </SidebarMenuAction>
+              )}
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {(item.children ?? []).map((subItem, index) => (
+                    <Tree
+                      key={index}
+                      item={subItem}
+                      selectedPath={selectedPath}
+                      expandedPaths={expandedPaths}
+                      onSelect={onSelect}
+                      onToggleFolder={onToggleFolder}
+                      actions={actions}
+                    />
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </Collapsible>
           </SidebarMenuItem>
         </ContextMenuTrigger>
         {contextMenuContent}
@@ -1149,7 +1171,7 @@ function Tree({
           <Collapsible
             open={isExpanded}
             onOpenChange={() => onSelect(item.path, item.kind)}
-            className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
+            className="sidebar-folder-collapsible group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
           >
             <CollapsibleTrigger asChild>
               <SidebarMenuButton>
