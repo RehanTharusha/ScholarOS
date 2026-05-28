@@ -1,10 +1,4 @@
-import {
-  ipcMain,
-  BrowserWindow,
-  shell,
-  app,
-  dialog,
-} from "electron";
+import { ipcMain, BrowserWindow, shell, app, dialog } from "electron";
 import { ipc } from "@x/shared";
 import path from "node:path";
 import os from "node:os";
@@ -718,6 +712,11 @@ export function setupIpcHandlers() {
       const filePath = resolveShellPath(args.path);
       const error = await shell.openPath(filePath);
       return { error: error || undefined };
+    },
+    "shell:revealInFolder": async (_event, args) => {
+      const filePath = resolveShellPath(args.path);
+      shell.showItemInFolder(filePath);
+      return { success: true as const };
     },
     "shell:readFileBase64": async (_event, args) => {
       const filePath = resolveShellPath(args.path);

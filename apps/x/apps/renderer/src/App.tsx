@@ -105,6 +105,7 @@ import {
 import { BrowserPane } from "@/components/browser-pane/BrowserPane";
 import { VersionHistoryPanel } from "@/components/version-history-panel";
 import { FileCardProvider } from "@/contexts/file-card-context";
+import { isHiddenSidebarRootEntry } from "@/config/sidebar-visibility";
 
 import { IngestWindow } from "@/components/ingest-window";
 import { PdfViewer } from "@/components/pdf-viewer";
@@ -512,22 +513,8 @@ function buildTree(entries: DirEntry[]): TreeNode[] {
   return sortNodes(roots);
 }
 
-// Top-level folders that are app plumbing, not user content.
-// Keep them out of sidebar view, but leave them in the full tree for views that
-// depend on their files (for example BasesView reads `bases/*.base`).
-const HIDDEN_SIDEBAR_ROOT_FOLDERS = new Set([
-  "agents",
-  "bases",
-  "config",
-  "events",
-  "logs",
-]);
-
 function getSidebarTree(tree: TreeNode[]): TreeNode[] {
-  return tree.filter(
-    (node) =>
-      !(node.kind === "dir" && HIDDEN_SIDEBAR_ROOT_FOLDERS.has(node.name)),
-  );
+  return tree.filter((node) => !isHiddenSidebarRootEntry(node));
 }
 
 const collectDirPaths = (nodes: TreeNode[]): string[] =>
@@ -545,6 +532,26 @@ const collectFilePaths = (nodes: TreeNode[]): string[] =>
         ? collectFilePaths(n.children)
         : [],
   );
+
+const buildDuplicatePath = (
+  sourcePath: string,
+  isDir: boolean,
+  index: number,
+) => {
+  const parts = sourcePath.split("/");
+  const leafName = parts.pop() ?? sourcePath;
+  const suffix = `-${index}`;
+
+  if (isDir) {
+    return [...parts, `${leafName}${suffix}`].join("/");
+  }
+
+  const lastDotIndex = leafName.lastIndexOf(".");
+  const baseName =
+    lastDotIndex > 0 ? leafName.slice(0, lastDotIndex) : leafName;
+  const extension = lastDotIndex > 0 ? leafName.slice(lastDotIndex) : "";
+  return [...parts, `${baseName}${suffix}${extension}`].join("/");
+};
 
 /** A snapshot of which view the user is on */
 type ViewState =
@@ -800,7 +807,8 @@ function App() {
       window.ipc.invoke("oauth:getState", null),
     ])
       .then(([config, oauthState]) => {
-        const scholarosConnected = oauthState.config?.scholaros?.connected ?? false;
+        const scholarosConnected =
+          oauthState.config?.scholaros?.connected ?? false;
         const hasVoice = !!config.deepgram || scholarosConnected;
         setVoiceAvailable(hasVoice);
         setTtsAvailable(!!config.elevenlabs || scholarosConnected);
@@ -1290,10 +1298,13 @@ function App() {
         path: "",
         opts: { recursive: true, includeHidden: false, includeStats: true },
       });
-      console.debug(
-        `[Renderer] loadDirectory: received ${rootEntries.length} root entries`,
+      const visibleRootEntries = rootEntries.filter(
+        (entry) => !isHiddenSidebarRootEntry(entry),
       );
-      return buildTree(rootEntries);
+      console.debug(
+        `[Renderer] loadDirectory: received ${rootEntries.length} root entries, ${visibleRootEntries.length} visible`,
+      );
+      return buildTree(visibleRootEntries);
     } catch (err) {
       console.error("Failed to load directory:", err);
       return [];
@@ -3354,7 +3365,13 @@ function App() {
     if (selectedPath) return { type: "file", path: selectedPath };
     if (isGraphOpen) return { type: "graph" };
     return { type: "chat", runId };
-  }, [isSuggestedTopicsOpen, isArtifactsOpen, selectedPath, isGraphOpen, runId]);
+  }, [
+    isSuggestedTopicsOpen,
+    isArtifactsOpen,
+    selectedPath,
+    isGraphOpen,
+    runId,
+  ]);
 
   const appendUnique = useCallback((stack: ViewState[], entry: ViewState) => {
     const last = stack[stack.length - 1];
@@ -4278,6 +4295,41 @@ function App() {
           document.body.removeChild(textarea);
         });
       },
+      revealInFileManager: async (path: string) => {
+        await window.ipc.invoke("shell:revealInFolder", { path });
+      },
+      duplicate: async (path: string, isDir: boolean) => {
+        try {
+          let duplicatePath = buildDuplicatePath(path, isDir, 1);
+          let index = 1;
+
+          while (
+            (
+              await window.ipc.invoke("workspace:exists", {
+                path: duplicatePath,
+              })
+            ).exists
+          ) {
+            index += 1;
+            duplicatePath = buildDuplicatePath(path, isDir, index);
+          }
+
+          await window.ipc.invoke("workspace:copy", {
+            from: path,
+            to: duplicatePath,
+          });
+          const newTree = await loadDirectory();
+          setTree(newTree);
+          if (!isDir) {
+            navigateToFile(duplicatePath);
+          }
+          toast("Duplicated successfully", "success");
+        } catch (err) {
+          console.error("Failed to duplicate:", err);
+          toast("Failed to duplicate", "error");
+          throw err;
+        }
+      },
       onOpenInNewTab: (path: string) => {
         openFileInNewTab(path);
       },
@@ -4293,6 +4345,7 @@ function App() {
       fileTabs,
       closeFileTab,
       removeEditorCacheForPath,
+      loadDirectory,
     ],
   );
 
@@ -4748,7 +4801,8 @@ function App() {
     if (isArtifactsOpen) return "artifacts";
     if (selectedPath === INGEST_TAB_PATH) return "ingest";
     if (isSuggestedTopicsOpen) return "suggested-topics";
-    if (selectedPath && isBaseFilePath(selectedPath)) return `bases:${selectedPath}`;
+    if (selectedPath && isBaseFilePath(selectedPath))
+      return `bases:${selectedPath}`;
     if (isGraphOpen) return "graph";
     if (selectedPath) {
       if (selectedPath.endsWith(".md")) return `md:${selectedPath}`;
@@ -4756,7 +4810,13 @@ function App() {
       return `file:${selectedPath}`;
     }
     return "chat";
-  }, [isBrowserOpen, isArtifactsOpen, selectedPath, isSuggestedTopicsOpen, isGraphOpen]);
+  }, [
+    isBrowserOpen,
+    isArtifactsOpen,
+    selectedPath,
+    isSuggestedTopicsOpen,
+    isGraphOpen,
+  ]);
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -4869,9 +4929,7 @@ function App() {
                         closeChatTab(tabForRun.id);
                       } else {
                         // Only one tab, reset it to new chat
-                        setChatTabs([
-                          { id: tabForRun.id, runId: null },
-                        ]);
+                        setChatTabs([{ id: tabForRun.id, runId: null }]);
                         if (
                           selectedPath ||
                           isGraphOpen ||
@@ -4947,7 +5005,10 @@ function App() {
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
               >
-                {(selectedPath || isGraphOpen || isSuggestedTopicsOpen || isArtifactsOpen) &&
+                {(selectedPath ||
+                  isGraphOpen ||
+                  isSuggestedTopicsOpen ||
+                  isArtifactsOpen) &&
                 fileTabs.length >= 1 ? (
                   <TabBar
                     tabs={fileTabs}
@@ -5090,328 +5151,339 @@ function App() {
                 )}
               </ContentHeader>
 
-              <div key={viewKey} className="flex-1 flex flex-col min-h-0 overflow-hidden animate-[enter-fade_0.15s_ease-out]">
-              {isBrowserOpen ? (
-                <BrowserPane onClose={handleCloseBrowser} />
-              ) : isArtifactsOpen ? (
-                <ArtifactsView
-                  onOpenArtifact={(path) => {
-                    if (path === "artifacts") {
-                      setPresetMessage("create a document on ");
-                      handleNewChatTab();
-                      void navigateToView({ type: "chat", runId: null });
-                    } else {
-                      void loadDirectory();
-                      navigateToFile(path);
-                    }
-                  }}
-                />
-              ) : selectedPath === INGEST_TAB_PATH ? (
-                <IngestWindow
-                  onProcessIngest={handleIngestProcess}
-                  isProcessing={isIngestProcessing}
-                />
-              ) : isSuggestedTopicsOpen ? (
-                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <SuggestedTopicsView
-                    onExploreTopic={(topic) => {
-                      const prompt = buildSuggestedTopicExplorePrompt(topic);
-                      submitFromPalette(prompt, null);
+              <div
+                key={viewKey}
+                className="flex-1 flex flex-col min-h-0 overflow-hidden animate-[enter-fade_0.15s_ease-out]"
+              >
+                {isBrowserOpen ? (
+                  <BrowserPane onClose={handleCloseBrowser} />
+                ) : isArtifactsOpen ? (
+                  <ArtifactsView
+                    onOpenArtifact={(path) => {
+                      if (path === "artifacts") {
+                        setPresetMessage("create a document on ");
+                        handleNewChatTab();
+                        void navigateToView({ type: "chat", runId: null });
+                      } else {
+                        void loadDirectory();
+                        navigateToFile(path);
+                      }
                     }}
                   />
-                </div>
-              ) : selectedPath && isBaseFilePath(selectedPath) ? (
-                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <BasesView
-                    tree={tree}
-                    onSelectNote={(path) => navigateToFile(path)}
-                    config={
-                      baseConfigByPath[selectedPath] ?? DEFAULT_BASE_CONFIG
-                    }
-                    onConfigChange={(cfg) =>
-                      handleBaseConfigChange(selectedPath, cfg)
-                    }
-                    isDefaultBase={selectedPath === BASES_DEFAULT_TAB_PATH}
-                    onSave={(name) => void handleBaseSave(name)}
-                    externalSearch={externalBaseSearch}
-                    onExternalSearchConsumed={() =>
-                      setExternalBaseSearch(undefined)
-                    }
-                    actions={{
-                      rename: knowledgeActions.rename,
-                      remove: knowledgeActions.remove,
-                      copyPath: knowledgeActions.copyPath,
-                    }}
+                ) : selectedPath === INGEST_TAB_PATH ? (
+                  <IngestWindow
+                    onProcessIngest={handleIngestProcess}
+                    isProcessing={isIngestProcessing}
                   />
-                </div>
-              ) : isGraphOpen ? (
-                <div className="flex-1 min-h-0">
-                  <GraphView
-                    nodes={graphData.nodes}
-                    edges={graphData.edges}
-                    isLoading={false}
-                    error={
-                      graphStatus === "error"
-                        ? (graphError ?? "Failed to build graph")
-                        : null
-                    }
-                    onSelectNode={(path) => {
-                      navigateToFile(path);
-                    }}
-                  />
-                </div>
-              ) : selectedPath ? (
-                selectedPath.endsWith(".md") ? (
-                  <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
-                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                      {openMarkdownTabs.map((tab) => {
-                        const isActive = activeFileTabId
-                          ? tab.id === activeFileTabId ||
-                            tab.path === selectedPath
-                          : tab.path === selectedPath;
-                        const isViewingHistory =
-                          viewingHistoricalVersion &&
-                          isActive &&
-                          versionHistoryPath === tab.path;
-                        const tabContent = isViewingHistory
-                          ? viewingHistoricalVersion.content
-                          : (editorContentByPath[tab.path] ??
-                            (isActive && editorPathRef.current === tab.path
-                              ? editorContent
-                              : ""));
-                        return (
-                          <div
-                            key={tab.id}
-                            className={cn(
-                              "min-h-0 flex-1 flex-col overflow-hidden",
-                              isActive ? "flex" : "hidden",
-                            )}
-                            data-file-tab-panel={tab.id}
-                            aria-hidden={!isActive}
-                          >
-                            <MarkdownEditor
-                              ref={(el) => {
-                                if (el)
-                                  editorRefsByTabId.current.set(tab.id, el);
-                                else editorRefsByTabId.current.delete(tab.id);
-                              }}
-                              content={tabContent}
-                              notePath={tab.path}
-                              onChange={(markdown) => {
-                                if (!isViewingHistory)
-                                  handleEditorChange(tab.path, markdown);
-                              }}
-                              onPrimaryHeadingCommit={() => {
-                                untitledRenameReadyPathsRef.current.add(
-                                  tab.path,
-                                );
-                              }}
-                              preserveUntitledTitleHeading={isUntitledPlaceholderName(
-                                getBaseName(tab.path),
-                              )}
-                              placeholder="Start writing..."
-                              wikiLinks={wikiLinkConfig}
-                              onImageUpload={handleImageUpload}
-                              editorSessionKey={
-                                editorSessionByTabId[tab.id] ?? 0
-                              }
-                              frontmatter={
-                                frontmatterByPathRef.current.get(tab.path) ??
-                                null
-                              }
-                              onFrontmatterChange={(newRaw) => {
-                                frontmatterByPathRef.current.set(
-                                  tab.path,
-                                  newRaw,
-                                );
-                                // Write updated frontmatter to disk immediately
-                                const currentBody = editorContentRef.current;
-                                const fullContent = joinFrontmatter(
-                                  newRaw,
-                                  currentBody,
-                                );
-                                initialContentByPathRef.current.set(
-                                  tab.path,
-                                  splitFrontmatter(fullContent).body,
-                                );
-                                initialContentRef.current =
-                                  splitFrontmatter(fullContent).body;
-                                void window.ipc.invoke("workspace:writeFile", {
-                                  path: tab.path,
-                                  data: fullContent,
-                                  opts: { encoding: "utf8" },
-                                });
-                              }}
-                              onHistoryHandlersChange={(handlers) => {
-                                if (handlers) {
-                                  fileHistoryHandlersRef.current.set(
-                                    tab.id,
-                                    handlers,
-                                  );
-                                } else {
-                                  fileHistoryHandlersRef.current.delete(tab.id);
-                                }
-                              }}
-                              editable={!isViewingHistory}
-                              onExport={async (format) => {
-                                const markdown = tabContent;
-                                const title = getBaseName(tab.path);
-                                try {
-                                  await window.ipc.invoke("export:note", {
-                                    markdown,
-                                    format,
-                                    title,
-                                  });
-                                  analytics.noteExported(format);
-                                } catch (err) {
-                                  console.error("Export failed:", err);
-                                }
-                              }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {versionHistoryPath && (
-                      <VersionHistoryPanel
-                        path={versionHistoryPath}
-                        onClose={() => {
-                          setVersionHistoryPath(null);
-                          setViewingHistoricalVersion(null);
-                        }}
-                        onSelectVersion={(oid, content) => {
-                          if (oid === null) {
-                            setViewingHistoricalVersion(null);
-                          } else {
-                            setViewingHistoricalVersion({ oid, content });
-                          }
-                        }}
-                        onRestore={async (oid) => {
-                          try {
-                            await window.ipc.invoke("knowledge:restore", {
-                              path: versionHistoryPath,
-                              oid,
-                            });
-                            // Reload file content
-                            const result = await window.ipc.invoke(
-                              "workspace:readFile",
-                              { path: versionHistoryPath },
-                            );
-                            handleEditorChange(versionHistoryPath, result.data);
-                            setViewingHistoricalVersion(null);
-                            setVersionHistoryPath(null);
-                          } catch (err) {
-                            console.error("Failed to restore version:", err);
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : selectedPath.endsWith(".pdf") && fileContent ? (
-                  <PdfViewer base64Data={fileContent} />
-                ) : /\.html?$/i.test(selectedPath) && fileContent ? (
-                  <HtmlViewer
-                    htmlContent={fileContent}
-                    fileName={getBaseName(selectedPath)}
-                  />
-                ) : /\.(docx?|xlsx?|pptx?)$/i.test(selectedPath) ? (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-                    <div className="text-muted-foreground text-sm">
-                      Preview not available for this file type
-                    </div>
-                    <button
-                      onClick={() => {
-                        window.ipc.invoke("shell:openPath", {
-                          path: selectedPath,
-                        });
+                ) : isSuggestedTopicsOpen ? (
+                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <SuggestedTopicsView
+                      onExploreTopic={(topic) => {
+                        const prompt = buildSuggestedTopicExplorePrompt(topic);
+                        submitFromPalette(prompt, null);
                       }}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground hover:bg-surface2 transition-colors"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                        <polyline points="15 3 21 3 21 9" />
-                        <line x1="10" y1="14" x2="21" y2="3" />
-                      </svg>
-                      Open with default application
-                    </button>
+                    />
                   </div>
-                ) : (
-                  <div className="flex-1 overflow-auto p-4">
-                    <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">
-                      {fileContent || "Loading..."}
-                    </pre>
+                ) : selectedPath && isBaseFilePath(selectedPath) ? (
+                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <BasesView
+                      tree={tree}
+                      onSelectNote={(path) => navigateToFile(path)}
+                      config={
+                        baseConfigByPath[selectedPath] ?? DEFAULT_BASE_CONFIG
+                      }
+                      onConfigChange={(cfg) =>
+                        handleBaseConfigChange(selectedPath, cfg)
+                      }
+                      isDefaultBase={selectedPath === BASES_DEFAULT_TAB_PATH}
+                      onSave={(name) => void handleBaseSave(name)}
+                      externalSearch={externalBaseSearch}
+                      onExternalSearchConsumed={() =>
+                        setExternalBaseSearch(undefined)
+                      }
+                      actions={{
+                        rename: knowledgeActions.rename,
+                        remove: knowledgeActions.remove,
+                        copyPath: knowledgeActions.copyPath,
+                      }}
+                    />
                   </div>
-                )
-              ) : (
-                <FileCardProvider
-                  onOpenKnowledgeFile={(path) => {
-                    navigateToFile(path);
-                  }}
-                >
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="relative min-h-0 flex-1">
-                      {chatTabs.map((tab) => {
-                        const isActive = tab.id === activeChatTabId;
-                        const tabState = getChatTabStateForRender(tab.id);
-                        const tabHasConversation =
-                          tabState.conversation.length > 0 ||
-                          tabState.currentAssistantMessage;
-                        const tabConversationContentClassName =
-                          tabHasConversation
-                            ? "mx-auto w-full max-w-4xl pb-28"
-                            : "mx-auto w-full max-w-4xl min-h-full items-center justify-center pb-0";
-                        return (
-                          <div
-                            key={tab.id}
-                            className={cn(
-                              "min-h-0 h-full flex-col",
-                              isActive
-                                ? "flex"
-                                : "pointer-events-none invisible absolute inset-0 flex",
-                            )}
-                            data-chat-tab-panel={tab.id}
-                            aria-hidden={!isActive}
-                          >
-                            <Conversation
-                              anchorMessageId={
-                                chatViewportAnchorByTab[tab.id]?.messageId
-                              }
-                              anchorRequestKey={
-                                chatViewportAnchorByTab[tab.id]?.requestKey
-                              }
-                              className="relative flex-1"
+                ) : isGraphOpen ? (
+                  <div className="flex-1 min-h-0">
+                    <GraphView
+                      nodes={graphData.nodes}
+                      edges={graphData.edges}
+                      isLoading={false}
+                      error={
+                        graphStatus === "error"
+                          ? (graphError ?? "Failed to build graph")
+                          : null
+                      }
+                      onSelectNode={(path) => {
+                        navigateToFile(path);
+                      }}
+                    />
+                  </div>
+                ) : selectedPath ? (
+                  selectedPath.endsWith(".md") ? (
+                    <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
+                      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                        {openMarkdownTabs.map((tab) => {
+                          const isActive = activeFileTabId
+                            ? tab.id === activeFileTabId ||
+                              tab.path === selectedPath
+                            : tab.path === selectedPath;
+                          const isViewingHistory =
+                            viewingHistoricalVersion &&
+                            isActive &&
+                            versionHistoryPath === tab.path;
+                          const tabContent = isViewingHistory
+                            ? viewingHistoricalVersion.content
+                            : (editorContentByPath[tab.path] ??
+                              (isActive && editorPathRef.current === tab.path
+                                ? editorContent
+                                : ""));
+                          return (
+                            <div
+                              key={tab.id}
+                              className={cn(
+                                "min-h-0 flex-1 flex-col overflow-hidden",
+                                isActive ? "flex" : "hidden",
+                              )}
+                              data-file-tab-panel={tab.id}
+                              aria-hidden={!isActive}
                             >
-                              <ConversationContent
-                                className={tabConversationContentClassName}
+                              <MarkdownEditor
+                                ref={(el) => {
+                                  if (el)
+                                    editorRefsByTabId.current.set(tab.id, el);
+                                  else editorRefsByTabId.current.delete(tab.id);
+                                }}
+                                content={tabContent}
+                                notePath={tab.path}
+                                onChange={(markdown) => {
+                                  if (!isViewingHistory)
+                                    handleEditorChange(tab.path, markdown);
+                                }}
+                                onPrimaryHeadingCommit={() => {
+                                  untitledRenameReadyPathsRef.current.add(
+                                    tab.path,
+                                  );
+                                }}
+                                preserveUntitledTitleHeading={isUntitledPlaceholderName(
+                                  getBaseName(tab.path),
+                                )}
+                                placeholder="Start writing..."
+                                wikiLinks={wikiLinkConfig}
+                                onImageUpload={handleImageUpload}
+                                editorSessionKey={
+                                  editorSessionByTabId[tab.id] ?? 0
+                                }
+                                frontmatter={
+                                  frontmatterByPathRef.current.get(tab.path) ??
+                                  null
+                                }
+                                onFrontmatterChange={(newRaw) => {
+                                  frontmatterByPathRef.current.set(
+                                    tab.path,
+                                    newRaw,
+                                  );
+                                  // Write updated frontmatter to disk immediately
+                                  const currentBody = editorContentRef.current;
+                                  const fullContent = joinFrontmatter(
+                                    newRaw,
+                                    currentBody,
+                                  );
+                                  initialContentByPathRef.current.set(
+                                    tab.path,
+                                    splitFrontmatter(fullContent).body,
+                                  );
+                                  initialContentRef.current =
+                                    splitFrontmatter(fullContent).body;
+                                  void window.ipc.invoke(
+                                    "workspace:writeFile",
+                                    {
+                                      path: tab.path,
+                                      data: fullContent,
+                                      opts: { encoding: "utf8" },
+                                    },
+                                  );
+                                }}
+                                onHistoryHandlersChange={(handlers) => {
+                                  if (handlers) {
+                                    fileHistoryHandlersRef.current.set(
+                                      tab.id,
+                                      handlers,
+                                    );
+                                  } else {
+                                    fileHistoryHandlersRef.current.delete(
+                                      tab.id,
+                                    );
+                                  }
+                                }}
+                                editable={!isViewingHistory}
+                                onExport={async (format) => {
+                                  const markdown = tabContent;
+                                  const title = getBaseName(tab.path);
+                                  try {
+                                    await window.ipc.invoke("export:note", {
+                                      markdown,
+                                      format,
+                                      title,
+                                    });
+                                    analytics.noteExported(format);
+                                  } catch (err) {
+                                    console.error("Export failed:", err);
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {versionHistoryPath && (
+                        <VersionHistoryPanel
+                          path={versionHistoryPath}
+                          onClose={() => {
+                            setVersionHistoryPath(null);
+                            setViewingHistoricalVersion(null);
+                          }}
+                          onSelectVersion={(oid, content) => {
+                            if (oid === null) {
+                              setViewingHistoricalVersion(null);
+                            } else {
+                              setViewingHistoricalVersion({ oid, content });
+                            }
+                          }}
+                          onRestore={async (oid) => {
+                            try {
+                              await window.ipc.invoke("knowledge:restore", {
+                                path: versionHistoryPath,
+                                oid,
+                              });
+                              // Reload file content
+                              const result = await window.ipc.invoke(
+                                "workspace:readFile",
+                                { path: versionHistoryPath },
+                              );
+                              handleEditorChange(
+                                versionHistoryPath,
+                                result.data,
+                              );
+                              setViewingHistoricalVersion(null);
+                              setVersionHistoryPath(null);
+                            } catch (err) {
+                              console.error("Failed to restore version:", err);
+                            }
+                          }}
+                        />
+                      )}
+                    </div>
+                  ) : selectedPath.endsWith(".pdf") && fileContent ? (
+                    <PdfViewer base64Data={fileContent} />
+                  ) : /\.html?$/i.test(selectedPath) && fileContent ? (
+                    <HtmlViewer
+                      htmlContent={fileContent}
+                      fileName={getBaseName(selectedPath)}
+                    />
+                  ) : /\.(docx?|xlsx?|pptx?)$/i.test(selectedPath) ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
+                      <div className="text-muted-foreground text-sm">
+                        Preview not available for this file type
+                      </div>
+                      <button
+                        onClick={() => {
+                          window.ipc.invoke("shell:openPath", {
+                            path: selectedPath,
+                          });
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground hover:bg-surface2 transition-colors"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                        Open with default application
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-auto p-4">
+                      <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">
+                        {fileContent || "Loading..."}
+                      </pre>
+                    </div>
+                  )
+                ) : (
+                  <FileCardProvider
+                    onOpenKnowledgeFile={(path) => {
+                      navigateToFile(path);
+                    }}
+                  >
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <div className="relative min-h-0 flex-1">
+                        {chatTabs.map((tab) => {
+                          const isActive = tab.id === activeChatTabId;
+                          const tabState = getChatTabStateForRender(tab.id);
+                          const tabHasConversation =
+                            tabState.conversation.length > 0 ||
+                            tabState.currentAssistantMessage;
+                          const tabConversationContentClassName =
+                            tabHasConversation
+                              ? "mx-auto w-full max-w-4xl pb-28"
+                              : "mx-auto w-full max-w-4xl min-h-full items-center justify-center pb-0";
+                          return (
+                            <div
+                              key={tab.id}
+                              className={cn(
+                                "min-h-0 h-full flex-col",
+                                isActive
+                                  ? "flex"
+                                  : "pointer-events-none invisible absolute inset-0 flex",
+                              )}
+                              data-chat-tab-panel={tab.id}
+                              aria-hidden={!isActive}
+                            >
+                              <Conversation
+                                anchorMessageId={
+                                  chatViewportAnchorByTab[tab.id]?.messageId
+                                }
+                                anchorRequestKey={
+                                  chatViewportAnchorByTab[tab.id]?.requestKey
+                                }
+                                className="relative flex-1"
                               >
-                                {!tabHasConversation ? (
-                                  <ConversationEmptyState className="h-auto">
-                                    <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
-                                      What are we working on?
-                                    </div>
-                                  </ConversationEmptyState>
-                                ) : (
-                                  <>
-                                    {tabState.conversation.map((item) => {
-                                      const rendered = renderConversationItem(
-                                        item,
-                                        tab.id,
-                                      );
-                                      if (isToolCall(item)) {
-                                        const permRequest =
-                                          tabState.allPermissionRequests.get(
-                                            item.id,
-                                          );
+                                <ConversationContent
+                                  className={tabConversationContentClassName}
+                                >
+                                  {!tabHasConversation ? (
+                                    <ConversationEmptyState className="h-auto">
+                                      <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
+                                        What are we working on?
+                                      </div>
+                                    </ConversationEmptyState>
+                                  ) : (
+                                    <>
+                                      {tabState.conversation.map((item) => {
+                                        const rendered = renderConversationItem(
+                                          item,
+                                          tab.id,
+                                        );
+                                        if (isToolCall(item)) {
+                                          const permRequest =
+                                            tabState.allPermissionRequests.get(
+                                              item.id,
+                                            );
                                           if (permRequest) {
                                             const response =
                                               tabState.permissionResponses.get(
@@ -5422,229 +5494,243 @@ function App() {
                                                 <motion.div
                                                   initial={{ opacity: 0, y: 6 }}
                                                   animate={{ opacity: 1, y: 0 }}
-                                                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                                                  transition={{
+                                                    duration: 0.25,
+                                                    ease: [0.16, 1, 0.3, 1],
+                                                  }}
                                                 >
                                                   {rendered}
                                                 </motion.div>
                                                 <PermissionRequest
-                                                toolCall={permRequest.toolCall}
-                                                onApprove={() =>
-                                                  handlePermissionResponse(
+                                                  toolCall={
                                                     permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                  )
+                                                  }
+                                                  onApprove={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                    )
+                                                  }
+                                                  onApproveSession={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                      "session",
+                                                    )
+                                                  }
+                                                  onApproveAlways={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                      "always",
+                                                    )
+                                                  }
+                                                  onDeny={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "deny",
+                                                    )
+                                                  }
+                                                  isProcessing={
+                                                    isActive && isProcessing
+                                                  }
+                                                  response={response}
+                                                />
+                                              </React.Fragment>
+                                            );
+                                          }
+                                        }
+                                        return (
+                                          <motion.div
+                                            key={item.id}
+                                            initial={{ opacity: 0, y: 6 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{
+                                              duration: 0.25,
+                                              ease: [0.16, 1, 0.3, 1],
+                                            }}
+                                          >
+                                            {rendered}
+                                          </motion.div>
+                                        );
+                                      })}
+
+                                      {Array.from(
+                                        tabState.pendingAskHumanRequests.values(),
+                                      ).map((request) => (
+                                        <AskHumanRequest
+                                          key={request.toolCallId}
+                                          query={request.query}
+                                          onResponse={(response) =>
+                                            handleAskHumanResponse(
+                                              request.toolCallId,
+                                              request.subflow,
+                                              response,
+                                            )
+                                          }
+                                          isProcessing={
+                                            isActive && isProcessing
+                                          }
+                                        />
+                                      ))}
+
+                                      {tabState.currentToolDraftActive && (
+                                        <Message from="assistant">
+                                          <MessageContent>
+                                            <StreamingMessageBody />
+                                          </MessageContent>
+                                        </Message>
+                                      )}
+
+                                      {!tabState.currentToolDraftActive &&
+                                        tabState.currentAssistantMessage && (
+                                          <Message from="assistant">
+                                            <MessageContent>
+                                              <SmoothStreamingMessage
+                                                text={tabState.currentAssistantMessage.replace(
+                                                  /<\/?voice>/g,
+                                                  "",
+                                                )}
+                                                components={
+                                                  streamdownComponents
                                                 }
-                                                onApproveSession={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                    "session",
-                                                  )
-                                                }
-                                                onApproveAlways={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                    "always",
-                                                  )
-                                                }
-                                                onDeny={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "deny",
-                                                  )
-                                                }
-                                                isProcessing={
-                                                  isActive && isProcessing
-                                                }
-                                                response={response}
                                               />
-                                            </React.Fragment>
-                                          );
-                                        }
-                                      }
-                                      return (
-                                        <motion.div
-                                          key={item.id}
-                                          initial={{ opacity: 0, y: 6 }}
-                                          animate={{ opacity: 1, y: 0 }}
-                                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                                        >
-                                          {rendered}
-                                        </motion.div>
-                                      );
-                                    })}
+                                            </MessageContent>
+                                          </Message>
+                                        )}
 
-                                    {Array.from(
-                                      tabState.pendingAskHumanRequests.values(),
-                                    ).map((request) => (
-                                      <AskHumanRequest
-                                        key={request.toolCallId}
-                                        query={request.query}
-                                        onResponse={(response) =>
-                                          handleAskHumanResponse(
-                                            request.toolCallId,
-                                            request.subflow,
-                                            response,
-                                          )
-                                        }
-                                        isProcessing={isActive && isProcessing}
-                                      />
-                                    ))}
-
-                                    {tabState.currentToolDraftActive && (
-                                      <Message from="assistant">
-                                        <MessageContent>
-                                          <StreamingMessageBody />
-                                        </MessageContent>
-                                      </Message>
-                                    )}
-
-                                    {!tabState.currentToolDraftActive &&
-                                      tabState.currentAssistantMessage && (
-                                        <Message from="assistant">
-                                          <MessageContent>
-                                            <SmoothStreamingMessage
-                                              text={tabState.currentAssistantMessage.replace(
-                                                /<\/?voice>/g,
-                                                "",
-                                              )}
-                                              components={streamdownComponents}
-                                            />
-                                          </MessageContent>
-                                        </Message>
-                                      )}
-
-                                    {isActive &&
-                                      isProcessing &&
-                                      !tabState.currentAssistantMessage &&
-                                      !tabState.currentToolDraftActive && (
-                                        <Message from="assistant">
-                                          <MessageContent>
-                                            <Shimmer duration={1}>
-                                              Thinking...
-                                            </Shimmer>
-                                          </MessageContent>
-                                        </Message>
-                                      )}
-                                  </>
-                                )}
-                              </ConversationContent>
-                              <ConversationScrollButton />
-                            </Conversation>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="sticky bottom-0 z-10 bg-background pb-12 pt-0 shadow-lg">
-                      <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-t from-background to-transparent" />
-                      <div className="mx-auto w-full max-w-4xl px-4">
-                        {!hasConversation && (
-                          <Suggestions
-                            onSelect={setPresetMessage}
-                            className="mb-3 justify-center"
-                          />
-                        )}
-                        {chatTabs.map((tab) => {
-                          const isActive = tab.id === activeChatTabId;
-                          const tabState = getChatTabStateForRender(tab.id);
-                          return (
-                            <div
-                              key={tab.id}
-                              className={isActive ? "block" : "hidden"}
-                              data-chat-input-panel={tab.id}
-                              aria-hidden={!isActive}
-                            >
-                              <ChatInputWithMentions
-                                knowledgeFiles={knowledgeFiles}
-                                recentFiles={recentWikiFiles}
-                                visibleFiles={visibleKnowledgeFiles}
-                                onSubmit={handlePromptSubmit}
-                                onStop={handleStop}
-                                isProcessing={isActive && isProcessing}
-                                isStopping={isActive && isStopping}
-                                isActive={isActive}
-                                presetMessage={
-                                  isActive ? presetMessage : undefined
-                                }
-                                onPresetMessageConsumed={
-                                  isActive
-                                    ? () => setPresetMessage(undefined)
-                                    : undefined
-                                }
-                                runId={tabState.runId}
-                                initialDraft={chatDraftsRef.current.get(tab.id)}
-                                onDraftChange={(text) =>
-                                  setChatDraftForTab(tab.id, text)
-                                }
-                                onSelectedModelChange={(m) => {
-                                  if (m) {
-                                    selectedModelByTabRef.current.set(
-                                      tab.id,
-                                      m,
-                                    );
-                                  } else {
-                                    selectedModelByTabRef.current.delete(
-                                      tab.id,
-                                    );
-                                  }
-                                }}
-                                isRecording={isActive && isRecording}
-                                recordingText={
-                                  isActive ? voice.interimText : undefined
-                                }
-                                recordingState={
-                                  isActive
-                                    ? voice.state === "connecting"
-                                      ? "connecting"
-                                      : "listening"
-                                    : undefined
-                                }
-                                onStartRecording={
-                                  isActive ? handleStartRecording : undefined
-                                }
-                                onSubmitRecording={
-                                  isActive ? handleSubmitRecording : undefined
-                                }
-                                onCancelRecording={
-                                  isActive ? handleCancelRecording : undefined
-                                }
-                                voiceAvailable={isActive && voiceAvailable}
-                                ttsAvailable={isActive && ttsAvailable}
-                                ttsEnabled={ttsEnabled}
-                                ttsMode={ttsMode}
-                                onToggleTts={
-                                  isActive ? handleToggleTts : undefined
-                                }
-                                cavemanEnabled={
-                                  cavemanByTabRef.current.get(tab.id) ?? false
-                                }
-                                onToggleCaveman={
-                                  isActive
-                                    ? () => handleToggleCaveman(tab.id)
-                                    : undefined
-                                }
-                                onTtsModeChange={
-                                  isActive ? handleTtsModeChange : undefined
-                                }
-                              />
+                                      {isActive &&
+                                        isProcessing &&
+                                        !tabState.currentAssistantMessage &&
+                                        !tabState.currentToolDraftActive && (
+                                          <Message from="assistant">
+                                            <MessageContent>
+                                              <Shimmer duration={1}>
+                                                Thinking...
+                                              </Shimmer>
+                                            </MessageContent>
+                                          </Message>
+                                        )}
+                                    </>
+                                  )}
+                                </ConversationContent>
+                                <ConversationScrollButton />
+                              </Conversation>
                             </div>
                           );
                         })}
                       </div>
+
+                      <div className="sticky bottom-0 z-10 bg-background pb-12 pt-0 shadow-lg">
+                        <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-t from-background to-transparent" />
+                        <div className="mx-auto w-full max-w-4xl px-4">
+                          {!hasConversation && (
+                            <Suggestions
+                              onSelect={setPresetMessage}
+                              className="mb-3 justify-center"
+                            />
+                          )}
+                          {chatTabs.map((tab) => {
+                            const isActive = tab.id === activeChatTabId;
+                            const tabState = getChatTabStateForRender(tab.id);
+                            return (
+                              <div
+                                key={tab.id}
+                                className={isActive ? "block" : "hidden"}
+                                data-chat-input-panel={tab.id}
+                                aria-hidden={!isActive}
+                              >
+                                <ChatInputWithMentions
+                                  knowledgeFiles={knowledgeFiles}
+                                  recentFiles={recentWikiFiles}
+                                  visibleFiles={visibleKnowledgeFiles}
+                                  onSubmit={handlePromptSubmit}
+                                  onStop={handleStop}
+                                  isProcessing={isActive && isProcessing}
+                                  isStopping={isActive && isStopping}
+                                  isActive={isActive}
+                                  presetMessage={
+                                    isActive ? presetMessage : undefined
+                                  }
+                                  onPresetMessageConsumed={
+                                    isActive
+                                      ? () => setPresetMessage(undefined)
+                                      : undefined
+                                  }
+                                  runId={tabState.runId}
+                                  initialDraft={chatDraftsRef.current.get(
+                                    tab.id,
+                                  )}
+                                  onDraftChange={(text) =>
+                                    setChatDraftForTab(tab.id, text)
+                                  }
+                                  onSelectedModelChange={(m) => {
+                                    if (m) {
+                                      selectedModelByTabRef.current.set(
+                                        tab.id,
+                                        m,
+                                      );
+                                    } else {
+                                      selectedModelByTabRef.current.delete(
+                                        tab.id,
+                                      );
+                                    }
+                                  }}
+                                  isRecording={isActive && isRecording}
+                                  recordingText={
+                                    isActive ? voice.interimText : undefined
+                                  }
+                                  recordingState={
+                                    isActive
+                                      ? voice.state === "connecting"
+                                        ? "connecting"
+                                        : "listening"
+                                      : undefined
+                                  }
+                                  onStartRecording={
+                                    isActive ? handleStartRecording : undefined
+                                  }
+                                  onSubmitRecording={
+                                    isActive ? handleSubmitRecording : undefined
+                                  }
+                                  onCancelRecording={
+                                    isActive ? handleCancelRecording : undefined
+                                  }
+                                  voiceAvailable={isActive && voiceAvailable}
+                                  ttsAvailable={isActive && ttsAvailable}
+                                  ttsEnabled={ttsEnabled}
+                                  ttsMode={ttsMode}
+                                  onToggleTts={
+                                    isActive ? handleToggleTts : undefined
+                                  }
+                                  cavemanEnabled={
+                                    cavemanByTabRef.current.get(tab.id) ?? false
+                                  }
+                                  onToggleCaveman={
+                                    isActive
+                                      ? () => handleToggleCaveman(tab.id)
+                                      : undefined
+                                  }
+                                  onTtsModeChange={
+                                    isActive ? handleTtsModeChange : undefined
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </FileCardProvider>
-              )}
+                  </FileCardProvider>
+                )}
               </div>
             </SidebarInset>
 

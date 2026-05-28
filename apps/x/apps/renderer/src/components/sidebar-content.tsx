@@ -98,6 +98,8 @@ type KnowledgeActions = {
   rename: (path: string, newName: string, isDir: boolean) => Promise<void>;
   remove: (path: string) => Promise<void>;
   copyPath: (path: string) => void;
+  revealInFileManager: (path: string) => Promise<void>;
+  duplicate: (path: string, isDir: boolean) => Promise<void>;
   onOpenInNewTab?: (path: string) => void;
 };
 
@@ -302,21 +304,8 @@ export function SidebarContentPanel({
             ))}
           </div>
         </div>
-        {showKnowledgeNewChat && onNewChat && (
-          <div className="titlebar-no-drag px-2 pt-0.5 pb-0">
-            <button
-              type="button"
-              onClick={onNewChat}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            >
-              <SquarePen className="size-4" />
-              <span>New chat</span>
-            </button>
-          </div>
-        )}
-        {/* Quick action buttons */}
-        <div className="titlebar-no-drag flex flex-col gap-0 px-2 -mt-1 pt-0 pb-1">
-          {showChatQuickActions && onNewChat && (
+        <div className="titlebar-no-drag flex flex-col gap-0 px-2 pt-0 pb-1">
+          {onNewChat && (
             <button
               type="button"
               onClick={onNewChat}
@@ -389,19 +378,19 @@ export function SidebarContentPanel({
         </div>
       </SidebarHeader>
       <SidebarContent>
-          {activeSection === "knowledge" && (
-            <KnowledgeSection
-              tree={tree}
-              selectedPath={selectedPath}
-              expandedPaths={expandedPaths}
-              onSelectFile={onSelectFile}
-              onToggleFolder={onToggleFolder}
-              actions={knowledgeActions}
-              onOpenSearch={onOpenSearch}
-              onVoiceNoteCreated={onVoiceNoteCreated}
-              onOpenArtifacts={onOpenArtifacts}
-            />
-          )}
+        {activeSection === "knowledge" && (
+          <KnowledgeSection
+            tree={tree}
+            selectedPath={selectedPath}
+            expandedPaths={expandedPaths}
+            onSelectFile={onSelectFile}
+            onToggleFolder={onToggleFolder}
+            actions={knowledgeActions}
+            onOpenSearch={onOpenSearch}
+            onVoiceNoteCreated={onVoiceNoteCreated}
+            onOpenArtifacts={onOpenArtifacts}
+          />
+        )}
         {activeSection === "tasks" && (
           <TasksSection
             runs={runs}
@@ -923,6 +912,10 @@ function Tree({
   const [isRenaming, setIsRenaming] = useState(false);
   const isSubmittingRef = React.useRef(false);
   const displayName = (isDir && FOLDER_DISPLAY_NAMES[item.name]) || item.name;
+  const isMac =
+    typeof navigator !== "undefined" &&
+    navigator.platform.toLowerCase().includes("mac");
+  const revealLabel = isMac ? "Reveal in Finder" : "Reveal in Explorer";
 
   // For files, strip .md extension for editing
   const baseName =
@@ -1005,6 +998,16 @@ function Tree({
       <ContextMenuItem onClick={handleCopyPath}>
         <Copy className="mr-2 size-4" />
         Copy Path
+      </ContextMenuItem>
+      <ContextMenuItem
+        onClick={() => void actions.revealInFileManager(item.path)}
+      >
+        <FolderOpen className="mr-2 size-4" />
+        {revealLabel}
+      </ContextMenuItem>
+      <ContextMenuItem onClick={() => void actions.duplicate(item.path, isDir)}>
+        <Copy className="mr-2 size-4" />
+        Duplicate
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
