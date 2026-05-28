@@ -3,7 +3,7 @@
   "productName": "ScholarOS",
   "description": "Your AI study assistant",
   "type": "module",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "main": ".package/dist/main.cjs",
   "license": "Apache-2.0",
   "scripts": {
