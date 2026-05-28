@@ -26,6 +26,12 @@ import { UserMessageContent } from "./message.js";
 import { ScholarOSApiConfig } from "./rowboat-account.js";
 import { ZListToolkitsResponse } from "./composio.js";
 import { BrowserStateSchema } from "./browser-control.js";
+import {
+  Project,
+  ProjectSummary,
+  CreateProjectOptions,
+  UpdateProjectOptions,
+} from "./projects.js";
 // ============================================================================
 // Runtime Validation Schemas (Single Source of Truth)
 // ============================================================================
@@ -225,6 +231,7 @@ const ipcSchemas = {
   "runs:list": {
     req: z.object({
       cursor: z.string().optional(),
+      projectId: z.string().optional(),
     }),
     res: ListRunsResponse,
   },
@@ -677,6 +684,78 @@ const ipcSchemas = {
   "vault:setPath": {
     req: z.object({
       path: z.string(),
+    }),
+    res: z.object({
+      success: z.literal(true),
+    }),
+  },
+  // Projects channels
+  "projects:list": {
+    req: z.null(),
+    res: z.object({
+      projects: z.array(ProjectSummary),
+    }),
+  },
+  "projects:get": {
+    req: z.object({
+      projectId: z.string(),
+    }),
+    res: Project,
+  },
+  "projects:create": {
+    req: CreateProjectOptions,
+    res: Project,
+  },
+  "projects:rename": {
+    req: z.object({
+      projectId: z.string(),
+      name: z.string().min(1),
+    }),
+    res: z.object({
+      success: z.literal(true),
+    }),
+  },
+  "projects:update": {
+    req: z.object({
+      projectId: z.string(),
+      updates: UpdateProjectOptions,
+    }),
+    res: z.object({
+      success: z.literal(true),
+    }),
+  },
+  "projects:delete": {
+    req: z.object({
+      projectId: z.string(),
+    }),
+    res: z.object({
+      success: z.literal(true),
+    }),
+  },
+  "projects:set-active": {
+    req: z.object({
+      projectId: z.string().nullable(),
+    }),
+    res: z.object({
+      success: z.literal(true),
+    }),
+  },
+  "projects:get-active": {
+    req: z.null(),
+    res: Project.nullable(),
+  },
+  "projects:get-context": {
+    req: z.object({
+      projectId: z.string(),
+    }),
+    res: z.object({
+      context: z.string(),
+    }),
+  },
+  "projects:update-context": {
+    req: z.object({
+      projectId: z.string(),
+      text: z.string(),
     }),
     res: z.object({
       success: z.literal(true),

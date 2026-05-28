@@ -51,6 +51,7 @@ import {
   getVaultPath,
 } from "@x/core/dist/config/config.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
+import type { IProjectsRepo } from "@x/core/dist/projects/repo.js";
 
 async function ensureUniqueWorkspaceDestination(
   destinationPath: string,
@@ -569,7 +570,7 @@ export function setupIpcHandlers() {
       return runsCore.fetchRun(args.runId);
     },
     "runs:list": async (_event, args) => {
-      return runsCore.listRuns(args.cursor);
+      return runsCore.listRuns(args.cursor, args.projectId);
     },
     "runs:delete": async (_event, args) => {
       await runsCore.deleteRun(args.runId);
@@ -908,6 +909,56 @@ export function setupIpcHandlers() {
     },
     "vault:setPath": async (_event, args) => {
       saveVaultPath(args.path);
+      return { success: true as const };
+    },
+    // Projects handlers
+    "projects:list": async () => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      const projects = await repo.list();
+      return { projects };
+    },
+    "projects:get": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      const project = await repo.get(args.projectId);
+      if (!project) throw new Error(`Project ${args.projectId} not found`);
+      return project;
+    },
+    "projects:create": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      return repo.create(args);
+    },
+    "projects:rename": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      await repo.rename(args.projectId, args.name);
+      return { success: true as const };
+    },
+    "projects:update": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      await repo.update(args.projectId, args.updates);
+      return { success: true as const };
+    },
+    "projects:delete": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      await repo.delete(args.projectId);
+      return { success: true as const };
+    },
+    "projects:set-active": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      await repo.setActive(args.projectId);
+      return { success: true as const };
+    },
+    "projects:get-active": async () => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      return repo.getActive();
+    },
+    "projects:get-context": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      const context = await repo.getContext(args.projectId);
+      return { context };
+    },
+    "projects:update-context": async (_event, args) => {
+      const repo = container.resolve<IProjectsRepo>("projectsRepo");
+      await repo.appendContext(args.projectId, args.text);
       return { success: true as const };
     },
     // Embedded browser handlers (WebContentsView + navigation)

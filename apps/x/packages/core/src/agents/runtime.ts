@@ -54,6 +54,8 @@ import { parse } from "yaml";
 import { getRaw as getNoteCreationRaw } from "../knowledge/note_creation.js";
 import { getRaw as getLabelingAgentRaw } from "../knowledge/note_tagging_agent.js";
 import { shouldDisableTools } from "../config/config.js";
+import { updateProjectMemory } from "../projects/context-updater.js";
+import { IProjectsRepo } from "../projects/repo.js";
 
 function loadAgentNotesContext(): string | null {
   return null;
@@ -104,12 +106,15 @@ export class AgentRuntime implements IAgentRuntime {
       return;
     }
     const signal = this.abortRegistry.createForRun(runId);
+    let projectContextId: string | undefined;
     try {
-      await this.bus.publish({
-        runId,
-        type: "run-processing-start",
-        subflow: [],
-      });
+      // Fetch run once to get projectId before the loop
+      const initialRun = await this.runsRepo.fetch(runId);
+      if (!initialRun) {
+        throw new Error(`Run ${runId} not found`);
+      }
+      projectContextId = initialRun.projectId;
+
       while (true) {
         // Check for abort before each iteration
         if (signal.aborted) {
@@ -130,6 +135,7 @@ export class AgentRuntime implements IAgentRuntime {
             state,
             idGenerator: this.idGenerator,
             runId,
+            projectId: projectContextId,
             messageQueue: this.messageQueue,
             modelConfigRepo: this.modelConfigRepo,
             signal,
@@ -137,7 +143,7 @@ export class AgentRuntime implements IAgentRuntime {
           })) {
             eventCount++;
             if (event.type !== "llm-stream-event") {
-              await this.runsRepo.appendEvents(runId, [event]);
+              await this.runsRepo.appendEvents(runId, [event], projectContextId);
             }
             await this.bus.publish(event);
           }
@@ -155,6 +161,14 @@ export class AgentRuntime implements IAgentRuntime {
         }
       }
 
+      // Update project memory if run belongs to a project
+      if (projectContextId) {
+        const updatedRun = await this.runsRepo.fetch(runId);
+        if (updatedRun) {
+          await updateProjectMemory(projectContextId, runId, updatedRun.log);
+        }
+      }
+
       // Emit run-stopped event if aborted
       if (signal.aborted) {
         const stoppedEvent: z.infer<typeof RunEvent> = {
@@ -163,7 +177,7 @@ export class AgentRuntime implements IAgentRuntime {
           reason: "user-requested",
           subflow: [],
         };
-        await this.runsRepo.appendEvents(runId, [stoppedEvent]);
+        await this.runsRepo.appendEvents(runId, [stoppedEvent], projectContextId);
         await this.bus.publish(stoppedEvent);
       }
     } catch (error) {
@@ -180,7 +194,7 @@ export class AgentRuntime implements IAgentRuntime {
         error: message,
         subflow: [],
       };
-      await this.runsRepo.appendEvents(runId, [errorEvent]);
+      await this.runsRepo.appendEvents(runId, [errorEvent], projectContextId);
       await this.bus.publish(errorEvent);
     } finally {
       this.abortRegistry.cleanup(runId);
@@ -779,6 +793,7 @@ export async function* streamAgent({
   state,
   idGenerator,
   runId,
+  projectId,
   messageQueue,
   modelConfigRepo,
   signal,
@@ -787,6 +802,7 @@ export async function* streamAgent({
   state: AgentState;
   idGenerator: IMonotonicallyIncreasingIdGenerator;
   runId: string;
+  projectId?: string;
   messageQueue: IMessageQueue;
   modelConfigRepo: IModelConfigRepo;
   signal: AbortSignal;
@@ -1027,6 +1043,21 @@ export async function* streamAgent({
       timeZoneName: "short",
     });
     let instructionsWithDateTime = `Current date and time: ${currentDateTime}\n\n${agent.instructions}`;
+
+    // Inject project context if run belongs to a project
+    if (projectId) {
+      try {
+        const projectsRepo = container.resolve<IProjectsRepo>("projectsRepo");
+        const project = await projectsRepo.get(projectId);
+        if (project) {
+          const memory = await projectsRepo.getContext(projectId);
+          instructionsWithDateTime += `\n\n## Active Project: ${project.name}\n${memory}\n\nYou are currently working within this project. All new artifacts should be saved to the project's artifacts folder. When the user refers to prior work, use the session log and key decisions above rather than asking them to repeat context.`;
+        }
+      } catch (err) {
+        console.error(`[Projects] Failed to load project context for ${projectId}:`, err);
+      }
+    }
+
     // Inject Agent Notes context for copilot
     if (state.agentName === "copilot" || state.agentName === "rowboatx") {
       const agentNotesContext = loadAgentNotesContext();

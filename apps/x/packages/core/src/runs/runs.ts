@@ -18,13 +18,12 @@ export async function createRun(opts: z.infer<typeof CreateRunOptions>): Promise
     const bus = container.resolve<IBus>('bus');
 
     // Resolve model+provider once at creation: opts > agent declaration > defaults.
-    // Both fields are plain strings (provider is a name, looked up at runtime).
     const agent = await loadAgent(opts.agentId);
     const defaults = await getDefaultModelAndProvider();
     const model = opts.model ?? agent.model ?? defaults.model;
     const provider = opts.provider ?? agent.provider ?? defaults.provider;
 
-    const run = await repo.create({ agentId: opts.agentId, model, provider });
+    const run = await repo.create({ agentId: opts.agentId, model, provider, projectId: opts.projectId });
     await bus.publish(run.log[0]);
     return run;
 }
@@ -122,7 +121,7 @@ export async function fetchRun(runId: string): Promise<z.infer<typeof Run>> {
     return repo.fetch(runId);
 }
 
-export async function listRuns(cursor?: string): Promise<z.infer<typeof ListRunsResponse>> {
+export async function listRuns(cursor?: string, projectId?: string): Promise<z.infer<typeof ListRunsResponse>> {
     const repo = container.resolve<IRunsRepo>('runsRepo');
-    return repo.list(cursor);
+    return repo.list(cursor, projectId);
 }

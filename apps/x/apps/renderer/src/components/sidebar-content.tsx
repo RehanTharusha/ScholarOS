@@ -79,6 +79,12 @@ import {
 import { SettingsDialog } from "@/components/settings-dialog";
 import { toast } from "@/lib/toast";
 import { useBilling } from "@/hooks/useBilling";
+import { Check, Plus } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface TreeNode {
   path: string;
@@ -108,6 +114,7 @@ type RunListItem = {
   title?: string;
   createdAt: string;
   agentId: string;
+  projectId?: string;
 };
 
 type TasksActions = {
@@ -132,6 +139,10 @@ type SidebarContentPanelProps = {
   processingRunIds?: Set<string>;
   tasksActions?: TasksActions;
   onNewChat?: () => void;
+  activeProject?: import("@x/shared/dist/projects.js").ProjectType | null;
+  projects?: import("@x/shared/dist/projects.js").ProjectType[];
+  onSelectProject?: (projectId: string | null) => void;
+  onCreateProject?: () => void;
   onOpenIngestWindow?: () => void;
   isBrowserOpen?: boolean;
   onToggleBrowser?: () => void;
@@ -178,6 +189,10 @@ export function SidebarContentPanel({
   tasksActions,
   onNewChat,
   onOpenSearch,
+  activeProject,
+  projects = [],
+  onSelectProject,
+  onCreateProject,
   onOpenIngestWindow,
 
   isBrowserOpen = false,
@@ -414,6 +429,10 @@ export function SidebarContentPanel({
             currentRunId={currentRunId}
             processingRunIds={processingRunIds}
             actions={tasksActions}
+            activeProject={activeProject}
+            projects={projects}
+            onSelectProject={onSelectProject}
+            onCreateProject={onCreateProject}
           />
         )}
       </SidebarContent>
@@ -1210,11 +1229,19 @@ function TasksSection({
   currentRunId,
   processingRunIds,
   actions,
+  activeProject,
+  projects,
+  onSelectProject,
+  onCreateProject,
 }: {
   runs: RunListItem[];
   currentRunId?: string | null;
   processingRunIds?: Set<string>;
   actions?: TasksActions;
+  activeProject?: import("@x/shared/dist/projects.js").ProjectType | null;
+  projects?: import("@x/shared/dist/projects.js").ProjectType[];
+  onSelectProject?: (projectId: string | null) => void;
+  onCreateProject?: () => void;
 }) {
   const [pendingDeleteRunId, setPendingDeleteRunId] = useState<string | null>(
     null,
@@ -1224,12 +1251,21 @@ function TasksSection({
   return (
     <SidebarGroup className="flex-1 flex flex-col overflow-hidden">
       <SidebarGroupContent className="flex-1 overflow-y-auto">
+        {/* Project selector */}
+        <div className="px-3 pt-3">
+          <ProjectSelector
+            activeProject={activeProject}
+            projects={projects}
+            onSelectProject={onSelectProject}
+            onCreateProject={onCreateProject}
+          />
+        </div>
         {/* Runs Section */}
         {runs.length > 0 && (
           <>
-            <div className="group/header flex items-center justify-between px-3 py-1.5 mt-4">
+            <div className="group/header flex items-center justify-between px-3 py-1.5 mt-2">
               <span className="text-xs font-medium text-muted-foreground">
-                Chat history
+                {activeProject ? `${activeProject.name} chats` : "Chat history"}
               </span>
               {actions?.onClearHistory && (
                 <button
@@ -1369,9 +1405,129 @@ function TasksSection({
             >
               Clear all
             </Button>
-          </DialogFooter>
+           </DialogFooter>
         </DialogContent>
       </Dialog>
     </SidebarGroup>
+  );
+}
+
+function ProjectSelector({
+  activeProject,
+  projects,
+  onSelectProject,
+  onCreateProject,
+}: {
+  activeProject?: import("@x/shared/dist/projects.js").ProjectType | null;
+  projects?: import("@x/shared/dist/projects.js").ProjectType[];
+  onSelectProject?: (projectId: string | null) => void;
+  onCreateProject?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filtered = (projects || []).filter(
+    (p) =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.course?.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex w-full items-center gap-2 rounded-md border border-sidebar-border px-2.5 py-1.5 text-sm transition-colors hover:bg-sidebar-accent",
+            activeProject ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {activeProject ? (
+            <>
+              {activeProject.color ? (
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: activeProject.color }}
+                />
+              ) : (
+                <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="truncate flex-1 text-left">{activeProject.name}</span>
+            </>
+          ) : (
+            <>
+              <Globe className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1 text-left">No project</span>
+            </>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start" side="bottom">
+        <div className="p-2">
+          <div className="flex items-center gap-2 rounded-md border px-2 py-1">
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        </div>
+        <div className="max-h-48 overflow-y-auto px-1 pb-1">
+          <button
+            onClick={() => {
+              onSelectProject?.(null);
+              setOpen(false);
+            }}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-sidebar-accent",
+              !activeProject && "bg-sidebar-accent",
+            )}
+          >
+            <Globe className="h-3 w-3 text-muted-foreground" />
+            <span className="flex-1 text-left">Global (no project)</span>
+            {!activeProject && <Check className="h-3 w-3 text-primary" />}
+          </button>
+          {filtered.map((project) => (
+            <button
+              key={project.id}
+              onClick={() => {
+                onSelectProject?.(project.id);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-sidebar-accent",
+                activeProject?.id === project.id && "bg-sidebar-accent",
+              )}
+            >
+              {project.color ? (
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: project.color }}
+                />
+              ) : (
+                <FolderOpen className="h-3 w-3 text-muted-foreground" />
+              )}
+              <div className="flex-1 text-left truncate">{project.name}</div>
+              {activeProject?.id === project.id && (
+                <Check className="h-3 w-3 text-primary" />
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="border-t p-1">
+          <button
+            onClick={() => {
+              onCreateProject?.();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-sidebar-accent"
+          >
+            <Plus className="h-3 w-3" />
+            New Project
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -125,6 +125,7 @@ export const Run = z.object({
     agentId: z.string(),
     model: z.string(),
     provider: z.string(),
+    projectId: z.string().optional(),
     log: z.array(RunEvent),
 });
 
@@ -134,6 +135,7 @@ export const ListRunsResponse = z.object({
         title: true,
         createdAt: true,
         agentId: true,
+        projectId: true,
     })),
     nextCursor: z.string().optional(),
 });
@@ -142,4 +144,5 @@ export const CreateRunOptions = z.object({
     agentId: z.string(),
     model: z.string().optional(),
     provider: z.string().optional(),
+    projectId: z.string().optional(),
 });

@@ -3,6 +3,7 @@ import { FSModelConfigRepo, IModelConfigRepo } from "../models/repo.js";
 import { FSMcpConfigRepo, IMcpConfigRepo } from "../mcp/repo.js";
 import { FSAgentsRepo, IAgentsRepo } from "../agents/repo.js";
 import { FSRunsRepo, IRunsRepo } from "../runs/repo.js";
+import { FSProjectsRepo, IProjectsRepo } from "../projects/repo.js";
 import { IMonotonicallyIncreasingIdGenerator, IdGen } from "../application/lib/id-gen.js";
 import { IMessageQueue, InMemoryMessageQueue } from "../application/lib/message-queue.js";
 import { IBus, InMemoryBus } from "../application/lib/bus.js";
@@ -31,6 +32,7 @@ container.register({
     modelConfigRepo: asClass<IModelConfigRepo>(FSModelConfigRepo).singleton(),
     agentsRepo: asClass<IAgentsRepo>(FSAgentsRepo).singleton(),
     runsRepo: asClass<IRunsRepo>(FSRunsRepo).singleton(),
+    projectsRepo: asClass<IProjectsRepo>(FSProjectsRepo).singleton(),
     oauthRepo: asClass<IOAuthRepo>(FSOAuthRepo).singleton(),
     clientRegistrationRepo: asClass<IClientRegistrationRepo>(FSClientRegistrationRepo).singleton(),
     slackConfigRepo: asClass<ISlackConfigRepo>(FSSlackConfigRepo).singleton(),

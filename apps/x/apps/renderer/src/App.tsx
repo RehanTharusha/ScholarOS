@@ -42,6 +42,7 @@ import { SidebarContentPanel } from "@/components/sidebar-content";
 import { SuggestedTopicsView } from "@/components/suggested-topics-view";
 import { ArtifactsView } from "@/components/artifacts-view";
 import { SidebarSectionProvider } from "@/contexts/sidebar-context";
+import { ProjectDialog } from "@/components/project-dialog";
 import {
   Conversation,
   ConversationContent,
@@ -924,8 +925,15 @@ function App() {
     title?: string;
     createdAt: string;
     agentId: string;
+    projectId?: string;
   };
   const [runs, setRuns] = useState<RunListItem[]>([]);
+
+  // Projects state
+  const [activeProject, setActiveProject] = useState<import("@x/shared/dist/projects.js").ProjectType | null>(null);
+  const [projects, setProjects] = useState<import("@x/shared/dist/projects.js").ProjectType[]>([]);
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<import("@x/shared/dist/projects.js").ProjectType | null>(null);
 
   // Chat tab state
   const [chatTabs, setChatTabs] = useState<ChatTab[]>([
@@ -1802,7 +1810,7 @@ function App() {
   }, [selectedPath, versionHistoryPath]);
 
   // Load runs list (all pages)
-  const loadRuns = useCallback(async () => {
+  const loadRuns = useCallback(async (filterProjectId?: string | null) => {
     try {
       const allRuns: RunListItem[] = [];
       let cursor: string | undefined = undefined;
@@ -1811,7 +1819,7 @@ function App() {
       do {
         const result: ListRunsResponseType = await window.ipc.invoke(
           "runs:list",
-          { cursor },
+          { cursor, projectId: filterProjectId ?? activeProject?.id },
         );
         allRuns.push(...result.runs);
         cursor = result.nextCursor;
@@ -1825,12 +1833,22 @@ function App() {
     } catch (err) {
       console.error("Failed to load runs:", err);
     }
-  }, []);
+  }, [activeProject?.id]);
 
-  // Load runs on mount
+  // Load runs on mount and when active project changes
   useEffect(() => {
     loadRuns();
   }, [loadRuns]);
+
+  // Load projects on mount
+  useEffect(() => {
+    window.ipc.invoke("projects:list", null).then((result) => {
+      setProjects(result.projects);
+    }).catch(() => {});
+    window.ipc.invoke("projects:get-active", null).then((project) => {
+      setActiveProject(project);
+    }).catch(() => {});
+  }, []);
 
   // Load a specific run and populate conversation
   const loadRun = useCallback(async (id: string) => {
@@ -2515,6 +2533,7 @@ function App() {
           ...(selected
             ? { model: selected.model, provider: selected.provider }
             : {}),
+          ...(activeProject ? { projectId: activeProject.id } : {}),
         });
         currentRunId = run.id;
         newRunCreatedAt = run.createdAt;
@@ -4849,6 +4868,17 @@ function App() {
               runs={runs}
               currentRunId={runId}
               processingRunIds={processingRunIds}
+              activeProject={activeProject}
+              projects={projects}
+              onSelectProject={async (projectId) => {
+                await window.ipc.invoke("projects:set-active", { projectId });
+                const updated = projectId
+                  ? projects.find((p) => p.id === projectId) ?? null
+                  : null;
+                setActiveProject(updated);
+                loadRuns(projectId);
+              }}
+              onCreateProject={() => setProjectDialogOpen(true)}
               tasksActions={{
                 onNewChat: handleNewChatTab,
                 onSelectRun: (runIdToLoad) => {
@@ -5830,6 +5860,32 @@ function App() {
           onChatSubmit={submitFromPalette}
         />
       </SidebarSectionProvider>
+      <ProjectDialog
+        open={projectDialogOpen}
+        onOpenChange={(open) => {
+          setProjectDialogOpen(open);
+          if (!open) setEditingProject(null);
+        }}
+        project={editingProject}
+        onSave={async (data) => {
+          try {
+            if (editingProject) {
+              await window.ipc.invoke("projects:update", {
+                projectId: editingProject.id,
+                updates: data,
+              });
+            } else {
+              const project = await window.ipc.invoke("projects:create", data);
+              await window.ipc.invoke("projects:set-active", { projectId: project.id });
+              setActiveProject(project);
+            }
+            const result = await window.ipc.invoke("projects:list", null);
+            setProjects(result.projects);
+          } catch (err) {
+            console.error("Failed to save project:", err);
+          }
+        }}
+      />
       <Toaster />
       <OnboardingModal
         open={showOnboarding}
