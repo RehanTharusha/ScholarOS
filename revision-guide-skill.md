@@ -1,6 +1,6 @@
 ---
 name: revision-guide
-description: Generate a comprehensive, beautifully styled HTML revision guide for any college module or subject. Reads all lecture pages, exam analysis, and concept pages to produce a self-contained HTML page with exam weight badges, comparison tables, memory hooks, SVG diagrams, step-by-step methods, interactive nav, and a quick-fire checklist. Also generates a markdown companion. Triggers on "revision guide", "study guide", "exam prep", "revision page", "make me a revision", "create a study guide for [module]".
+description: Generate a comprehensive, beautifully styled HTML revision guide for any college module or subject. Reads all lecture pages, exam analysis, and concept pages to produce a self-contained HTML page with exam weight badges, comparison tables, memory hooks, SVG diagrams, step-by-step methods, interactive nav, and a quick-fire checklist. Uses the kami design language (warm parchment, ink-blue accent, serif-led hierarchy). Also generates a markdown companion. Triggers on "revision guide", "study guide", "exam prep", "revision page", "make me a revision", "create a study guide for [module]".
 ---
 
 # Revision Guide Skill
@@ -93,32 +93,40 @@ Structure:
 
 ### Step 5: Generate the HTML revision page
 
-Create `artifacts/{Module Name} Revision Guide.html` — a fully self-contained, beautifully styled HTML file.
+Create `artifacts/{Module Name} Revision Guide.html` — a fully self-contained, beautifully styled HTML file using the **kami** design language (warm parchment canvas, ink-blue accent, serif-led hierarchy), while keeping the dynamic, interactive revision guide experience with sticky nav, scroll tracking, hover effects, and card grids.
 
-#### Required HTML design spec:
+#### Required HTML design spec (kami design language):
 
-**Color scheme** (light mode):
-- Background: `#f5f7fa`
-- Surfaces: `#ffffff` / `#eef1f6`
-- Borders: `#d0d6e1`
-- Text: `#1a1d26` / `#5a6070`
-- Accent gradient: `#6c8cff` → `#a78bfa` (blue to purple)
-- Tag colors: green `#34d399`, red `#f87171`, blue `#60a5fa`, purple `#c084fc`, amber `#fbbf24`, teal `#2dd4bf`
+**Color scheme** (warm parchment / ink-blue palette):
+- Background: `#f5f0e8` (warm parchment)
+- Surfaces: `#ffffff` / `#ede8de` (warm off-white)
+- Borders: `#d9d0c0` (warm tan)
+- Text: `#1a1a1a` (deep charcoal) / `#6b6258` (warm gray)
+- Accent: `#1e3a5f` (ink blue) — single solid color, no gradient
+- Accent light: `#e8edf4` (ink-blue tint for backgrounds)
+- Tag colors: sage `#7a9e7e`, brick `#b85450`, slate `#6b7b9e`, plum `#8b6f9e`, ochre `#c4913a`, teal `#4f8a8a`
 
-**Header**: Light gradient background, module title with gradient text, subtitle, badge pills for exam metadata
+**Typography** (serif-led):
+- Font stack: Charter, Georgia, Palatino, "Times New Roman", serif — same stack for both headings and body
+- No separate sans-serif fallback; one typeface family per page
+- Heading sizes: 2.4rem (h1), 1.6rem (h2), 1.3rem (h3), 1.1rem (h4)
+- Body: 0.95rem, 1.55 line-height
+- Tight tracking for headings: letter-spacing -0.01em
 
-**Sticky nav**: Horizontal scrollable links to each week/ topic section, with scroll-position highlight via JS
+**Header**: Warm parchment background, bottom border with ink-blue double line, module title in serif with ink-blue color, subtitle and metadata in muted warm gray, badge pills with ink-blue border
+
+**Sticky nav**: Horizontal scrollable links to each week/topic section, with scroll-position highlight via JS — nav has ink-blue bottom bar, active link colored ink-blue with a small triangular indicator
 
 **Content cards and tables**:
-- `.exam-critical` red-bordered box for "always appears" or high-stakes warnings
-- `.memory-hook` purple-bordered box with 💡 icon for memory aids
-- `.highlight` blocks for general callouts (blue), important (amber), tips (green), exam (red)
-- `.card-grid` for showing sets of items (e.g. 5 computer system components, 5 governance elements)
-- Tables with `thead` styling and hover rows for comparisons (ERP/CRM/SCM, LAN/MAN/WAN, etc.)
+- `.exam-critical` ink-blue bordered box with `#e8edf4` tinted background for high-stakes warnings
+- `.memory-hook` plum-bordered box with 💡 icon and warm `#f0ece4` background for memory aids
+- `.highlight` blocks for general callouts (ink-blue `#e8edf4` bg), important (ochre `#f5ede0` bg), tips (sage `#eaf0ea` bg), exam (brick `#f4e8e8` bg)
+- `.card-grid` for showing sets of items with subtle ink-blue border on hover and warm surface shift
+- Tables with `#ede8de` thead background, ink-blue header text, hover highlight on rows
 - `.two-col` grid layout for side-by-side content (e.g. Zara vs Tesla cases)
-- `.steps` ordered list with numbered badges for sequential methods (e.g. 5-step ER diagram method)
+- `.steps` ordered list with ink-blue numbered badges for sequential methods
 
-**Topic frequency in nav bar**: each nav item should show the exam weight via a colored dot or indicator
+**Topic frequency in nav bar**: each nav item shows the exam weight via a small colored dot — brick for Always, ochre for Very High, slate for Regular, teal for Occasional
 
 **Diagrams**: For topics that have SVG diagrams mapped in Step 3.5, embed them as:
 ```html
@@ -129,16 +137,17 @@ Create `artifacts/{Module Name} Revision Guide.html` — a fully self-contained,
   <figcaption>Description of what the diagram shows</figcaption>
 </figure>
 ```
-- Add CSS classes `.econ-diagram` and `.econ-diagram-figure` to the `<style>` block (see `references/diagrams.md` for the CSS)
+- Add CSS classes `.econ-diagram` and `.econ-diagram-figure` to the `<style>` block
 - Use `<figure>` wrapping for semantic HTML and centered layout
+- Figure background: warm `#f5f0e8` surface, ink-blue thin border
 - Adjust axis labels and curve labels to match the specific topic being discussed
 - Keep all SVG inline — no external image files
 
-**Checklist section**: Two-column grid of `.checklist` lists with `□` prefix bullets for all revision items
+**Checklist section**: Two-column grid of `.checklist` lists with `□` prefix bullets for all revision items, checked items in ink-blue
 
-**Footer**: Module name, attribution
+**Footer**: Thin ink-blue top border, module name in small serif, centered, attribution in warm gray
 
-**JavaScript**: Sticky nav scroll-highlight that tracks which section is in view
+**JavaScript**: Sticky nav scroll-highlight that tracks which section is in view; smooth scroll on nav link click; optional back-to-top button per section
 
 ### Step 6: Update indexes and log
 
@@ -149,19 +158,20 @@ Create `artifacts/{Module Name} Revision Guide.html` — a fully self-contained,
 ## Design rules
 
 - All CSS must be inline in a single `<style>` block in the HTML `<head>` — no external dependencies
-- No JavaScript frameworks — vanilla JS only for the scroll-highlight nav
+- No JavaScript frameworks — vanilla JS only for the scroll-highlight nav and interactive behaviors
 - Responsive: tables should scroll horizontally on narrow screens if needed
-- The `.two-col` grid should collapse to single column at 600px
-- Use CSS `:root` variables for the color scheme so light/dark can be toggled by swapping the block
-- Every exam weight badge should be color-coded: red for "Always", amber for "Very High", blue for "Regular", teal for "Occasional"
+- The `.two-col` grid should collapse to single column at 640px
+- Use CSS `:root` variables for the full color palette (warm parchment / ink-blue)
+- Every exam weight badge should be color-coded: brick for "Always", ochre for "Very High", slate for "Regular", teal for "Occasional"
 - Tables must use consistent styling: `var(--surface2)` for `thead`, `var(--border)` for borders, hover highlight on rows
-- Cards in `.card-grid` should have subtle hover effects (translateY(-1px), border color change)
+- Cards in `.card-grid` should have subtle hover effects (translateY(-1px), ink-blue border color change, background shift to warm surface)
+- All interactive elements must work without a network connection (inline SVG, inline CSS, vanilla JS)
 
 ## Diagram rules
 
 - All SVG must be inline — no external files or `<img>` tags referencing files
 - Use viewBox `0 0 400 300` as the standard canvas size (except PED comparison which uses wider layout)
-- Add `.econ-diagram-figure` styling for centered layout with italic captions
+- Add `.econ-diagram-figure` styling for centered layout with italic captions, warm `#f5f0e8` background, ink-blue thin border
 - Add `.econ-diagram` styling with `max-width: 480px; margin: 16px auto; display: block;`
 - Color convention: Demand curves = `#3b82f6` (blue), Supply curves = `#ef4444` (red), Government/Tax = `#f59e0b` (amber), Subsidy/Social optimum = `#34d399` (green), Social cost/benefit = `#8b5cf6` (purple)
 - Label every axis, curve, equilibrium point, and shaded area
@@ -174,4 +184,4 @@ Create `artifacts/{Module Name} Revision Guide.html` — a fully self-contained,
 
 - User only wants a quick summary, not a full revision page
 - Module has no existing lectures or content in the vault
-- User wants a PDF or printed document (use kami skill instead for that)
+- User wants a PDF or printed document (use the Presentations skill instead for that)
