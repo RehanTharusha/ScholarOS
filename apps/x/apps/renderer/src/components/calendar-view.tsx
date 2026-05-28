@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -65,8 +64,18 @@ const TYPE_LABELS: Record<Task["type"], string> = {
 
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 function getDaysInMonth(year: number, month: number): number {
@@ -87,7 +96,7 @@ type CalendarViewProps = {
 
 export function CalendarView({ onSelectFile }: CalendarViewProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -143,7 +152,11 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
   }, [firstDay, daysInMonth]);
 
   const today = new Date();
-  const todayKey = formatDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayKey = formatDateKey(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
 
   const prevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -166,7 +179,13 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
         description: newTask.description || undefined,
       });
       setIsCreateOpen(false);
-      setNewTask({ title: "", due: "", dueTime: "", type: "manual", description: "" });
+      setNewTask({
+        title: "",
+        due: "",
+        dueTime: "",
+        type: "manual",
+        description: "",
+      });
       await loadTasks();
     } catch (err) {
       console.error("Failed to create task:", err);
@@ -257,12 +276,19 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
           <div className="grid grid-cols-7 gap-px rounded-xl border border-border bg-border/50 overflow-hidden">
             {calendarDays.map((day, i) => {
               if (day === null) {
-                return <div key={`empty-${i}`} className="bg-background min-h-[72px]" />;
+                return (
+                  <div
+                    key={`empty-${i}`}
+                    className="bg-background min-h-[72px]"
+                  />
+                );
               }
 
               const dateStr = formatDateKey(year, month, day);
               const dayTasks = tasksByDate.get(dateStr) || [];
-              const pendingDayTasks = dayTasks.filter((t) => t.status === "pending");
+              const pendingDayTasks = dayTasks.filter(
+                (t) => t.status === "pending",
+              );
               const isToday = dateStr === todayKey;
               const isSelected = dateStr === selectedDate;
 
@@ -315,11 +341,14 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">
-                  {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
+                  {new Date(selectedDate + "T00:00:00").toLocaleDateString(
+                    "en-US",
+                    {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    },
+                  )}
                 </h3>
                 <Button
                   variant="ghost"
@@ -331,7 +360,9 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
                 </Button>
               </div>
               {selectedTasks.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No tasks on this day.</p>
+                <p className="text-xs text-muted-foreground">
+                  No tasks on this day.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {selectedTasks.map((task) => (
@@ -348,7 +379,9 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-foreground">Upcoming</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Upcoming
+              </h3>
               {upcomingTasks.length === 0 ? (
                 <AcademicEmptyState
                   title="No upcoming tasks"
@@ -393,7 +426,9 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Title</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Title
+              </label>
               <Input
                 placeholder="Assignment, exam, lecture..."
                 value={newTask.title}
@@ -404,7 +439,9 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">Due date</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Due date
+                </label>
                 <Input
                   type="date"
                   value={newTask.due}
@@ -427,7 +464,9 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Type</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Type
+              </label>
               <Select
                 value={newTask.type}
                 onValueChange={(val) =>
@@ -445,7 +484,10 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
                     <SelectItem key={key} value={key}>
                       <span className="flex items-center gap-2">
                         <span
-                          className={cn("size-2 rounded-full", TYPE_COLORS[key as Task["type"]])}
+                          className={cn(
+                            "size-2 rounded-full",
+                            TYPE_COLORS[key as Task["type"]],
+                          )}
                         />
                         {label}
                       </span>
@@ -462,7 +504,10 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
                 placeholder="Additional details..."
                 value={newTask.description}
                 onChange={(e) =>
-                  setNewTask((prev) => ({ ...prev, description: e.target.value }))
+                  setNewTask((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -471,7 +516,10 @@ export function CalendarView({ onSelectFile }: CalendarViewProps) {
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateTask} disabled={!newTask.title || !newTask.due}>
+            <Button
+              onClick={handleCreateTask}
+              disabled={!newTask.title || !newTask.due}
+            >
               Create
             </Button>
           </DialogFooter>

@@ -14,7 +14,6 @@ import {
   createTextNode,
   duplicateNodes,
   getNodeColorStyle,
-  removeEdges,
   removeNodes,
   updateNodeFields,
   COLOR_PRESETS,
@@ -105,11 +104,7 @@ function sideDir(side: NodeSide) {
   }
 }
 
-function closestSide(
-  nx: number,
-  ny: number,
-  n: CanvasNode,
-): NodeSide {
+function closestSide(nx: number, ny: number, n: CanvasNode): NodeSide {
   const cx = n.x + n.width / 2;
   const cy = n.y + n.height / 2;
   const dx = nx - cx;
@@ -138,7 +133,11 @@ const SIDES: NodeSide[] = ["top", "right", "bottom", "left"];
 const HANDLE_SIZE = 8;
 const DOT_SIZE = 10;
 
-export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewProps) {
+export function CanvasView({
+  data,
+  onDataChange,
+  readOnly = false,
+}: CanvasViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -209,9 +208,16 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       const delta = -e.deltaY * ZOOM_SENS;
-      const nz = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, viewport.zoom * (1 + delta)));
+      const nz = Math.min(
+        MAX_ZOOM,
+        Math.max(MIN_ZOOM, viewport.zoom * (1 + delta)),
+      );
       const s = nz / viewport.zoom;
-      setViewport({ x: cx - (cx - viewport.x) * s, y: cy - (cy - viewport.y) * s, zoom: nz });
+      setViewport({
+        x: cx - (cx - viewport.x) * s,
+        y: cy - (cy - viewport.y) * s,
+        zoom: nz,
+      });
     },
     [viewport],
   );
@@ -224,11 +230,17 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
   }, []);
 
   const zoomToFit = useCallback(() => {
-    if (nodes.length === 0) { setViewport({ x: 0, y: 0, zoom: 1 }); return; }
+    if (nodes.length === 0) {
+      setViewport({ x: 0, y: 0, zoom: 1 });
+      return;
+    }
     const c = containerRef.current;
     if (!c) return;
     const { width: cw, height: ch } = c.getBoundingClientRect();
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const n of nodes) {
       if (n.x < minX) minX = n.x;
       if (n.y < minY) minY = n.y;
@@ -270,7 +282,13 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
       if (connectDot) {
         const nodeId = connectDot.getAttribute("data-node-id")!;
         const side = connectDot.getAttribute("data-side")! as NodeSide;
-        setInteractionBoth({ type: "connecting", fromNode: nodeId, fromSide: side, worldX: wp.x, worldY: wp.y });
+        setInteractionBoth({
+          type: "connecting",
+          fromNode: nodeId,
+          fromSide: side,
+          worldX: wp.x,
+          worldY: wp.y,
+        });
         e.stopPropagation();
         return;
       }
@@ -327,7 +345,13 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
       }
 
       setSelectedIds(new Set());
-      setInteractionBoth({ type: "panning", sx: e.clientX, sy: e.clientY, vx: currentViewport.x, vy: currentViewport.y });
+      setInteractionBoth({
+        type: "panning",
+        sx: e.clientX,
+        sy: e.clientY,
+        vx: currentViewport.x,
+        vy: currentViewport.y,
+      });
     },
     [readOnly],
   );
@@ -359,7 +383,11 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
         let updated = currentData;
         for (const id of selectedIdsRef.current) {
           const n = currentNodes.find((nd) => nd.id === id);
-          if (n) updated = updateNodeFields(updated, id, { x: n.x + diffX, y: n.y + diffY });
+          if (n)
+            updated = updateNodeFields(updated, id, {
+              x: n.x + diffX,
+              y: n.y + diffY,
+            });
         }
         pushDataChange(updated);
         return;
@@ -371,10 +399,23 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
         let { nx, ny, nw, nh } = ict;
         const h = ict.handle;
         if (h.includes("e")) nw = Math.max(80, ict.nw + dx);
-        if (h.includes("w")) { nw = Math.max(80, ict.nw - dx); nx = ict.nx + dx; }
+        if (h.includes("w")) {
+          nw = Math.max(80, ict.nw - dx);
+          nx = ict.nx + dx;
+        }
         if (h.includes("s")) nh = Math.max(40, ict.nh + dy);
-        if (h.includes("n")) { nh = Math.max(40, ict.nh - dy); ny = ict.ny + dy; }
-        pushDataChange(updateNodeFields(currentData, ict.nodeId, { x: Math.round(nx), y: Math.round(ny), width: Math.round(nw), height: Math.round(nh) }));
+        if (h.includes("n")) {
+          nh = Math.max(40, ict.nh - dy);
+          ny = ict.ny + dy;
+        }
+        pushDataChange(
+          updateNodeFields(currentData, ict.nodeId, {
+            x: Math.round(nx),
+            y: Math.round(ny),
+            width: Math.round(nw),
+            height: Math.round(nh),
+          }),
+        );
         return;
       }
 
@@ -413,7 +454,9 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
             const toNode = currentNodes.find((n) => n.id === toId);
             if (toNode) {
               const c = containerRef.current;
-              const wp = c ? worldPos(e.clientX, e.clientY, c, vp) : { x: 0, y: 0 };
+              const wp = c
+                ? worldPos(e.clientX, e.clientY, c, vp)
+                : { x: 0, y: 0 };
               const side = closestSide(wp.x, wp.y, toNode);
               const edge = createEdge(ict.fromNode, toId, {
                 fromSide: ict.fromSide,
@@ -439,19 +482,16 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
     [nodes],
   );
 
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const target = e.target as HTMLElement;
-      const nodeEl = target.closest("[data-canvas-node]");
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        nodeId: nodeEl?.getAttribute("data-canvas-node") ?? undefined,
-      });
-    },
-    [],
-  );
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const target = e.target as HTMLElement;
+    const nodeEl = target.closest("[data-canvas-node]");
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      nodeId: nodeEl?.getAttribute("data-canvas-node") ?? undefined,
+    });
+  }, []);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
@@ -490,7 +530,7 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
       // OS file drop
       const files = e.dataTransfer.files;
       if (files.length > 0) {
-        handleOSFileDrop(files, wp, data, commitMutation, containerRef);
+        handleOSFileDrop(files, wp, data, commitMutation);
         return;
       }
 
@@ -526,7 +566,11 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
   const setNodeColor = useCallback(
     (color: string) => {
       for (const id of selectedIds) {
-        pushDataChange(updateNodeFields(dataRef.current, id, { color } as Partial<CanvasNode>));
+        pushDataChange(
+          updateNodeFields(dataRef.current, id, {
+            color,
+          } as Partial<CanvasNode>),
+        );
       }
       commitMutation(dataRef.current);
       closeContextMenu();
@@ -536,7 +580,9 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
 
   const clearNodeColor = useCallback(() => {
     for (const id of selectedIds) {
-      pushDataChange(updateNodeFields(dataRef.current, id, { color: undefined }));
+      pushDataChange(
+        updateNodeFields(dataRef.current, id, { color: undefined }),
+      );
     }
     commitMutation(dataRef.current);
     closeContextMenu();
@@ -570,7 +616,10 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
     const handler = (e: KeyboardEvent) => {
       if (editingNodeId) return;
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (contextMenu) { closeContextMenuRef.current(); return; }
+        if (contextMenu) {
+          closeContextMenuRef.current();
+          return;
+        }
         deleteSelectedRef.current();
         e.preventDefault();
         return;
@@ -611,24 +660,32 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
 
   const handleTextEditBlur = useCallback(
     (nodeId: string, text: string) => {
-      commitMutation(updateNodeFields(dataRef.current, nodeId, { text } as Partial<CanvasNode>));
+      commitMutation(
+        updateNodeFields(dataRef.current, nodeId, {
+          text,
+        } as Partial<CanvasNode>),
+      );
       setEditingNodeId(null);
     },
     [commitMutation],
   );
 
-  const cursor = interaction.type === "panning"
-    ? "grabbing"
-    : interaction.type === "connecting"
-      ? "crosshair"
-      : interaction.type === "dragging"
-        ? "move"
-        : interaction.type === "resizing"
-          ? "nw-resize"
-          : "default";
+  const cursor =
+    interaction.type === "panning"
+      ? "grabbing"
+      : interaction.type === "connecting"
+        ? "crosshair"
+        : interaction.type === "dragging"
+          ? "move"
+          : interaction.type === "resizing"
+            ? "nw-resize"
+            : "default";
 
   const selectedArr = useMemo(() => Array.from(selectedIds), [selectedIds]);
-  const selectedNode = selectedArr.length === 1 ? nodes.find((n) => n.id === selectedArr[0]) : null;
+  const selectedNode =
+    selectedArr.length === 1
+      ? nodes.find((n) => n.id === selectedArr[0])
+      : null;
 
   return (
     <div
@@ -641,14 +698,18 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
       onPointerUp={handlePointerUp}
       onContextMenu={handleContextMenu}
       onDoubleClick={handleCanvasDoubleClick}
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
       onDrop={handleDrop}
     >
       {/* Grid */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: "radial-gradient(circle, var(--muted-foreground) 1.5px, transparent 1.5px)",
+          backgroundImage:
+            "radial-gradient(circle, var(--muted-foreground) 1.5px, transparent 1.5px)",
           backgroundSize: `${GRID_SIZE * viewport.zoom}px ${GRID_SIZE * viewport.zoom}px`,
           backgroundPosition: `${viewport.x % (GRID_SIZE * viewport.zoom)}px ${viewport.y % (GRID_SIZE * viewport.zoom)}px`,
           opacity: 0.35,
@@ -666,8 +727,18 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
         {/* SVG for edges */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
           <defs>
-            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="var(--muted-foreground)" />
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="10"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon
+                points="0 0, 10 3.5, 0 7"
+                fill="var(--muted-foreground)"
+              />
             </marker>
           </defs>
           {edges.map((edge) => (
@@ -675,7 +746,13 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
           ))}
           {/* Ghost edge while connecting */}
           {interaction.type === "connecting" && (
-            <GhostEdge fromNode={interaction.fromNode} fromSide={interaction.fromSide} toX={interaction.worldX} toY={interaction.worldY} nodes={nodes} />
+            <GhostEdge
+              fromNode={interaction.fromNode}
+              fromSide={interaction.fromSide}
+              toX={interaction.worldX}
+              toY={interaction.worldY}
+              nodes={nodes}
+            />
           )}
         </svg>
 
@@ -687,15 +764,17 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
             isSelected={selectedIds.has(node.id)}
             isEditing={editingNodeId === node.id}
             isHovered={hoveredNode === node.id}
-            onPointerDown={(e) => {
-              // handled by canvas-level pointerDown
-            }}
             onClick={handleNodeClick(selectedIds, setSelectedIds)}
             onDoubleClick={handleNodeDoubleClick}
             onTextEditBlur={handleTextEditBlur}
             onHover={setHoveredNode}
             onNodeResize={(id, w, h) => {
-              commitMutation(updateNodeFields(dataRef.current, id, { width: w, height: h } as any));
+              commitMutation(
+                updateNodeFields(dataRef.current, id, {
+                  width: w,
+                  height: h,
+                } as any),
+              );
             }}
           />
         ))}
@@ -738,9 +817,7 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
       </div>
 
       {/* Zoom indicator (bottom-right) */}
-      <div
-        className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded border border-border z-20"
-      >
+      <div className="absolute bottom-4 right-4 text-xs text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded border border-border z-20">
         {Math.round(viewport.zoom * 100)}%
       </div>
 
@@ -755,10 +832,33 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
             {contextMenu.nodeId ? (
               <>
                 {selectedNode?.type === "text" && (
-                  <ContextMenuItem icon={<Type className="size-4" />} label="Edit" onClick={() => { setEditingNodeId(contextMenu.nodeId!); closeContextMenu(); }} />
+                  <ContextMenuItem
+                    icon={<Type className="size-4" />}
+                    label="Edit"
+                    onClick={() => {
+                      setEditingNodeId(contextMenu.nodeId!);
+                      closeContextMenu();
+                    }}
+                  />
                 )}
-                <ContextMenuItem icon={<Copy className="size-4" />} label="Duplicate" onClick={() => { duplicateSelected(); closeContextMenu(); }} shortcut="⌘D" />
-                <ContextMenuItem icon={<Trash2 className="size-4" />} label="Delete" onClick={() => { deleteSelected(); closeContextMenu(); }} shortcut="⌫" />
+                <ContextMenuItem
+                  icon={<Copy className="size-4" />}
+                  label="Duplicate"
+                  onClick={() => {
+                    duplicateSelected();
+                    closeContextMenu();
+                  }}
+                  shortcut="⌘D"
+                />
+                <ContextMenuItem
+                  icon={<Trash2 className="size-4" />}
+                  label="Delete"
+                  onClick={() => {
+                    deleteSelected();
+                    closeContextMenu();
+                  }}
+                  shortcut="⌫"
+                />
                 <div className="h-px bg-border my-1" />
                 <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-2">
                   <Palette className="size-3" />
@@ -785,8 +885,22 @@ export function CanvasView({ data, onDataChange, readOnly = false }: CanvasViewP
               </>
             ) : (
               <>
-                <ContextMenuItem icon={<Type className="size-4" />} label="Add text note" onClick={() => { addTextNode(); closeContextMenu(); }} />
-                <ContextMenuItem icon={<Maximize2 className="size-4" />} label="Zoom to fit" onClick={() => { zoomToFit(); closeContextMenu(); }} />
+                <ContextMenuItem
+                  icon={<Type className="size-4" />}
+                  label="Add text note"
+                  onClick={() => {
+                    addTextNode();
+                    closeContextMenu();
+                  }}
+                />
+                <ContextMenuItem
+                  icon={<Maximize2 className="size-4" />}
+                  label="Zoom to fit"
+                  onClick={() => {
+                    zoomToFit();
+                    closeContextMenu();
+                  }}
+                />
               </>
             )}
           </div>
@@ -822,6 +936,7 @@ function NodeWrapper({
   isSelected,
   isEditing,
   isHovered,
+  onPointerDown,
   onClick,
   onDoubleClick,
   onTextEditBlur,
@@ -832,6 +947,7 @@ function NodeWrapper({
   isSelected: boolean;
   isEditing: boolean;
   isHovered: boolean;
+  onPointerDown?: (e: React.PointerEvent) => void;
   onClick: (e: React.MouseEvent, id: string) => void;
   onDoubleClick: (e: React.MouseEvent, id: string) => void;
   onTextEditBlur: (id: string, text: string) => void;
@@ -847,11 +963,10 @@ function NodeWrapper({
       data-canvas-node={node.id}
       className={cn(
         "absolute overflow-hidden",
-        isImg
-          ? ""
-          : "rounded-lg border shadow-sm",
+        isImg ? "" : "rounded-lg border shadow-sm",
         isSelected && !isImg ? "ring-2 ring-primary" : "",
         isSelected && isImg ? "ring-1 ring-primary/50" : "",
+        isHovered ? "ring-1 ring-accent/30" : "",
         node.type === "group"
           ? "border-dashed bg-muted/20"
           : colorStyle
@@ -874,6 +989,9 @@ function NodeWrapper({
       onDoubleClick={(e) => onDoubleClick(e, node.id)}
       onMouseEnter={() => onHover(node.id)}
       onMouseLeave={() => onHover(null)}
+      onPointerDown={(e) => {
+        onPointerDown?.(e);
+      }}
     >
       {/* Header bar for non-group, non-image nodes */}
       {node.type !== "group" && !isImg && (
@@ -890,13 +1008,18 @@ function NodeWrapper({
           }}
         >
           {node.type === "text" && "Text"}
-            {node.type === "file" && ((node as any).file?.split("/").pop() ?? "File")}
+          {node.type === "file" &&
+            ((node as any).file?.split("/").pop() ?? "File")}
           {node.type === "link" && "Link"}
         </div>
       )}
 
       {/* Content */}
-      <div className={cn(node.type !== "group" && !isImg ? "h-[calc(100%-32px)]" : "h-full")}>
+      <div
+        className={cn(
+          node.type !== "group" && !isImg ? "h-[calc(100%-32px)]" : "h-full",
+        )}
+      >
         {node.type === "text" && (
           <TextNodeContent
             node={node}
@@ -1005,7 +1128,9 @@ function TextNodeContent({
       <textarea
         ref={ref}
         defaultValue={node.text}
-        onChange={(e) => { valueRef.current = e.target.value; }}
+        onChange={(e) => {
+          valueRef.current = e.target.value;
+        }}
         onBlur={(e) => {
           valueRef.current = e.target.value;
           onBlur(node.id, e.target.value);
@@ -1027,13 +1152,24 @@ function TextNodeContent({
   return (
     <div className="p-3 text-sm whitespace-pre-wrap break-words h-full overflow-auto">
       {node.text || (
-        <span className="text-muted-foreground italic">Empty note — double-click to edit</span>
+        <span className="text-muted-foreground italic">
+          Empty note — double-click to edit
+        </span>
       )}
     </div>
   );
 }
 
-const imageExts = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico"]);
+const imageExts = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "ico",
+]);
 const imageCache = new Map<string, string>();
 
 function isImageNode(node: CanvasNode): boolean {
@@ -1046,8 +1182,16 @@ function isImageNode(node: CanvasNode): boolean {
 const MAX_IMG_W = 800;
 const MAX_IMG_H = 600;
 
-function ImagePreview({ filePath, onResize }: { filePath: string; onResize?: (w: number, h: number) => void }) {
-  const [src, setSrc] = useState<string | null>(imageCache.get(filePath) ?? null);
+function ImagePreview({
+  filePath,
+  onResize,
+}: {
+  filePath: string;
+  onResize?: (w: number, h: number) => void;
+}) {
+  const [src, setSrc] = useState<string | null>(
+    imageCache.get(filePath) ?? null,
+  );
 
   useEffect(() => {
     if (src) return;
@@ -1059,7 +1203,10 @@ function ImagePreview({ filePath, onResize }: { filePath: string; onResize?: (w:
         const b64 = result?.data;
         if (!b64) return;
         const ext = filePath.split(".").pop()?.toLowerCase() ?? "png";
-        const mime = ext === "svg" ? "image/svg+xml" : `image/${ext === "jpg" ? "jpeg" : ext}`;
+        const mime =
+          ext === "svg"
+            ? "image/svg+xml"
+            : `image/${ext === "jpg" ? "jpeg" : ext}`;
         const dataUrl = `data:${mime};base64,${b64}`;
         imageCache.set(filePath, dataUrl);
         setSrc(dataUrl);
@@ -1091,11 +1238,22 @@ function ImagePreview({ filePath, onResize }: { filePath: string; onResize?: (w:
   }
 
   return (
-    <img src={src} alt="" className="w-full h-full object-contain" onLoad={handleImgLoad} />
+    <img
+      src={src}
+      alt=""
+      className="w-full h-full object-contain"
+      onLoad={handleImgLoad}
+    />
   );
 }
 
-function FileNodeContent({ node, onNodeResize }: { node: any; onNodeResize?: (w: number, h: number) => void }) {
+function FileNodeContent({
+  node,
+  onNodeResize,
+}: {
+  node: any;
+  onNodeResize?: (w: number, h: number) => void;
+}) {
   const fileName = node.file?.split("/").pop() ?? "File";
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
 
@@ -1121,7 +1279,9 @@ function LinkNodeContent({ node }: { node: any }) {
   return (
     <div className="p-3 text-sm flex flex-col gap-1 h-full overflow-auto">
       <div className="font-medium text-foreground truncate">{hostname}</div>
-      <div className="text-muted-foreground text-xs truncate break-all">{node.url}</div>
+      <div className="text-muted-foreground text-xs truncate break-all">
+        {node.url}
+      </div>
     </div>
   );
 }
@@ -1143,8 +1303,12 @@ function EdgePath({ edge, nodes }: { edge: CanvasEdge; nodes: CanvasNode[] }) {
   const to = nodes.find((n) => n.id === edge.toNode);
   if (!from || !to) return null;
 
-  const fromSide = edge.fromSide ?? closestSide(to.x + to.width / 2, to.y + to.height / 2, from);
-  const toSide = edge.toSide ?? closestSide(from.x + from.width / 2, from.y + from.height / 2, to);
+  const fromSide =
+    edge.fromSide ??
+    closestSide(to.x + to.width / 2, to.y + to.height / 2, from);
+  const toSide =
+    edge.toSide ??
+    closestSide(from.x + from.width / 2, from.y + from.height / 2, to);
 
   const fp = sideCenter(from, fromSide);
   const tp = sideCenter(to, toSide);
@@ -1219,12 +1383,13 @@ async function handleOSFileDrop(
   dropPos: { x: number; y: number },
   currentData: CanvasData,
   commit: (data: CanvasData) => void,
-  containerRef: React.RefObject<HTMLDivElement | null>,
 ) {
   const { ipc } = window;
   if (!ipc) return;
 
-  await ipc.invoke("workspace:mkdir", { path: "attachments", recursive: true }).catch(() => {});
+  await ipc
+    .invoke("workspace:mkdir", { path: "attachments", recursive: true })
+    .catch(() => {});
 
   let data = currentData;
 

@@ -1083,7 +1083,9 @@ function App() {
   );
   const fileTabIdCounterRef = useRef(0);
   const newFileTabId = () => `file-tab-${++fileTabIdCounterRef.current}`;
-  const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   const getFileTabTitle = useCallback((tab: FileTab) => {
     if (isGraphTabPath(tab.path)) return "Graph View";
@@ -4671,10 +4673,10 @@ function App() {
           if (!isDir) {
             navigateToFile(duplicatePath);
           }
-          toast("Duplicated successfully", "success");
+          toast.success("Duplicated successfully");
         } catch (err) {
           console.error("Failed to duplicate:", err);
-          toast("Failed to duplicate", "error");
+          toast.error("Failed to duplicate");
           throw err;
         }
       },
