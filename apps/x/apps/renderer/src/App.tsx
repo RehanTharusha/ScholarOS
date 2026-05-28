@@ -110,6 +110,7 @@ import { isHiddenSidebarRootEntry } from "@/config/sidebar-visibility";
 import { IngestWindow } from "@/components/ingest-window";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { HtmlViewer } from "@/components/html-viewer";
+import { getExtension, getMimeFromExtension } from "@/lib/file-utils";
 import { motion } from "motion/react";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
@@ -5416,6 +5417,14 @@ function App() {
                         </svg>
                         Open with default application
                       </button>
+                    </div>
+                  ) : /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|tiff?)$/i.test(selectedPath) && fileContent ? (
+                    <div className="flex-1 overflow-hidden flex items-center justify-center p-4">
+                      <img
+                        src={`data:${getMimeFromExtension(getExtension(selectedPath))};base64,${fileContent}`}
+                        alt={getBaseName(selectedPath)}
+                        className="max-w-full max-h-full object-contain"
+                      />
                     </div>
                   ) : (
                     <div className="flex-1 overflow-auto p-4">
