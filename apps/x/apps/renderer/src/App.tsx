@@ -1487,6 +1487,9 @@ function App() {
       }
       return;
     }
+    if (isCanvasesTabPath(selectedPath)) {
+      return;
+    }
     if (selectedPath.endsWith(".base")) {
       // Load base config from file only if not already cached
       if (!baseConfigByPath[selectedPath]) {
@@ -3106,6 +3109,16 @@ function App() {
         setSelectedPath(null);
         setIsGraphOpen(true);
         setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasesOpen(false);
+        return;
+      }
+      if (isSuggestedTopicsTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(true);
+        setIsArtifactsOpen(false);
+        setIsCanvasesOpen(false);
         return;
       }
       if (isSuggestedTopicsTabPath(tab.path)) {
@@ -3120,6 +3133,7 @@ function App() {
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(false);
         setIsArtifactsOpen(true);
+        setIsCanvasesOpen(false);
         setIsCanvasOpen(false);
         return;
       }
@@ -3128,7 +3142,18 @@ function App() {
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(false);
         setIsArtifactsOpen(false);
+        setIsCanvasesOpen(false);
         setIsCanvasOpen(true);
+        return;
+      }
+      if (isCanvasesTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasOpen(false);
+        setIsCalendarOpen(false);
+        setIsCanvasesOpen(true);
         return;
       }
       if (isCalendarTabPath(tab.path)) {
@@ -3137,12 +3162,14 @@ function App() {
         setIsSuggestedTopicsOpen(false);
         setIsArtifactsOpen(false);
         setIsCanvasOpen(false);
+        setIsCanvasesOpen(false);
         setIsCalendarOpen(true);
         return;
       }
       setIsGraphOpen(false);
       setIsSuggestedTopicsOpen(false);
       setIsArtifactsOpen(false);
+      setIsCanvasesOpen(false);
       setIsCanvasOpen(false);
       setIsCalendarOpen(false);
       setSelectedPath(tab.path);
@@ -3181,6 +3208,7 @@ function App() {
           setIsGraphOpen(false);
           setIsSuggestedTopicsOpen(false);
           setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
           setIsCanvasOpen(false);
           setIsCalendarOpen(false);
           return [];
@@ -3197,25 +3225,37 @@ function App() {
             setIsGraphOpen(true);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
             setIsCalendarOpen(false);
           } else if (isSuggestedTopicsTabPath(newActiveTab.path)) {
             setSelectedPath(null);
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(true);
             setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
             setIsCalendarOpen(false);
           } else if (isArtifactsTabPath(newActiveTab.path)) {
             setSelectedPath(null);
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(true);
+            setIsCanvasesOpen(false);
             setIsCanvasOpen(false);
             setIsCalendarOpen(false);
+          } else if (isCanvasesTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(false);
+            setIsCanvasesOpen(true);
           } else if (isCalendarTabPath(newActiveTab.path)) {
             setSelectedPath(null);
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
             setIsCanvasOpen(false);
             setIsCalendarOpen(true);
           } else if (isCanvasTabPath(newActiveTab.path)) {
@@ -3223,12 +3263,14 @@ function App() {
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
             setIsCanvasOpen(true);
             setIsCalendarOpen(false);
           } else {
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
             setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
             setIsCanvasOpen(false);
             setIsCalendarOpen(false);
             setSelectedPath(newActiveTab.path);
