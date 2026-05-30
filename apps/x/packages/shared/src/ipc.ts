@@ -23,7 +23,7 @@ import { LlmModelConfig } from "./models.js";
 import { ServiceEvent } from "./service-events.js";
 
 import { UserMessageContent } from "./message.js";
-import { RowboatApiConfig } from "./rowboat-account.js";
+import { ScholarOSApiConfig } from "./rowboat-account.js";
 import { ZListToolkitsResponse } from "./composio.js";
 import { BrowserStateSchema } from "./browser-control.js";
 // ============================================================================
@@ -317,12 +317,12 @@ const ipcSchemas = {
       ),
     }),
   },
-  "account:getRowboat": {
+  "account:getAccount": {
     req: z.null(),
     res: z.object({
       signedIn: z.boolean(),
       accessToken: z.string().nullable(),
-      config: RowboatApiConfig.nullable(),
+      config: ScholarOSApiConfig.nullable(),
     }),
   },
   "oauth:didConnect": {
@@ -361,6 +361,7 @@ const ipcSchemas = {
     req: z.null(),
     res: z.object({
       showOnboarding: z.boolean(),
+      devOverride: z.boolean().optional(),
     }),
   },
   "onboarding:markComplete": {
@@ -451,6 +452,10 @@ const ipcSchemas = {
   "shell:openPath": {
     req: z.object({ path: z.string() }),
     res: z.object({ error: z.string().optional() }),
+  },
+  "shell:revealInFolder": {
+    req: z.object({ path: z.string() }),
+    res: z.object({ success: z.literal(true) }),
   },
   "shell:readFileBase64": {
     req: z.object({ path: z.string() }),
@@ -675,6 +680,94 @@ const ipcSchemas = {
     }),
     res: z.object({
       success: z.literal(true),
+    }),
+  },
+  // Calendar / Tasks channels
+  "calendar:list": {
+    req: z.null(),
+    res: z.object({
+      tasks: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          due: z.string(),
+          dueTime: z.string().optional(),
+          type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+          status: z.enum(["pending", "done"]),
+          source: z.string().optional(),
+          description: z.string().optional(),
+          createdAt: z.string(),
+          updatedAt: z.string(),
+          completedAt: z.string().nullable(),
+        }),
+      ),
+    }),
+  },
+  "calendar:create": {
+    req: z.object({
+      title: z.string().min(1),
+      due: z.string(),
+      dueTime: z.string().optional(),
+      type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+      source: z.string().optional(),
+      description: z.string().optional(),
+    }),
+    res: z.object({
+      task: z.object({
+        id: z.string(),
+        title: z.string(),
+        due: z.string(),
+        dueTime: z.string().optional(),
+        type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+        status: z.enum(["pending", "done"]),
+        source: z.string().optional(),
+        description: z.string().optional(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        completedAt: z.string().nullable(),
+      }),
+    }),
+  },
+  "calendar:complete": {
+    req: z.object({ id: z.string() }),
+    res: z.object({
+      task: z.object({
+        id: z.string(),
+        title: z.string(),
+        due: z.string(),
+        dueTime: z.string().optional(),
+        type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+        status: z.enum(["pending", "done"]),
+        source: z.string().optional(),
+        description: z.string().optional(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        completedAt: z.string().nullable(),
+      }),
+    }),
+  },
+  "calendar:delete": {
+    req: z.object({ id: z.string() }),
+    res: z.object({ success: z.literal(true) }),
+  },
+  "calendar:upcoming": {
+    req: z.object({ days: z.number().optional() }),
+    res: z.object({
+      tasks: z.array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          due: z.string(),
+          dueTime: z.string().optional(),
+          type: z.enum(["manual", "assignment", "lecture", "deadline", "custom"]),
+          status: z.enum(["pending", "done"]),
+          source: z.string().optional(),
+          description: z.string().optional(),
+          createdAt: z.string(),
+          updatedAt: z.string(),
+          completedAt: z.string().nullable(),
+        }),
+      ),
     }),
   },
 } as const;

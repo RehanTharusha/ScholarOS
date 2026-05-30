@@ -32,6 +32,14 @@ import {
   type GraphEdge,
   type GraphNode,
 } from "@/components/graph-view";
+import { CanvasView } from "@/components/canvas-view";
+import { CalendarView } from "@/components/calendar-view";
+import {
+  parseCanvas,
+  serializeCanvas,
+  createEmptyCanvas,
+  type CanvasData,
+} from "@/lib/canvas-utils";
 import {
   BasesView,
   type BaseConfig,
@@ -40,6 +48,8 @@ import {
 import { useDebounce } from "./hooks/use-debounce";
 import { SidebarContentPanel } from "@/components/sidebar-content";
 import { SuggestedTopicsView } from "@/components/suggested-topics-view";
+import { ArtifactsView } from "@/components/artifacts-view";
+import { CanvasesView } from "@/components/canvases-view";
 import { SidebarSectionProvider } from "@/contexts/sidebar-context";
 import {
   Conversation,
@@ -104,10 +114,13 @@ import {
 import { BrowserPane } from "@/components/browser-pane/BrowserPane";
 import { VersionHistoryPanel } from "@/components/version-history-panel";
 import { FileCardProvider } from "@/contexts/file-card-context";
+import { isHiddenSidebarRootEntry } from "@/config/sidebar-visibility";
 
 import { IngestWindow } from "@/components/ingest-window";
 import { PdfViewer } from "@/components/pdf-viewer";
 import { HtmlViewer } from "@/components/html-viewer";
+import { getExtension, getMimeFromExtension } from "@/lib/file-utils";
+import { motion } from "motion/react";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
@@ -193,9 +206,13 @@ const TITLEBAR_BUTTONS_COLLAPSED = 1;
 const TITLEBAR_BUTTON_GAPS_COLLAPSED = 0;
 const GRAPH_TAB_PATH = "__scholaros_graph_view__";
 const SUGGESTED_TOPICS_TAB_PATH = "__scholar_suggested_topics__";
+const ARTIFACTS_TAB_PATH = "__scholaros_artifacts__";
 const BASES_DEFAULT_TAB_PATH = "__scholaros_bases_default__";
 
 const INGEST_TAB_PATH = "__scholar_ingest__";
+const CANVAS_TAB_PATH = "__scholaros_canvas__";
+const CANVASES_TAB_PATH = "__scholaros_canvases__";
+const CALENDAR_TAB_PATH = "__scholaros_calendar__";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -340,6 +357,10 @@ const getAncestorDirectoryPaths = (path: string): string[] => {
 const isGraphTabPath = (path: string) => path === GRAPH_TAB_PATH;
 const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
+const isArtifactsTabPath = (path: string) => path === ARTIFACTS_TAB_PATH;
+const isCanvasTabPath = (path: string) => path === CANVAS_TAB_PATH;
+const isCanvasesTabPath = (path: string) => path === CANVASES_TAB_PATH;
+const isCalendarTabPath = (path: string) => path === CALENDAR_TAB_PATH;
 
 const isBaseFilePath = (path: string) =>
   path.endsWith(".base") || path === BASES_DEFAULT_TAB_PATH;
@@ -508,22 +529,8 @@ function buildTree(entries: DirEntry[]): TreeNode[] {
   return sortNodes(roots);
 }
 
-// Top-level folders that are app plumbing, not user content.
-// Keep them out of sidebar view, but leave them in the full tree for views that
-// depend on their files (for example BasesView reads `bases/*.base`).
-const HIDDEN_SIDEBAR_ROOT_FOLDERS = new Set([
-  "agents",
-  "bases",
-  "config",
-  "events",
-  "logs",
-]);
-
 function getSidebarTree(tree: TreeNode[]): TreeNode[] {
-  return tree.filter(
-    (node) =>
-      !(node.kind === "dir" && HIDDEN_SIDEBAR_ROOT_FOLDERS.has(node.name)),
-  );
+  return tree.filter((node) => !isHiddenSidebarRootEntry(node));
 }
 
 const collectDirPaths = (nodes: TreeNode[]): string[] =>
@@ -542,17 +549,42 @@ const collectFilePaths = (nodes: TreeNode[]): string[] =>
         : [],
   );
 
+const buildDuplicatePath = (
+  sourcePath: string,
+  isDir: boolean,
+  index: number,
+) => {
+  const parts = sourcePath.split("/");
+  const leafName = parts.pop() ?? sourcePath;
+  const suffix = `-${index}`;
+
+  if (isDir) {
+    return [...parts, `${leafName}${suffix}`].join("/");
+  }
+
+  const lastDotIndex = leafName.lastIndexOf(".");
+  const baseName =
+    lastDotIndex > 0 ? leafName.slice(0, lastDotIndex) : leafName;
+  const extension = lastDotIndex > 0 ? leafName.slice(lastDotIndex) : "";
+  return [...parts, `${baseName}${suffix}${extension}`].join("/");
+};
+
 /** A snapshot of which view the user is on */
 type ViewState =
   | { type: "chat"; runId: string | null }
   | { type: "file"; path: string }
   | { type: "graph" }
-  | { type: "suggested-topics" };
+  | { type: "suggested-topics" }
+  | { type: "artifacts" }
+  | { type: "canvases" }
+  | { type: "canvas"; path: string }
+  | { type: "calendar" };
 
 function viewStatesEqual(a: ViewState, b: ViewState): boolean {
   if (a.type !== b.type) return false;
   if (a.type === "chat" && b.type === "chat") return a.runId === b.runId;
   if (a.type === "file" && b.type === "file") return a.path === b.path;
+  if (a.type === "canvas" && b.type === "canvas") return a.path === b.path;
   return true;
 }
 
@@ -664,6 +696,13 @@ function App() {
   const [isGraphOpen, setIsGraphOpen] = useState(false);
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [isSuggestedTopicsOpen, setIsSuggestedTopicsOpen] = useState(false);
+  const [isArtifactsOpen, setIsArtifactsOpen] = useState(false);
+  const [isCanvasesOpen, setIsCanvasesOpen] = useState(false);
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [canvasDataByPath, setCanvasDataByPath] = useState<
+    Record<string, CanvasData>
+  >({});
   const [isIngestProcessing, setIsIngestProcessing] = useState(false);
   const [expandedFrom, setExpandedFrom] = useState<{
     path: string | null;
@@ -794,10 +833,11 @@ function App() {
       window.ipc.invoke("oauth:getState", null),
     ])
       .then(([config, oauthState]) => {
-        const rowboatConnected = oauthState.config?.rowboat?.connected ?? false;
-        const hasVoice = !!config.deepgram || rowboatConnected;
+        const scholarosConnected =
+          oauthState.config?.scholaros?.connected ?? false;
+        const hasVoice = !!config.deepgram || scholarosConnected;
         setVoiceAvailable(hasVoice);
-        setTtsAvailable(!!config.elevenlabs || rowboatConnected);
+        setTtsAvailable(!!config.elevenlabs || scholarosConnected);
         // Pre-cache auth details so mic click skips IPC round-trips
         if (hasVoice) {
           voice.warmup();
@@ -1043,10 +1083,16 @@ function App() {
   );
   const fileTabIdCounterRef = useRef(0);
   const newFileTabId = () => `file-tab-${++fileTabIdCounterRef.current}`;
+  const canvasSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   const getFileTabTitle = useCallback((tab: FileTab) => {
     if (isGraphTabPath(tab.path)) return "Graph View";
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
+    if (isArtifactsTabPath(tab.path)) return "Artifacts";
+    if (isCalendarTabPath(tab.path)) return "Calendar";
+    if (isCanvasTabPath(tab.path)) return "Canvas";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
     if (tab.path.endsWith(".base"))
       return (
@@ -1281,12 +1327,15 @@ function App() {
       console.debug("[Renderer] loadDirectory: requesting root readdir");
       const rootEntries = await window.ipc.invoke("workspace:readdir", {
         path: "",
-        opts: { recursive: true, includeHidden: false, includeStats: true },
+        opts: { recursive: true, includeHidden: false, includeStats: false },
       });
-      console.debug(
-        `[Renderer] loadDirectory: received ${rootEntries.length} root entries`,
+      const visibleRootEntries = rootEntries.filter(
+        (entry) => !isHiddenSidebarRootEntry(entry),
       );
-      return buildTree(rootEntries);
+      console.debug(
+        `[Renderer] loadDirectory: received ${rootEntries.length} root entries, ${visibleRootEntries.length} visible`,
+      );
+      return buildTree(visibleRootEntries);
     } catch (err) {
       console.error("Failed to load directory:", err);
       return [];
@@ -1440,6 +1489,9 @@ function App() {
       }
       return;
     }
+    if (isCanvasesTabPath(selectedPath)) {
+      return;
+    }
     if (selectedPath.endsWith(".base")) {
       // Load base config from file only if not already cached
       if (!baseConfigByPath[selectedPath]) {
@@ -1468,6 +1520,41 @@ function App() {
               [selectedPath]: { ...DEFAULT_BASE_CONFIG },
             }));
           });
+      }
+      return;
+    }
+    if (selectedPath.endsWith(".canvas")) {
+      // Load canvas data from file
+      if (!canvasDataByPath[selectedPath]) {
+        window.ipc
+          .invoke("workspace:readFile", {
+            path: selectedPath,
+            encoding: "utf8",
+          })
+          .then((result: { data: string }) => {
+            const canvasData = parseCanvas(result.data);
+            setCanvasDataByPath((prev) => ({
+              ...prev,
+              [selectedPath]: canvasData,
+            }));
+            // Switch to canvas view
+            setIsCanvasOpen(true);
+            setSelectedPath(null);
+            ensureCanvasFileTab(selectedPath);
+          })
+          .catch(() => {
+            setCanvasDataByPath((prev) => ({
+              ...prev,
+              [selectedPath]: createEmptyCanvas(),
+            }));
+            setIsCanvasOpen(true);
+            setSelectedPath(null);
+            ensureCanvasFileTab(selectedPath);
+          });
+      } else {
+        setIsCanvasOpen(true);
+        setSelectedPath(null);
+        ensureCanvasFileTab(selectedPath);
       }
       return;
     }
@@ -3024,16 +3111,69 @@ function App() {
         setSelectedPath(null);
         setIsGraphOpen(true);
         setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasesOpen(false);
         return;
       }
       if (isSuggestedTopicsTabPath(tab.path)) {
         setSelectedPath(null);
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(true);
+        setIsArtifactsOpen(false);
+        setIsCanvasesOpen(false);
+        return;
+      }
+      if (isSuggestedTopicsTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(true);
+        setIsArtifactsOpen(false);
+        return;
+      }
+      if (isArtifactsTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(true);
+        setIsCanvasesOpen(false);
+        setIsCanvasOpen(false);
+        return;
+      }
+      if (isCanvasTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasesOpen(false);
+        setIsCanvasOpen(true);
+        return;
+      }
+      if (isCanvasesTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasOpen(false);
+        setIsCalendarOpen(false);
+        setIsCanvasesOpen(true);
+        return;
+      }
+      if (isCalendarTabPath(tab.path)) {
+        setSelectedPath(null);
+        setIsGraphOpen(false);
+        setIsSuggestedTopicsOpen(false);
+        setIsArtifactsOpen(false);
+        setIsCanvasOpen(false);
+        setIsCanvasesOpen(false);
+        setIsCalendarOpen(true);
         return;
       }
       setIsGraphOpen(false);
       setIsSuggestedTopicsOpen(false);
+      setIsArtifactsOpen(false);
+      setIsCanvasesOpen(false);
+      setIsCanvasOpen(false);
+      setIsCalendarOpen(false);
       setSelectedPath(tab.path);
     },
     [fileTabs, isRightPaneMaximized],
@@ -3069,6 +3209,10 @@ function App() {
           setSelectedPath(null);
           setIsGraphOpen(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(false);
           return [];
         }
         const idx = prev.findIndex((t) => t.id === tabId);
@@ -3082,13 +3226,55 @@ function App() {
             setSelectedPath(null);
             setIsGraphOpen(true);
             setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
+            setIsCalendarOpen(false);
           } else if (isSuggestedTopicsTabPath(newActiveTab.path)) {
             setSelectedPath(null);
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(true);
+            setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
+            setIsCalendarOpen(false);
+          } else if (isArtifactsTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(true);
+            setIsCanvasesOpen(false);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(false);
+          } else if (isCanvasesTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(false);
+            setIsCanvasesOpen(true);
+          } else if (isCalendarTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(true);
+          } else if (isCanvasTabPath(newActiveTab.path)) {
+            setSelectedPath(null);
+            setIsGraphOpen(false);
+            setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
+            setIsCanvasOpen(true);
+            setIsCalendarOpen(false);
           } else {
             setIsGraphOpen(false);
             setIsSuggestedTopicsOpen(false);
+            setIsArtifactsOpen(false);
+            setIsCanvasesOpen(false);
+            setIsCanvasOpen(false);
+            setIsCalendarOpen(false);
             setSelectedPath(newActiveTab.path);
           }
         }
@@ -3151,7 +3337,13 @@ function App() {
 
     handleNewChat();
     // Left-pane "new chat" should always open full chat view.
-    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
+    if (
+      selectedPath ||
+      isGraphOpen ||
+      isSuggestedTopicsOpen ||
+      isCanvasOpen ||
+      isCalendarOpen
+    ) {
       setExpandedFrom({
         path: selectedPath,
         graph: isGraphOpen,
@@ -3164,6 +3356,7 @@ function App() {
     setSelectedPath(null);
     setIsGraphOpen(false);
     setIsSuggestedTopicsOpen(false);
+    setIsCalendarOpen(false);
   }, [chatTabs, activeChatTabId, handleNewChat]);
 
   // Sidebar variant: create/switch chat tab without leaving file/graph context.
@@ -3292,7 +3485,13 @@ function App() {
 
   const handleOpenFullScreenChat = useCallback(() => {
     // Remember where we came from so the close button can return
-    if (selectedPath || isGraphOpen || isSuggestedTopicsOpen) {
+    if (
+      selectedPath ||
+      isGraphOpen ||
+      isSuggestedTopicsOpen ||
+      isCanvasOpen ||
+      isCalendarOpen
+    ) {
       setExpandedFrom({
         path: selectedPath,
         graph: isGraphOpen,
@@ -3303,19 +3502,30 @@ function App() {
     setSelectedPath(null);
     setIsGraphOpen(false);
     setIsSuggestedTopicsOpen(false);
-  }, [selectedPath, isGraphOpen, isSuggestedTopicsOpen]);
+    setIsCanvasOpen(false);
+    setIsCalendarOpen(false);
+  }, [
+    selectedPath,
+    isGraphOpen,
+    isSuggestedTopicsOpen,
+    isCanvasOpen,
+    isCalendarOpen,
+  ]);
 
   const handleCloseFullScreenChat = useCallback(() => {
     if (expandedFrom) {
       if (expandedFrom.graph) {
         setIsGraphOpen(true);
         setIsSuggestedTopicsOpen(false);
+        setIsCalendarOpen(false);
       } else if (expandedFrom.suggestedTopics) {
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(true);
+        setIsCalendarOpen(false);
       } else if (expandedFrom.path) {
         setIsGraphOpen(false);
         setIsSuggestedTopicsOpen(false);
+        setIsCalendarOpen(false);
         setSelectedPath(expandedFrom.path);
       }
       setExpandedFrom(null);
@@ -3325,10 +3535,27 @@ function App() {
 
   const currentViewState = React.useMemo<ViewState>(() => {
     if (isSuggestedTopicsOpen) return { type: "suggested-topics" };
+    if (isArtifactsOpen) return { type: "artifacts" };
+    if (isCanvasesOpen) return { type: "canvases" };
+    if (isCalendarOpen) return { type: "calendar" };
+    if (isCanvasOpen) {
+      const canvasPath = fileTabs.find((t) => isCanvasTabPath(t.path))?.path;
+      return { type: "canvas", path: canvasPath ?? CANVAS_TAB_PATH };
+    }
     if (selectedPath) return { type: "file", path: selectedPath };
     if (isGraphOpen) return { type: "graph" };
     return { type: "chat", runId };
-  }, [isSuggestedTopicsOpen, selectedPath, isGraphOpen, runId]);
+  }, [
+    isSuggestedTopicsOpen,
+    isArtifactsOpen,
+    isCanvasesOpen,
+    isCalendarOpen,
+    isCanvasOpen,
+    selectedPath,
+    isGraphOpen,
+    runId,
+    fileTabs,
+  ]);
 
   const appendUnique = useCallback((stack: ViewState[], entry: ViewState) => {
     const last = stack[stack.length - 1];
@@ -3394,6 +3621,54 @@ function App() {
     setActiveFileTabId(id);
   }, [fileTabs]);
 
+  const ensureArtifactsFileTab = useCallback(() => {
+    const existing = fileTabs.find((tab) => isArtifactsTabPath(tab.path));
+    if (existing) {
+      setActiveFileTabId(existing.id);
+      return;
+    }
+    const id = newFileTabId();
+    setFileTabs((prev) => [...prev, { id, path: ARTIFACTS_TAB_PATH }]);
+    setActiveFileTabId(id);
+  }, [fileTabs]);
+
+  const ensureCanvasFileTab = useCallback(
+    (path?: string) => {
+      const canvasPath = path ?? CANVAS_TAB_PATH;
+      const existing = fileTabs.find((tab) => tab.path === canvasPath);
+      if (existing) {
+        setActiveFileTabId(existing.id);
+        return;
+      }
+      const id = newFileTabId();
+      setFileTabs((prev) => [...prev, { id, path: canvasPath }]);
+      setActiveFileTabId(id);
+    },
+    [fileTabs],
+  );
+
+  const ensureCanvasesFileTab = useCallback(() => {
+    const existing = fileTabs.find((tab) => isCanvasesTabPath(tab.path));
+    if (existing) {
+      setActiveFileTabId(existing.id);
+      return;
+    }
+    const id = newFileTabId();
+    setFileTabs((prev) => [...prev, { id, path: CANVASES_TAB_PATH }]);
+    setActiveFileTabId(id);
+  }, [fileTabs]);
+
+  const ensureCalendarFileTab = useCallback(() => {
+    const existing = fileTabs.find((tab) => isCalendarTabPath(tab.path));
+    if (existing) {
+      setActiveFileTabId(existing.id);
+      return;
+    }
+    const id = newFileTabId();
+    setFileTabs((prev) => [...prev, { id, path: CALENDAR_TAB_PATH }]);
+    setActiveFileTabId(id);
+  }, [fileTabs]);
+
   const applyViewState = useCallback(
     async (view: ViewState) => {
       switch (view.type) {
@@ -3401,10 +3676,21 @@ function App() {
           setIsGraphOpen(false);
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCalendarOpen(false);
           setExpandedFrom(null);
           if (isRightPaneMaximized) {
             setIsRightPaneMaximized(false);
           }
+          // Canvas files get special handling
+          if (view.path.endsWith(".canvas")) {
+            setIsCanvasOpen(true);
+            setSelectedPath(null);
+            ensureCanvasFileTab(view.path);
+            return;
+          }
+          setIsCanvasOpen(false);
           setSelectedPath(view.path);
           ensureFileTabForPath(view.path);
           return;
@@ -3412,6 +3698,9 @@ function App() {
           setSelectedPath(null);
           setIsBrowserOpen(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCalendarOpen(false);
           setExpandedFrom(null);
           setIsGraphOpen(true);
           ensureGraphFileTab();
@@ -3425,8 +3714,63 @@ function App() {
           setIsBrowserOpen(false);
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCalendarOpen(false);
           setIsSuggestedTopicsOpen(true);
           ensureSuggestedTopicsFileTab();
+          return;
+        case "artifacts":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setIsCanvasesOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsArtifactsOpen(true);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(false);
+          ensureArtifactsFileTab();
+          return;
+        case "canvases":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsCanvasesOpen(true);
+          setIsCalendarOpen(false);
+          ensureCanvasesFileTab();
+          return;
+        case "canvas":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsCanvasOpen(true);
+          setIsCalendarOpen(false);
+          ensureCanvasFileTab(view.path);
+          return;
+        case "calendar":
+          setSelectedPath(null);
+          setIsGraphOpen(false);
+          setIsBrowserOpen(false);
+          setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setExpandedFrom(null);
+          setIsRightPaneMaximized(false);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(true);
+          ensureCalendarFileTab();
           return;
         case "chat":
           setSelectedPath(null);
@@ -3434,6 +3778,10 @@ function App() {
           setExpandedFrom(null);
           setIsRightPaneMaximized(false);
           setIsSuggestedTopicsOpen(false);
+          setIsArtifactsOpen(false);
+          setIsCanvasesOpen(false);
+          setIsCanvasOpen(false);
+          setIsCalendarOpen(false);
           if (view.runId) {
             await loadRun(view.runId);
           } else {
@@ -3446,6 +3794,10 @@ function App() {
       ensureFileTabForPath,
       ensureGraphFileTab,
       ensureSuggestedTopicsFileTab,
+      ensureArtifactsFileTab,
+      ensureCanvasesFileTab,
+      ensureCanvasFileTab,
+      ensureCalendarFileTab,
       handleNewChat,
       isRightPaneMaximized,
       loadRun,
@@ -3769,7 +4121,11 @@ function App() {
 
   // Keyboard shortcut: Ctrl+L to toggle main chat view
   const isFullScreenChat =
-    !selectedPath && !isGraphOpen && !isSuggestedTopicsOpen && !isBrowserOpen;
+    !selectedPath &&
+    !isGraphOpen &&
+    !isSuggestedTopicsOpen &&
+    !isBrowserOpen &&
+    !isCanvasOpen;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "l") {
@@ -3857,7 +4213,11 @@ function App() {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
       const rightPaneAvailable = Boolean(
-        (selectedPath || isGraphOpen || isSuggestedTopicsOpen) &&
+        (selectedPath ||
+          isGraphOpen ||
+          isSuggestedTopicsOpen ||
+          isCanvasOpen ||
+          isCalendarOpen) &&
         isChatSidebarOpen,
       );
       const targetPane: ShortcutPane = rightPaneAvailable
@@ -3867,12 +4227,20 @@ function App() {
         : "left";
       const inFileView =
         targetPane === "left" &&
-        Boolean(selectedPath || isGraphOpen || isSuggestedTopicsOpen);
+        Boolean(
+          selectedPath ||
+          isGraphOpen ||
+          isSuggestedTopicsOpen ||
+          isCanvasOpen ||
+          isCalendarOpen,
+        );
       const selectedKnowledgePath = isGraphOpen
         ? GRAPH_TAB_PATH
         : isSuggestedTopicsOpen
           ? SUGGESTED_TOPICS_TAB_PATH
-          : selectedPath;
+          : isCanvasOpen
+            ? CANVAS_TAB_PATH
+            : selectedPath;
       const targetFileTabId =
         activeFileTabId ??
         (selectedKnowledgePath
@@ -3958,6 +4326,14 @@ function App() {
 
     // Top-level knowledge folders open as a bases view with folder filter
     const parts = path.split("/");
+    if (path === "artifacts") {
+      void navigateToView({ type: "artifacts" });
+      return;
+    }
+    if (path === "canvases") {
+      void navigateToView({ type: "canvases" });
+      return;
+    }
     if (parts.length === 1 && isKnowledgeRelPath(parts[0] + "/")) {
       const folderName = parts[0];
       const folderCfg = FOLDER_BASE_CONFIGS[folderName];
@@ -3973,7 +4349,13 @@ function App() {
           }),
         },
       }));
-      if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
+      if (
+        !selectedPath &&
+        !isGraphOpen &&
+        !isSuggestedTopicsOpen &&
+        !isCanvasOpen &&
+        !isCalendarOpen
+      ) {
         setIsChatSidebarOpen(false);
         setIsRightPaneMaximized(false);
       }
@@ -4096,19 +4478,60 @@ function App() {
           throw err;
         }
       },
+      createCanvas: async (parentPath: string = "canvases") => {
+        try {
+          const dir = parentPath || "canvases";
+          let index = 0;
+          let name = "untitled";
+          let fullPath = `${dir}/${name}.canvas`;
+          while (index < 1000) {
+            const exists = await window.ipc.invoke("workspace:exists", {
+              path: fullPath,
+            });
+            if (!exists.exists) break;
+            index += 1;
+            name = `untitled-${index}`;
+            fullPath = `${dir}/${name}.canvas`;
+          }
+          await window.ipc.invoke("workspace:writeFile", {
+            path: fullPath,
+            data: serializeCanvas(createEmptyCanvas()),
+            opts: { encoding: "utf8" },
+          });
+          navigateToFile(fullPath);
+        } catch (err) {
+          console.error("Failed to create canvas:", err);
+          throw err;
+        }
+      },
       openGraph: () => {
-        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
+        if (
+          !selectedPath &&
+          !isGraphOpen &&
+          !isSuggestedTopicsOpen &&
+          !isCanvasOpen &&
+          !isCalendarOpen
+        ) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "graph" });
       },
       openBases: () => {
-        if (!selectedPath && !isGraphOpen && !isSuggestedTopicsOpen) {
+        if (
+          !selectedPath &&
+          !isGraphOpen &&
+          !isSuggestedTopicsOpen &&
+          !isCanvasOpen &&
+          !isCalendarOpen
+        ) {
           setIsChatSidebarOpen(false);
           setIsRightPaneMaximized(false);
         }
         void navigateToView({ type: "file", path: BASES_DEFAULT_TAB_PATH });
+      },
+      openCanvas: () => {
+        void navigateToView({ type: "canvases" });
       },
       expandAll: () => setExpandedPaths(new Set(collectDirPaths(tree))),
       collapseAll: () => setExpandedPaths(new Set()),
@@ -4222,6 +4645,41 @@ function App() {
           document.body.removeChild(textarea);
         });
       },
+      revealInFileManager: async (path: string) => {
+        await window.ipc.invoke("shell:revealInFolder", { path });
+      },
+      duplicate: async (path: string, isDir: boolean) => {
+        try {
+          let duplicatePath = buildDuplicatePath(path, isDir, 1);
+          let index = 1;
+
+          while (
+            (
+              await window.ipc.invoke("workspace:exists", {
+                path: duplicatePath,
+              })
+            ).exists
+          ) {
+            index += 1;
+            duplicatePath = buildDuplicatePath(path, isDir, index);
+          }
+
+          await window.ipc.invoke("workspace:copy", {
+            from: path,
+            to: duplicatePath,
+          });
+          const newTree = await loadDirectory();
+          setTree(newTree);
+          if (!isDir) {
+            navigateToFile(duplicatePath);
+          }
+          toast.success("Duplicated successfully");
+        } catch (err) {
+          console.error("Failed to duplicate:", err);
+          toast.error("Failed to duplicate");
+          throw err;
+        }
+      },
       onOpenInNewTab: (path: string) => {
         openFileInNewTab(path);
       },
@@ -4230,6 +4688,7 @@ function App() {
       tree,
       selectedPath,
       isGraphOpen,
+      isCanvasOpen,
       workspaceRoot,
       navigateToFile,
       navigateToView,
@@ -4237,6 +4696,7 @@ function App() {
       fileTabs,
       closeFileTab,
       removeEditorCacheForPath,
+      loadDirectory,
     ],
   );
 
@@ -4665,7 +5125,11 @@ function App() {
     activeChatTabState.currentAssistantMessage ||
     activeChatTabState.currentToolDraftActive;
   const isRightPaneContext = Boolean(
-    selectedPath || isGraphOpen || isSuggestedTopicsOpen || isBrowserOpen,
+    selectedPath ||
+    isGraphOpen ||
+    isSuggestedTopicsOpen ||
+    isBrowserOpen ||
+    isCanvasOpen,
   );
   const isRightPaneOnlyMode =
     isRightPaneContext && isChatSidebarOpen && isRightPaneMaximized;
@@ -4686,6 +5150,32 @@ function App() {
     }
     return markdownTabs;
   }, [fileTabs, selectedPath]);
+
+  const viewKey = React.useMemo(() => {
+    if (isBrowserOpen) return "browser";
+    if (isArtifactsOpen) return "artifacts";
+    if (selectedPath === INGEST_TAB_PATH) return "ingest";
+    if (isSuggestedTopicsOpen) return "suggested-topics";
+    if (isCanvasOpen) {
+      const canvasPath = fileTabs.find((t) => isCanvasTabPath(t.path))?.path;
+      return `canvas:${canvasPath ?? CANVAS_TAB_PATH}`;
+    }
+    if (selectedPath && isBaseFilePath(selectedPath))
+      return `bases:${selectedPath}`;
+    if (isGraphOpen) return "graph";
+    if (selectedPath) {
+      if (selectedPath.endsWith(".md")) return `md:${selectedPath}`;
+      if (selectedPath.endsWith(".pdf")) return `pdf:${selectedPath}`;
+      return `file:${selectedPath}`;
+    }
+    return "chat";
+  }, [
+    isBrowserOpen,
+    isArtifactsOpen,
+    selectedPath,
+    isSuggestedTopicsOpen,
+    isGraphOpen,
+  ]);
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -4798,9 +5288,7 @@ function App() {
                         closeChatTab(tabForRun.id);
                       } else {
                         // Only one tab, reset it to new chat
-                        setChatTabs([
-                          { id: tabForRun.id, runId: null, mode: "agent" },
-                        ]);
+                        setChatTabs([{ id: tabForRun.id, runId: null }]);
                         if (
                           selectedPath ||
                           isGraphOpen ||
@@ -4848,6 +5336,13 @@ function App() {
               onOpenIngestWindow={() => {
                 void navigateToView({ type: "file", path: INGEST_TAB_PATH });
               }}
+              onOpenArtifacts={() => {
+                void navigateToView({ type: "artifacts" });
+              }}
+              isCalendarOpen={isCalendarOpen}
+              onOpenCalendar={() => {
+                void navigateToView({ type: "calendar" });
+              }}
             />
             <SidebarInset
               className={cn(
@@ -4873,7 +5368,12 @@ function App() {
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
               >
-                {(selectedPath || isGraphOpen || isSuggestedTopicsOpen) &&
+                {(selectedPath ||
+                  isGraphOpen ||
+                  isSuggestedTopicsOpen ||
+                  isArtifactsOpen ||
+                  isCanvasOpen ||
+                  isCalendarOpen) &&
                 fileTabs.length >= 1 ? (
                   <TabBar
                     tabs={fileTabs}
@@ -4882,12 +5382,7 @@ function App() {
                     getTabId={(t) => t.id}
                     onSwitchTab={switchFileTab}
                     onCloseTab={closeFileTab}
-                    allowSingleTabClose={
-                      fileTabs.length === 1 &&
-                      (isGraphOpen ||
-                        isSuggestedTopicsOpen ||
-                        (selectedPath != null && isBaseFilePath(selectedPath)))
-                    }
+                    allowSingleTabClose={true}
                   />
                 ) : (
                   <TabBar
@@ -5021,532 +5516,638 @@ function App() {
                 )}
               </ContentHeader>
 
-              {isBrowserOpen ? (
-                <BrowserPane onClose={handleCloseBrowser} />
-              ) : selectedPath === INGEST_TAB_PATH ? (
-                <IngestWindow
-                  onProcessIngest={handleIngestProcess}
-                  isProcessing={isIngestProcessing}
-                />
-              ) : isSuggestedTopicsOpen ? (
-                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <SuggestedTopicsView
-                    onExploreTopic={(topic) => {
-                      const prompt = buildSuggestedTopicExplorePrompt(topic);
-                      submitFromPalette(prompt, null);
+              <div
+                key={viewKey}
+                className="flex-1 flex flex-col min-h-0 overflow-hidden animate-[enter-fade_0.15s_ease-out]"
+              >
+                {isBrowserOpen ? (
+                  <BrowserPane onClose={handleCloseBrowser} />
+                ) : isArtifactsOpen ? (
+                  <ArtifactsView
+                    onOpenArtifact={(path) => {
+                      if (path === "artifacts") {
+                        setPresetMessage("create a document on ");
+                        handleNewChatTab();
+                        void navigateToView({ type: "chat", runId: null });
+                      } else {
+                        void loadDirectory();
+                        navigateToFile(path);
+                      }
                     }}
                   />
-                </div>
-              ) : selectedPath && isBaseFilePath(selectedPath) ? (
-                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <BasesView
-                    tree={tree}
-                    onSelectNote={(path) => navigateToFile(path)}
-                    config={
-                      baseConfigByPath[selectedPath] ?? DEFAULT_BASE_CONFIG
+                ) : isCanvasesOpen ? (
+                  <CanvasesView
+                    onOpenCanvas={(path) => navigateToFile(path)}
+                    onNewCanvas={() =>
+                      knowledgeActions.createCanvas("canvases")
                     }
-                    onConfigChange={(cfg) =>
-                      handleBaseConfigChange(selectedPath, cfg)
-                    }
-                    isDefaultBase={selectedPath === BASES_DEFAULT_TAB_PATH}
-                    onSave={(name) => void handleBaseSave(name)}
-                    externalSearch={externalBaseSearch}
-                    onExternalSearchConsumed={() =>
-                      setExternalBaseSearch(undefined)
-                    }
-                    actions={{
-                      rename: knowledgeActions.rename,
-                      remove: knowledgeActions.remove,
-                      copyPath: knowledgeActions.copyPath,
+                    onDeleteCanvas={async (path) => {
+                      await knowledgeActions.remove(path);
+                      void navigateToView({ type: "canvases" });
                     }}
                   />
-                </div>
-              ) : isGraphOpen ? (
-                <div className="flex-1 min-h-0">
-                  <GraphView
-                    nodes={graphData.nodes}
-                    edges={graphData.edges}
-                    isLoading={false}
-                    error={
-                      graphStatus === "error"
-                        ? (graphError ?? "Failed to build graph")
-                        : null
-                    }
-                    onSelectNode={(path) => {
-                      navigateToFile(path);
-                    }}
+                ) : selectedPath === INGEST_TAB_PATH ? (
+                  <IngestWindow
+                    onProcessIngest={handleIngestProcess}
+                    isProcessing={isIngestProcessing}
                   />
-                </div>
-              ) : selectedPath ? (
-                selectedPath.endsWith(".md") ? (
-                  <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
-                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                      {openMarkdownTabs.map((tab) => {
-                        const isActive = activeFileTabId
-                          ? tab.id === activeFileTabId ||
-                            tab.path === selectedPath
-                          : tab.path === selectedPath;
-                        const isViewingHistory =
-                          viewingHistoricalVersion &&
-                          isActive &&
-                          versionHistoryPath === tab.path;
-                        const tabContent = isViewingHistory
-                          ? viewingHistoricalVersion.content
-                          : (editorContentByPath[tab.path] ??
-                            (isActive && editorPathRef.current === tab.path
-                              ? editorContent
-                              : ""));
-                        return (
-                          <div
-                            key={tab.id}
-                            className={cn(
-                              "min-h-0 flex-1 flex-col overflow-hidden",
-                              isActive ? "flex" : "hidden",
-                            )}
-                            data-file-tab-panel={tab.id}
-                            aria-hidden={!isActive}
-                          >
-                            <MarkdownEditor
-                              ref={(el) => {
-                                if (el)
-                                  editorRefsByTabId.current.set(tab.id, el);
-                                else editorRefsByTabId.current.delete(tab.id);
-                              }}
-                              content={tabContent}
-                              notePath={tab.path}
-                              onChange={(markdown) => {
-                                if (!isViewingHistory)
-                                  handleEditorChange(tab.path, markdown);
-                              }}
-                              onPrimaryHeadingCommit={() => {
-                                untitledRenameReadyPathsRef.current.add(
-                                  tab.path,
-                                );
-                              }}
-                              preserveUntitledTitleHeading={isUntitledPlaceholderName(
-                                getBaseName(tab.path),
-                              )}
-                              placeholder="Start writing..."
-                              wikiLinks={wikiLinkConfig}
-                              onImageUpload={handleImageUpload}
-                              editorSessionKey={
-                                editorSessionByTabId[tab.id] ?? 0
-                              }
-                              frontmatter={
-                                frontmatterByPathRef.current.get(tab.path) ??
-                                null
-                              }
-                              onFrontmatterChange={(newRaw) => {
-                                frontmatterByPathRef.current.set(
-                                  tab.path,
-                                  newRaw,
-                                );
-                                // Write updated frontmatter to disk immediately
-                                const currentBody = editorContentRef.current;
-                                const fullContent = joinFrontmatter(
-                                  newRaw,
-                                  currentBody,
-                                );
-                                initialContentByPathRef.current.set(
-                                  tab.path,
-                                  splitFrontmatter(fullContent).body,
-                                );
-                                initialContentRef.current =
-                                  splitFrontmatter(fullContent).body;
-                                void window.ipc.invoke("workspace:writeFile", {
-                                  path: tab.path,
-                                  data: fullContent,
-                                  opts: { encoding: "utf8" },
-                                });
-                              }}
-                              onHistoryHandlersChange={(handlers) => {
-                                if (handlers) {
-                                  fileHistoryHandlersRef.current.set(
-                                    tab.id,
-                                    handlers,
-                                  );
-                                } else {
-                                  fileHistoryHandlersRef.current.delete(tab.id);
-                                }
-                              }}
-                              editable={!isViewingHistory}
-                              onExport={async (format) => {
-                                const markdown = tabContent;
-                                const title = getBaseName(tab.path);
-                                try {
-                                  await window.ipc.invoke("export:note", {
-                                    markdown,
-                                    format,
-                                    title,
-                                  });
-                                  analytics.noteExported(format);
-                                } catch (err) {
-                                  console.error("Export failed:", err);
-                                }
-                              }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {versionHistoryPath && (
-                      <VersionHistoryPanel
-                        path={versionHistoryPath}
-                        onClose={() => {
-                          setVersionHistoryPath(null);
-                          setViewingHistoricalVersion(null);
-                        }}
-                        onSelectVersion={(oid, content) => {
-                          if (oid === null) {
-                            setViewingHistoricalVersion(null);
-                          } else {
-                            setViewingHistoricalVersion({ oid, content });
-                          }
-                        }}
-                        onRestore={async (oid) => {
-                          try {
-                            await window.ipc.invoke("knowledge:restore", {
-                              path: versionHistoryPath,
-                              oid,
-                            });
-                            // Reload file content
-                            const result = await window.ipc.invoke(
-                              "workspace:readFile",
-                              { path: versionHistoryPath },
-                            );
-                            handleEditorChange(versionHistoryPath, result.data);
-                            setViewingHistoricalVersion(null);
-                            setVersionHistoryPath(null);
-                          } catch (err) {
-                            console.error("Failed to restore version:", err);
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : selectedPath.endsWith(".pdf") && fileContent ? (
-                  <PdfViewer base64Data={fileContent} />
-                ) : /\.html?$/i.test(selectedPath) && fileContent ? (
-                  <HtmlViewer
-                    htmlContent={fileContent}
-                    fileName={getBaseName(selectedPath)}
-                  />
-                ) : /\.(docx?|xlsx?|pptx?)$/i.test(selectedPath) ? (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-                    <div className="text-muted-foreground text-sm">
-                      Preview not available for this file type
-                    </div>
-                    <button
-                      onClick={() => {
-                        window.ipc.invoke("shell:openPath", {
-                          path: selectedPath,
-                        });
+                ) : isSuggestedTopicsOpen ? (
+                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <SuggestedTopicsView
+                      onExploreTopic={(topic) => {
+                        const prompt = buildSuggestedTopicExplorePrompt(topic);
+                        submitFromPalette(prompt, null);
                       }}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground hover:bg-surface2 transition-colors"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                        <polyline points="15 3 21 3 21 9" />
-                        <line x1="10" y1="14" x2="21" y2="3" />
-                      </svg>
-                      Open with default application
-                    </button>
+                    />
                   </div>
-                ) : (
-                  <div className="flex-1 overflow-auto p-4">
-                    <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">
-                      {fileContent || "Loading..."}
-                    </pre>
+                ) : selectedPath && isBaseFilePath(selectedPath) ? (
+                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <BasesView
+                      tree={tree}
+                      onSelectNote={(path) => navigateToFile(path)}
+                      config={
+                        baseConfigByPath[selectedPath] ?? DEFAULT_BASE_CONFIG
+                      }
+                      onConfigChange={(cfg) =>
+                        handleBaseConfigChange(selectedPath, cfg)
+                      }
+                      isDefaultBase={selectedPath === BASES_DEFAULT_TAB_PATH}
+                      onSave={(name) => void handleBaseSave(name)}
+                      externalSearch={externalBaseSearch}
+                      onExternalSearchConsumed={() =>
+                        setExternalBaseSearch(undefined)
+                      }
+                      actions={{
+                        rename: knowledgeActions.rename,
+                        remove: knowledgeActions.remove,
+                        copyPath: knowledgeActions.copyPath,
+                      }}
+                    />
                   </div>
-                )
-              ) : (
-                <FileCardProvider
-                  onOpenKnowledgeFile={(path) => {
-                    navigateToFile(path);
-                  }}
-                >
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="relative min-h-0 flex-1">
-                      {chatTabs.map((tab) => {
-                        const isActive = tab.id === activeChatTabId;
-                        const tabState = getChatTabStateForRender(tab.id);
-                        const tabHasConversation =
-                          tabState.conversation.length > 0 ||
-                          tabState.currentAssistantMessage;
-                        const tabConversationContentClassName =
-                          tabHasConversation
-                            ? "mx-auto w-full max-w-4xl pb-28"
-                            : "mx-auto w-full max-w-4xl min-h-full items-center justify-center pb-0";
-                        return (
-                          <div
-                            key={tab.id}
-                            className={cn(
-                              "min-h-0 h-full flex-col",
-                              isActive
-                                ? "flex"
-                                : "pointer-events-none invisible absolute inset-0 flex",
-                            )}
-                            data-chat-tab-panel={tab.id}
-                            aria-hidden={!isActive}
-                          >
-                            <Conversation
-                              anchorMessageId={
-                                chatViewportAnchorByTab[tab.id]?.messageId
-                              }
-                              anchorRequestKey={
-                                chatViewportAnchorByTab[tab.id]?.requestKey
-                              }
-                              className="relative flex-1"
-                            >
-                              <ConversationContent
-                                className={tabConversationContentClassName}
-                              >
-                                {!tabHasConversation ? (
-                                  <ConversationEmptyState className="h-auto">
-                                    <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
-                                      What are we working on?
-                                    </div>
-                                  </ConversationEmptyState>
-                                ) : (
-                                  <>
-                                    {tabState.conversation.map((item) => {
-                                      const rendered = renderConversationItem(
-                                        item,
-                                        tab.id,
-                                      );
-                                      if (isToolCall(item)) {
-                                        const permRequest =
-                                          tabState.allPermissionRequests.get(
-                                            item.id,
-                                          );
-                                        if (permRequest) {
-                                          const response =
-                                            tabState.permissionResponses.get(
-                                              item.id,
-                                            ) || null;
-                                          return (
-                                            <React.Fragment key={item.id}>
-                                              {rendered}
-                                              <PermissionRequest
-                                                toolCall={permRequest.toolCall}
-                                                onApprove={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                  )
-                                                }
-                                                onApproveSession={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                    "session",
-                                                  )
-                                                }
-                                                onApproveAlways={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "approve",
-                                                    "always",
-                                                  )
-                                                }
-                                                onDeny={() =>
-                                                  handlePermissionResponse(
-                                                    permRequest.toolCall
-                                                      .toolCallId,
-                                                    permRequest.subflow,
-                                                    "deny",
-                                                  )
-                                                }
-                                                isProcessing={
-                                                  isActive && isProcessing
-                                                }
-                                                response={response}
-                                              />
-                                            </React.Fragment>
-                                          );
-                                        }
-                                      }
-                                      return rendered;
-                                    })}
-
-                                    {Array.from(
-                                      tabState.pendingAskHumanRequests.values(),
-                                    ).map((request) => (
-                                      <AskHumanRequest
-                                        key={request.toolCallId}
-                                        query={request.query}
-                                        onResponse={(response) =>
-                                          handleAskHumanResponse(
-                                            request.toolCallId,
-                                            request.subflow,
-                                            response,
-                                          )
-                                        }
-                                        isProcessing={isActive && isProcessing}
-                                      />
-                                    ))}
-
-                                    {tabState.currentToolDraftActive && (
-                                      <Message from="assistant">
-                                        <MessageContent>
-                                          <StreamingMessageBody />
-                                        </MessageContent>
-                                      </Message>
-                                    )}
-
-                                    {!tabState.currentToolDraftActive &&
-                                      tabState.currentAssistantMessage && (
-                                        <Message from="assistant">
-                                          <MessageContent>
-                                            <SmoothStreamingMessage
-                                              text={tabState.currentAssistantMessage.replace(
-                                                /<\/?voice>/g,
-                                                "",
-                                              )}
-                                              components={streamdownComponents}
-                                            />
-                                          </MessageContent>
-                                        </Message>
-                                      )}
-
-                                    {isActive &&
-                                      isProcessing &&
-                                      !tabState.currentAssistantMessage &&
-                                      !tabState.currentToolDraftActive && (
-                                        <Message from="assistant">
-                                          <MessageContent>
-                                            <Shimmer duration={1}>
-                                              Thinking...
-                                            </Shimmer>
-                                          </MessageContent>
-                                        </Message>
-                                      )}
-                                  </>
-                                )}
-                              </ConversationContent>
-                              <ConversationScrollButton />
-                            </Conversation>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="sticky bottom-0 z-10 bg-background pb-12 pt-0 shadow-lg">
-                      <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-t from-background to-transparent" />
-                      <div className="mx-auto w-full max-w-4xl px-4">
-                        {!hasConversation && (
-                          <Suggestions
-                            onSelect={setPresetMessage}
-                            className="mb-3 justify-center"
-                          />
-                        )}
-                        {chatTabs.map((tab) => {
-                          const isActive = tab.id === activeChatTabId;
-                          const tabState = getChatTabStateForRender(tab.id);
+                ) : isGraphOpen ? (
+                  <div className="flex-1 min-h-0">
+                    <GraphView
+                      nodes={graphData.nodes}
+                      edges={graphData.edges}
+                      isLoading={false}
+                      error={
+                        graphStatus === "error"
+                          ? (graphError ?? "Failed to build graph")
+                          : null
+                      }
+                      onSelectNode={(path) => {
+                        navigateToFile(path);
+                      }}
+                    />
+                  </div>
+                ) : isCanvasOpen ? (
+                  <CanvasView
+                    data={
+                      canvasDataByPath[
+                        fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
+                          CANVAS_TAB_PATH
+                      ] ?? createEmptyCanvas()
+                    }
+                    onDataChange={(newData) => {
+                      const canvasPath =
+                        fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
+                        CANVAS_TAB_PATH;
+                      setCanvasDataByPath((prev) => ({
+                        ...prev,
+                        [canvasPath]: newData,
+                      }));
+                      if (canvasSaveTimerRef.current) {
+                        clearTimeout(canvasSaveTimerRef.current);
+                      }
+                      canvasSaveTimerRef.current = setTimeout(() => {
+                        void window.ipc.invoke("workspace:writeFile", {
+                          path: canvasPath,
+                          data: serializeCanvas(newData),
+                          opts: { encoding: "utf8" },
+                        });
+                      }, 300);
+                    }}
+                  />
+                ) : isCalendarOpen ? (
+                  <CalendarView onSelectFile={(path) => navigateToFile(path)} />
+                ) : selectedPath ? (
+                  selectedPath.endsWith(".md") ? (
+                    <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
+                      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                        {openMarkdownTabs.map((tab) => {
+                          const isActive = activeFileTabId
+                            ? tab.id === activeFileTabId ||
+                              tab.path === selectedPath
+                            : tab.path === selectedPath;
+                          const isViewingHistory =
+                            viewingHistoricalVersion &&
+                            isActive &&
+                            versionHistoryPath === tab.path;
+                          const tabContent = isViewingHistory
+                            ? viewingHistoricalVersion.content
+                            : (editorContentByPath[tab.path] ??
+                              (isActive && editorPathRef.current === tab.path
+                                ? editorContent
+                                : ""));
                           return (
                             <div
                               key={tab.id}
-                              className={isActive ? "block" : "hidden"}
-                              data-chat-input-panel={tab.id}
+                              className={cn(
+                                "min-h-0 flex-1 flex-col overflow-hidden",
+                                isActive ? "flex" : "hidden",
+                              )}
+                              data-file-tab-panel={tab.id}
                               aria-hidden={!isActive}
                             >
-                              <ChatInputWithMentions
-                                knowledgeFiles={knowledgeFiles}
-                                recentFiles={recentWikiFiles}
-                                visibleFiles={visibleKnowledgeFiles}
-                                onSubmit={handlePromptSubmit}
-                                onStop={handleStop}
-                                isProcessing={isActive && isProcessing}
-                                isStopping={isActive && isStopping}
-                                isActive={isActive}
-                                presetMessage={
-                                  isActive ? presetMessage : undefined
+                              <MarkdownEditor
+                                ref={(el) => {
+                                  if (el)
+                                    editorRefsByTabId.current.set(tab.id, el);
+                                  else editorRefsByTabId.current.delete(tab.id);
+                                }}
+                                content={tabContent}
+                                notePath={tab.path}
+                                onChange={(markdown) => {
+                                  if (!isViewingHistory)
+                                    handleEditorChange(tab.path, markdown);
+                                }}
+                                onPrimaryHeadingCommit={() => {
+                                  untitledRenameReadyPathsRef.current.add(
+                                    tab.path,
+                                  );
+                                }}
+                                preserveUntitledTitleHeading={isUntitledPlaceholderName(
+                                  getBaseName(tab.path),
+                                )}
+                                placeholder="Start writing..."
+                                wikiLinks={wikiLinkConfig}
+                                onImageUpload={handleImageUpload}
+                                editorSessionKey={
+                                  editorSessionByTabId[tab.id] ?? 0
                                 }
-                                onPresetMessageConsumed={
-                                  isActive
-                                    ? () => setPresetMessage(undefined)
-                                    : undefined
+                                frontmatter={
+                                  frontmatterByPathRef.current.get(tab.path) ??
+                                  null
                                 }
-                                runId={tabState.runId}
-                                initialDraft={chatDraftsRef.current.get(tab.id)}
-                                onDraftChange={(text) =>
-                                  setChatDraftForTab(tab.id, text)
-                                }
-                                onSelectedModelChange={(m) => {
-                                  if (m) {
-                                    selectedModelByTabRef.current.set(
+                                onFrontmatterChange={(newRaw) => {
+                                  frontmatterByPathRef.current.set(
+                                    tab.path,
+                                    newRaw,
+                                  );
+                                  // Write updated frontmatter to disk immediately
+                                  const currentBody = editorContentRef.current;
+                                  const fullContent = joinFrontmatter(
+                                    newRaw,
+                                    currentBody,
+                                  );
+                                  initialContentByPathRef.current.set(
+                                    tab.path,
+                                    splitFrontmatter(fullContent).body,
+                                  );
+                                  initialContentRef.current =
+                                    splitFrontmatter(fullContent).body;
+                                  void window.ipc.invoke(
+                                    "workspace:writeFile",
+                                    {
+                                      path: tab.path,
+                                      data: fullContent,
+                                      opts: { encoding: "utf8" },
+                                    },
+                                  );
+                                }}
+                                onHistoryHandlersChange={(handlers) => {
+                                  if (handlers) {
+                                    fileHistoryHandlersRef.current.set(
                                       tab.id,
-                                      m,
+                                      handlers,
                                     );
                                   } else {
-                                    selectedModelByTabRef.current.delete(
+                                    fileHistoryHandlersRef.current.delete(
                                       tab.id,
                                     );
                                   }
                                 }}
-                                isRecording={isActive && isRecording}
-                                recordingText={
-                                  isActive ? voice.interimText : undefined
-                                }
-                                recordingState={
-                                  isActive
-                                    ? voice.state === "connecting"
-                                      ? "connecting"
-                                      : "listening"
-                                    : undefined
-                                }
-                                onStartRecording={
-                                  isActive ? handleStartRecording : undefined
-                                }
-                                onSubmitRecording={
-                                  isActive ? handleSubmitRecording : undefined
-                                }
-                                onCancelRecording={
-                                  isActive ? handleCancelRecording : undefined
-                                }
-                                voiceAvailable={isActive && voiceAvailable}
-                                ttsAvailable={isActive && ttsAvailable}
-                                ttsEnabled={ttsEnabled}
-                                ttsMode={ttsMode}
-                                onToggleTts={
-                                  isActive ? handleToggleTts : undefined
-                                }
-                                cavemanEnabled={
-                                  cavemanByTabRef.current.get(tab.id) ?? false
-                                }
-                                onToggleCaveman={
-                                  isActive
-                                    ? () => handleToggleCaveman(tab.id)
-                                    : undefined
-                                }
-                                onTtsModeChange={
-                                  isActive ? handleTtsModeChange : undefined
-                                }
+                                editable={!isViewingHistory}
+                                onExport={async (format) => {
+                                  const markdown = tabContent;
+                                  const title = getBaseName(tab.path);
+                                  try {
+                                    await window.ipc.invoke("export:note", {
+                                      markdown,
+                                      format,
+                                      title,
+                                    });
+                                    analytics.noteExported(format);
+                                  } catch (err) {
+                                    console.error("Export failed:", err);
+                                  }
+                                }}
                               />
                             </div>
                           );
                         })}
                       </div>
+                      {versionHistoryPath && (
+                        <VersionHistoryPanel
+                          path={versionHistoryPath}
+                          onClose={() => {
+                            setVersionHistoryPath(null);
+                            setViewingHistoricalVersion(null);
+                          }}
+                          onSelectVersion={(oid, content) => {
+                            if (oid === null) {
+                              setViewingHistoricalVersion(null);
+                            } else {
+                              setViewingHistoricalVersion({ oid, content });
+                            }
+                          }}
+                          onRestore={async (oid) => {
+                            try {
+                              await window.ipc.invoke("knowledge:restore", {
+                                path: versionHistoryPath,
+                                oid,
+                              });
+                              // Reload file content
+                              const result = await window.ipc.invoke(
+                                "workspace:readFile",
+                                { path: versionHistoryPath },
+                              );
+                              handleEditorChange(
+                                versionHistoryPath,
+                                result.data,
+                              );
+                              setViewingHistoricalVersion(null);
+                              setVersionHistoryPath(null);
+                            } catch (err) {
+                              console.error("Failed to restore version:", err);
+                            }
+                          }}
+                        />
+                      )}
                     </div>
-                  </div>
-                </FileCardProvider>
-              )}
+                  ) : selectedPath.endsWith(".pdf") && fileContent ? (
+                    <PdfViewer base64Data={fileContent} />
+                  ) : /\.html?$/i.test(selectedPath) && fileContent ? (
+                    <HtmlViewer
+                      htmlContent={fileContent}
+                      fileName={getBaseName(selectedPath)}
+                    />
+                  ) : /\.(docx?|xlsx?|pptx?)$/i.test(selectedPath) ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
+                      <div className="text-muted-foreground text-sm">
+                        Preview not available for this file type
+                      </div>
+                      <button
+                        onClick={() => {
+                          window.ipc.invoke("shell:openPath", {
+                            path: selectedPath,
+                          });
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground hover:bg-surface2 transition-colors"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                        Open with default application
+                      </button>
+                    </div>
+                  ) : /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|tiff?)$/i.test(
+                      selectedPath,
+                    ) && fileContent ? (
+                    <div className="flex-1 overflow-hidden flex items-center justify-center p-4">
+                      <img
+                        src={`data:${getMimeFromExtension(getExtension(selectedPath))};base64,${fileContent}`}
+                        alt={getBaseName(selectedPath)}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-auto p-4">
+                      <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">
+                        {fileContent || "Loading..."}
+                      </pre>
+                    </div>
+                  )
+                ) : (
+                  <FileCardProvider
+                    onOpenKnowledgeFile={(path) => {
+                      navigateToFile(path);
+                    }}
+                  >
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <div className="relative min-h-0 flex-1">
+                        {chatTabs.map((tab) => {
+                          const isActive = tab.id === activeChatTabId;
+                          const tabState = getChatTabStateForRender(tab.id);
+                          const tabHasConversation =
+                            tabState.conversation.length > 0 ||
+                            tabState.currentAssistantMessage;
+                          const tabConversationContentClassName =
+                            tabHasConversation
+                              ? "mx-auto w-full max-w-4xl pb-28"
+                              : "mx-auto w-full max-w-4xl min-h-full items-center justify-center pb-0";
+                          return (
+                            <div
+                              key={tab.id}
+                              className={cn(
+                                "min-h-0 h-full flex-col",
+                                isActive
+                                  ? "flex"
+                                  : "pointer-events-none invisible absolute inset-0 flex",
+                              )}
+                              data-chat-tab-panel={tab.id}
+                              aria-hidden={!isActive}
+                            >
+                              <Conversation
+                                anchorMessageId={
+                                  chatViewportAnchorByTab[tab.id]?.messageId
+                                }
+                                anchorRequestKey={
+                                  chatViewportAnchorByTab[tab.id]?.requestKey
+                                }
+                                className="relative flex-1"
+                              >
+                                <ConversationContent
+                                  className={tabConversationContentClassName}
+                                >
+                                  {!tabHasConversation ? (
+                                    <ConversationEmptyState className="h-auto">
+                                      <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
+                                        What are we working on?
+                                      </div>
+                                    </ConversationEmptyState>
+                                  ) : (
+                                    <>
+                                      {tabState.conversation.map((item) => {
+                                        const rendered = renderConversationItem(
+                                          item,
+                                          tab.id,
+                                        );
+                                        if (isToolCall(item)) {
+                                          const permRequest =
+                                            tabState.allPermissionRequests.get(
+                                              item.id,
+                                            );
+                                          if (permRequest) {
+                                            const response =
+                                              tabState.permissionResponses.get(
+                                                item.id,
+                                              ) || null;
+                                            return (
+                                              <React.Fragment key={item.id}>
+                                                <motion.div
+                                                  initial={{ opacity: 0, y: 6 }}
+                                                  animate={{ opacity: 1, y: 0 }}
+                                                  transition={{
+                                                    duration: 0.25,
+                                                    ease: [0.16, 1, 0.3, 1],
+                                                  }}
+                                                >
+                                                  {rendered}
+                                                </motion.div>
+                                                <PermissionRequest
+                                                  toolCall={
+                                                    permRequest.toolCall
+                                                  }
+                                                  onApprove={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                    )
+                                                  }
+                                                  onApproveSession={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                      "session",
+                                                    )
+                                                  }
+                                                  onApproveAlways={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "approve",
+                                                      "always",
+                                                    )
+                                                  }
+                                                  onDeny={() =>
+                                                    handlePermissionResponse(
+                                                      permRequest.toolCall
+                                                        .toolCallId,
+                                                      permRequest.subflow,
+                                                      "deny",
+                                                    )
+                                                  }
+                                                  isProcessing={
+                                                    isActive && isProcessing
+                                                  }
+                                                  response={response}
+                                                />
+                                              </React.Fragment>
+                                            );
+                                          }
+                                        }
+                                        return (
+                                          <motion.div
+                                            key={item.id}
+                                            initial={{ opacity: 0, y: 6 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{
+                                              duration: 0.25,
+                                              ease: [0.16, 1, 0.3, 1],
+                                            }}
+                                          >
+                                            {rendered}
+                                          </motion.div>
+                                        );
+                                      })}
+
+                                      {Array.from(
+                                        tabState.pendingAskHumanRequests.values(),
+                                      ).map((request) => (
+                                        <AskHumanRequest
+                                          key={request.toolCallId}
+                                          query={request.query}
+                                          onResponse={(response) =>
+                                            handleAskHumanResponse(
+                                              request.toolCallId,
+                                              request.subflow,
+                                              response,
+                                            )
+                                          }
+                                          isProcessing={
+                                            isActive && isProcessing
+                                          }
+                                        />
+                                      ))}
+
+                                      {tabState.currentToolDraftActive && (
+                                        <Message from="assistant">
+                                          <MessageContent>
+                                            <StreamingMessageBody />
+                                          </MessageContent>
+                                        </Message>
+                                      )}
+
+                                      {!tabState.currentToolDraftActive &&
+                                        tabState.currentAssistantMessage && (
+                                          <Message from="assistant">
+                                            <MessageContent>
+                                              <SmoothStreamingMessage
+                                                text={tabState.currentAssistantMessage.replace(
+                                                  /<\/?voice>/g,
+                                                  "",
+                                                )}
+                                                components={
+                                                  streamdownComponents
+                                                }
+                                              />
+                                            </MessageContent>
+                                          </Message>
+                                        )}
+
+                                      {isActive &&
+                                        isProcessing &&
+                                        !tabState.currentAssistantMessage &&
+                                        !tabState.currentToolDraftActive && (
+                                          <Message from="assistant">
+                                            <MessageContent>
+                                              <Shimmer duration={1}>
+                                                Thinking...
+                                              </Shimmer>
+                                            </MessageContent>
+                                          </Message>
+                                        )}
+                                    </>
+                                  )}
+                                </ConversationContent>
+                                <ConversationScrollButton />
+                              </Conversation>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="sticky bottom-0 z-10 bg-background pb-12 pt-0 shadow-lg">
+                        <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-t from-background to-transparent" />
+                        <div className="mx-auto w-full max-w-4xl px-4">
+                          {!hasConversation && (
+                            <Suggestions
+                              onSelect={setPresetMessage}
+                              className="mb-3 justify-center"
+                            />
+                          )}
+                          {chatTabs.map((tab) => {
+                            const isActive = tab.id === activeChatTabId;
+                            const tabState = getChatTabStateForRender(tab.id);
+                            return (
+                              <div
+                                key={tab.id}
+                                className={isActive ? "block" : "hidden"}
+                                data-chat-input-panel={tab.id}
+                                aria-hidden={!isActive}
+                              >
+                                <ChatInputWithMentions
+                                  knowledgeFiles={knowledgeFiles}
+                                  recentFiles={recentWikiFiles}
+                                  visibleFiles={visibleKnowledgeFiles}
+                                  onSubmit={handlePromptSubmit}
+                                  onStop={handleStop}
+                                  isProcessing={isActive && isProcessing}
+                                  isStopping={isActive && isStopping}
+                                  isActive={isActive}
+                                  presetMessage={
+                                    isActive ? presetMessage : undefined
+                                  }
+                                  onPresetMessageConsumed={
+                                    isActive
+                                      ? () => setPresetMessage(undefined)
+                                      : undefined
+                                  }
+                                  runId={tabState.runId}
+                                  initialDraft={chatDraftsRef.current.get(
+                                    tab.id,
+                                  )}
+                                  onDraftChange={(text) =>
+                                    setChatDraftForTab(tab.id, text)
+                                  }
+                                  onSelectedModelChange={(m) => {
+                                    if (m) {
+                                      selectedModelByTabRef.current.set(
+                                        tab.id,
+                                        m,
+                                      );
+                                    } else {
+                                      selectedModelByTabRef.current.delete(
+                                        tab.id,
+                                      );
+                                    }
+                                  }}
+                                  isRecording={isActive && isRecording}
+                                  recordingText={
+                                    isActive ? voice.interimText : undefined
+                                  }
+                                  recordingState={
+                                    isActive
+                                      ? voice.state === "connecting"
+                                        ? "connecting"
+                                        : "listening"
+                                      : undefined
+                                  }
+                                  onStartRecording={
+                                    isActive ? handleStartRecording : undefined
+                                  }
+                                  onSubmitRecording={
+                                    isActive ? handleSubmitRecording : undefined
+                                  }
+                                  onCancelRecording={
+                                    isActive ? handleCancelRecording : undefined
+                                  }
+                                  voiceAvailable={isActive && voiceAvailable}
+                                  ttsAvailable={isActive && ttsAvailable}
+                                  ttsEnabled={ttsEnabled}
+                                  ttsMode={ttsMode}
+                                  onToggleTts={
+                                    isActive ? handleToggleTts : undefined
+                                  }
+                                  cavemanEnabled={
+                                    cavemanByTabRef.current.get(tab.id) ?? false
+                                  }
+                                  onToggleCaveman={
+                                    isActive
+                                      ? () => handleToggleCaveman(tab.id)
+                                      : undefined
+                                  }
+                                  onTtsModeChange={
+                                    isActive ? handleTtsModeChange : undefined
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </FileCardProvider>
+                )}
+              </div>
             </SidebarInset>
 
             {/* Chat sidebar - shown when viewing files/graph */}

@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowDownIcon } from "lucide-react";
+import { ArrowDownIcon, MessageSquareTextIcon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type { ComponentProps, ReactNode, RefObject } from "react";
 import {
   createContext,
@@ -243,7 +244,7 @@ export const ConversationContent = ({
 
   return (
     <div
-      className={cn("flex flex-col gap-8 p-4", className)}
+      className={cn("flex flex-col gap-5 p-4", className)}
       ref={contentRef}
       {...props}
     />
@@ -266,21 +267,30 @@ export const ConversationEmptyState = ({
 }: ConversationEmptyStateProps) => (
   <div
     className={cn(
-      "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
+      "flex size-full flex-col items-center justify-center gap-5 p-8 text-center",
       className,
     )}
     {...props}
   >
     {children ?? (
-      <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
-        <div className="space-y-1">
-          <h3 className="font-medium text-sm">{title}</h3>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="flex flex-col items-center gap-4"
+      >
+        <div className="flex size-14 items-center justify-center rounded-2xl border border-border/50 bg-muted/50 text-muted-foreground/40">
+          {icon ?? <MessageSquareTextIcon className="size-6" strokeWidth={1.5} />}
+        </div>
+        <div className="space-y-1.5">
+          <h3 className="text-base font-medium text-foreground/80">{title}</h3>
           {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
+            <p className="max-w-xs text-sm text-muted-foreground/70">
+              {description}
+            </p>
           )}
         </div>
-      </>
+      </motion.div>
     )}
   </div>
 );
@@ -300,20 +310,30 @@ export const ConversationScrollButton = ({
   }, [scrollToBottom]);
 
   return (
-    !isAtBottom && (
-      <Button
-        className={cn(
-          "absolute bottom-6 left-[50%] z-10 h-12 w-12 translate-x-[-50%] rounded-full border border-border/70 bg-background/95 text-foreground shadow-lg backdrop-blur-sm transition hover:bg-background",
-          className,
-        )}
-        aria-label="Scroll to latest message"
-        onClick={handleScrollToBottom}
-        type="button"
-        variant="ghost"
-        {...props}
-      >
-        <ArrowDownIcon className="size-6" strokeWidth={1.75} />
-      </Button>
-    )
+    <AnimatePresence>
+      {!isAtBottom && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.8, y: 8 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="absolute bottom-6 left-[50%] z-10"
+        >
+          <Button
+            className={cn(
+              "h-12 w-12 rounded-full border border-border/70 bg-background/95 text-foreground shadow-lg backdrop-blur-sm transition hover:bg-background active:scale-90",
+              className,
+            )}
+            aria-label="Scroll to latest message"
+            onClick={handleScrollToBottom}
+            type="button"
+            variant="ghost"
+            {...props}
+          >
+            <ArrowDownIcon className="size-6" strokeWidth={1.75} />
+          </Button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

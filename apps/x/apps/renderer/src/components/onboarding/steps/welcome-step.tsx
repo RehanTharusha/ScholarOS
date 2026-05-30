@@ -1,4 +1,4 @@
-import { Loader2, FolderOpen, BookOpen, Brain } from "lucide-react";
+import { Loader2, FolderOpen, BookOpen } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import type { OnboardingState } from "../use-onboarding-state";

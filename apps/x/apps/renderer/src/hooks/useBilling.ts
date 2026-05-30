@@ -10,12 +10,12 @@ interface BillingInfo {
   availableCredits: number
 }
 
-export function useBilling(isRowboatConnected: boolean) {
+export function useBilling(isSignedIn: boolean) {
   const [billing, setBilling] = useState<BillingInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   const fetchBilling = useCallback(async () => {
-    if (!isRowboatConnected) {
+    if (!isSignedIn) {
       setBilling(null)
       return
     }
@@ -29,7 +29,7 @@ export function useBilling(isRowboatConnected: boolean) {
     } finally {
       setIsLoading(false)
     }
-  }, [isRowboatConnected])
+  }, [isSignedIn])
 
   useEffect(() => {
     fetchBilling()

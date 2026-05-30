@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./styles/transitions-dev.css";
 
 /* Required for Streamdown markdown rendering (bullet points, lists, etc.) */
 @source "../node_modules/streamdown/dist/*.js";
@@ -51,11 +52,19 @@
 
 /* Onboarding dot grid background */
 .onboarding-dot-grid {
-  background-image: radial-gradient(circle, oklch(0.5 0 0 / 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(
+    circle,
+    oklch(0.5 0 0 / 0.08) 1px,
+    transparent 1px
+  );
   background-size: 24px 24px;
 }
 .dark .onboarding-dot-grid {
-  background-image: radial-gradient(circle, oklch(0.7 0 0 / 0.06) 1px, transparent 1px);
+  background-image: radial-gradient(
+    circle,
+    oklch(0.7 0 0 / 0.06) 1px,
+    transparent 1px
+  );
 }
 
 @theme inline {
@@ -117,7 +126,7 @@
   --color-warm-silver: #b0aea5;
   --font-serif: "Charter", "Georgia", "Palatino", "Times New Roman", serif;
   --font-latin-ui: "Inter", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --shadow-whisper: 0 4px 24px rgba(0,0,0,0.05);
+  --shadow-whisper: 0 4px 24px rgba(0, 0, 0, 0.05);
 }
 
 :root {
@@ -149,7 +158,7 @@
   --sidebar-foreground: var(--text-color, oklch(0.145 0 0));
   --sidebar-primary: var(--main-color, oklch(0.205 0 0));
   --sidebar-primary-foreground: var(--bg-color, oklch(0.985 0 0));
-  --sidebar-accent: var(--sub-color, oklch(0.90 0 0));
+  --sidebar-accent: var(--sub-color, oklch(0.9 0 0));
   --sidebar-accent-foreground: var(--text-color, oklch(0.205 0 0));
   --sidebar-border: var(--sub-alt-color, oklch(0.922 0 0));
   --sidebar-ring: var(--main-color, oklch(0.708 0 0));
@@ -238,12 +247,12 @@
   --scrollbar-thumb-hover: #b8b7b0;
   --radius: 0.5rem;
   /* Whisper shadow for all shadow utilities */
-  --shadow-xs: 0 4px 24px rgba(0,0,0,0.05);
-  --shadow-sm: 0 4px 24px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 24px rgba(0,0,0,0.05);
-  --shadow-lg: 0 4px 24px rgba(0,0,0,0.05);
-  --shadow-xl: 0 4px 24px rgba(0,0,0,0.05);
-  --shadow-2xl: 0 4px 24px rgba(0,0,0,0.05);
+  --shadow-xs: 0 4px 24px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 4px 24px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 4px 24px rgba(0, 0, 0, 0.05);
+  --shadow-2xl: 0 4px 24px rgba(0, 0, 0, 0.05);
 }
 
 @layer base {
@@ -274,6 +283,72 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover);
   }
+}
+
+/* Ambient texture per theme */
+#root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Light theme: subtle warm glow at bottom-right */
+:root #root::before {
+  background: radial-gradient(
+    ellipse 80% 60% at 80% 90%,
+    oklch(0.92 0.01 85 / 0.35),
+    transparent 70%
+  );
+}
+
+/* Paper theme: subtle grain texture */
+.paper #root::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.15'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  background-repeat: repeat;
+  opacity: 0.4;
+}
+
+/* Dark theme: deep gradient with subtle warmth */
+.dark #root::before {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 20% 30%,
+      oklch(0.18 0.015 60 / 0.5),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 80% 80%,
+      oklch(0.15 0.01 260 / 0.4),
+      transparent 50%
+    );
+}
+
+/* Border hierarchy - cards subtly lighter than panel borders */
+.rounded-2xl.border.border-border:not(.border-dashed) {
+  border-color: color-mix(in oklch, var(--border) 55%, transparent);
+}
+
+[data-slot="message-content"] {
+  --msg-border: var(--border);
+}
+
+/* Active/selected border states */
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+[data-state="active"],
+[data-active="true"],
+[aria-selected="true"] {
+  border-color: color-mix(in oklch, var(--primary) 25%, transparent);
 }
 
 /* Markdown content base styles for Streamdown/MessageResponse */
@@ -351,7 +426,7 @@
 }
 
 .graph-view::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background-image: radial-gradient(#1f2937 1px, transparent 1px);
@@ -383,7 +458,7 @@
 }
 
 .upgrade-btn::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background:
@@ -397,7 +472,9 @@
       rgba(168, 85, 247, 0.3) 80%,
       transparent 100%
     );
-  background-size: 100px 100px, 100% 100%;
+  background-size:
+    100px 100px,
+    100% 100%;
   transform: translateX(-120%);
   opacity: 0;
   z-index: 1;
@@ -459,10 +536,96 @@
   background-color: #e8e6dc;
 }
 
+/* Sidebar quick actions: fast, snappy cascade */
+.sidebar-quick-actions {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  transition:
+    max-height 140ms cubic-bezier(0.2, 0.9, 0.2, 1),
+    opacity 110ms ease-out,
+    transform 140ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.sidebar-quick-actions[data-state="open"] {
+  max-height: 320px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sidebar-quick-actions[data-state="closed"] {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+}
+
+.sidebar-quick-action {
+  transition:
+    opacity 120ms ease-out,
+    transform 140ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transition-delay: 0ms;
+  will-change: transform, opacity;
+}
+
+.sidebar-quick-actions[data-state="open"] .sidebar-quick-action {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: var(--stagger, 0ms);
+}
+
+.sidebar-quick-actions[data-state="closed"] .sidebar-quick-action {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition-delay: 0ms;
+}
+
+/* Sidebar folders: fast, snappy collapse/expand */
+.sidebar-folder-collapsible [data-slot="collapsible-content"] {
+  overflow: hidden;
+}
+
+.sidebar-folder-collapsible
+  [data-slot="collapsible-content"][data-state="open"] {
+  animation: sidebar-collapsible-down 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.sidebar-folder-collapsible
+  [data-slot="collapsible-content"][data-state="closed"] {
+  animation: sidebar-collapsible-up 120ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+@keyframes sidebar-collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sidebar-collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
 /* Overlays: warm transparent instead of black */
 .paper [data-slot="dialog-overlay"],
 .paper [data-slot="alert-dialog-overlay"] {
-  background-color: rgba(20,20,19,0.4);
+  background-color: rgba(20, 20, 19, 0.4);
 }
 
 /* Onboarding dot grid */

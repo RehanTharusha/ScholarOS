@@ -5,6 +5,7 @@ import {
 } from "./runtime-context.js";
 import { composioAccountsRepo } from "../../composio/repo.js";
 import { isConfigured as isComposioConfigured } from "../../composio/client.js";
+import { getMergedTasks } from "../../calendar/frontmatter-scanner.js";
 
 const runtimeContextPrompt = getRuntimeContextPrompt(getRuntimeContext());
 
@@ -376,6 +377,55 @@ For browser pages, mention the URL in plain text or use the browser-control tool
 Never output raw file paths in plain text when they could be wrapped in a filepath block — unless the file does not exist yet.`;
 }
 
+/**
+ * Generate calendar/task context for the system prompt.
+ * Lists upcoming pending tasks so the AI can proactively mention deadlines.
+ */
+async function getCalendarContextPrompt(): Promise<string> {
+  try {
+    const tasks = await getMergedTasks();
+    const today = new Date().toISOString().split("T")[0];
+    const twoWeeks = new Date(Date.now() + 14 * 86400000)
+      .toISOString()
+      .split("T")[0];
+
+    const upcoming = tasks.filter(
+      (t) => t.due >= today && t.due <= twoWeeks && t.status === "pending",
+    );
+
+    if (upcoming.length === 0) {
+      return `
+## Tasks
+No upcoming tasks in the next 14 days. Use \`tasks-list\` to check all tasks, or \`tasks-create\` to add one.`;
+    }
+
+    const taskLines = upcoming
+      .map((t) => {
+        const daysUntil = Math.ceil(
+          (new Date(t.due).getTime() - Date.now()) / 86400000,
+        );
+        const timeStr = t.dueTime ? ` at ${t.dueTime}` : "";
+        const daysStr =
+          daysUntil === 0
+            ? " **TODAY**"
+            : daysUntil === 1
+              ? " **TOMORROW**"
+              : ` (in ${daysUntil} days)`;
+        const sourceStr = t.source ? ` → \`${t.source}\`` : "";
+        return `- **${t.title}** — ${t.due}${timeStr}${daysStr} [${t.type}]${sourceStr}`;
+      })
+      .join("\n");
+
+    return `
+## Tasks — Upcoming (next 14 days)
+${taskLines}
+
+Use \`tasks-list\` for the full list. Use \`tasks-create\` to add tasks from natural language (e.g., "add assignment due May 20"). Use \`tasks-complete\` to mark tasks as done.`;
+  } catch {
+    return "";
+  }
+}
+
 /** Keep backward-compatible export for any external consumers */
 export const CopilotInstructions = buildStaticInstructions(true, skillCatalog);
 
@@ -404,8 +454,11 @@ export async function buildCopilotInstructions(): Promise<string> {
     : buildSkillCatalog({ excludeIds: ["composio-integration"] });
   const baseInstructions = buildStaticInstructions(composioEnabled, catalog);
   const composioPrompt = await getComposioToolsPrompt();
-  cachedInstructions = composioPrompt
-    ? baseInstructions + "\n" + composioPrompt
-    : baseInstructions;
+  const calendarPrompt = await getCalendarContextPrompt();
+
+  let result = composioPrompt ? baseInstructions + "\n" + composioPrompt : baseInstructions;
+  if (calendarPrompt) result += "\n" + calendarPrompt;
+
+  cachedInstructions = result;
   return cachedInstructions;
 }

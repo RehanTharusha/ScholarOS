@@ -118,7 +118,7 @@ export function ConnectorsPopover({
               onClick={() => c.handleDisconnect(provider)}
               className="h-7 px-2 text-xs"
             >
-              {provider === "rowboat" ? "Log Out" : "Disconnect"}
+              {provider === "scholaros" ? "Log Out" : "Disconnect"}
             </Button>
           ) : (
             <Button
@@ -130,7 +130,7 @@ export function ConnectorsPopover({
             >
               {state.isConnecting ? (
                 <Loader2 className="size-3 animate-spin" />
-              ) : provider === "rowboat" ? (
+              ) : provider === "scholaros" ? (
                 "Log In"
               ) : (
                 "Connect"
@@ -143,13 +143,13 @@ export function ConnectorsPopover({
   };
 
   // For unconnected mode, check if there's anything to show
-  const isRowboatUnconnected = (() => {
-    if (!c.providers.includes("rowboat")) return false;
-    const rowboatState = c.providerStates["rowboat"];
-    return !rowboatState?.isConnected || rowboatState?.isLoading;
+  const isScholarOSUnconnected = (() => {
+    if (!c.providers.includes("scholaros")) return false;
+    const scholarosState = c.providerStates["scholaros"];
+    return !scholarosState?.isConnected || scholarosState?.isLoading;
   })();
 
-  const allConnected = isUnconnectedMode && !isRowboatUnconnected;
+  const allConnected = isUnconnectedMode && !isScholarOSUnconnected;
 
   return (
     <>
@@ -213,13 +213,13 @@ export function ConnectorsPopover({
               </div>
             ) : (
               <>
-                {/* Rowboat Account - show in "all" mode always, or in "unconnected" mode only when not connected */}
-                {c.providers.includes("rowboat") &&
+                {/* ScholarOS Account - show in "all" mode always, or in "unconnected" mode only when not connected */}
+                {c.providers.includes("scholaros") &&
                   (() => {
-                    const rowboatState = c.providerStates["rowboat"];
-                    const isRowboatConnected =
-                      rowboatState?.isConnected && !rowboatState?.isLoading;
-                    if (isUnconnectedMode && isRowboatConnected) return null;
+                    const scholarosState = c.providerStates["scholaros"];
+                    const isConnected =
+                      scholarosState?.isConnected && !scholarosState?.isLoading;
+                    if (isUnconnectedMode && isConnected) return null;
                     return (
                       <>
                         <div className="px-2 py-1.5">
@@ -228,10 +228,10 @@ export function ConnectorsPopover({
                           </span>
                         </div>
                         {renderOAuthProvider(
-                          "rowboat",
-                          "Rowboat",
+                          "scholaros",
+                          "ScholarOS",
                           <User className="size-4" />,
-                          "Log in to your Rowboat account",
+                          "Log in to your ScholarOS account",
                         )}
                         <Separator className="my-2" />
                       </>

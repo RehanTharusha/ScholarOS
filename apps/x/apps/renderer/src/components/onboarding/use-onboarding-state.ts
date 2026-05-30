@@ -320,6 +320,24 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     handleNext,
   ]);
 
+  // Connect accounts state
+  const [providers] = useState<string[]>([]);
+  const [providersLoading] = useState(false);
+  const [providerStates] = useState<Record<string, ProviderState>>({});
+
+  const handleConnect = useCallback((_provider: string) => {
+    // no-op placeholder
+  }, []);
+
+  const [useComposioForGoogle] = useState(false);
+  const [gmailConnected] = useState(false);
+  const [gmailLoading] = useState(false);
+  const [gmailConnecting] = useState(false);
+
+  const handleConnectGmail = useCallback(() => {
+    // no-op placeholder
+  }, []);
+
   // Vault selection state
   const [vaultLoading, setVaultLoading] = useState(false);
 
@@ -375,6 +393,17 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     handleNext,
     handleBack,
     handleComplete,
+
+    // Connect accounts
+    providers,
+    providersLoading,
+    providerStates,
+    handleConnect,
+    useComposioForGoogle,
+    gmailConnected,
+    gmailLoading,
+    gmailConnecting,
+    handleConnectGmail,
 
     // Vault
     vaultPath,

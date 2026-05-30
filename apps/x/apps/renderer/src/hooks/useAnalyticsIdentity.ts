@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import posthog from 'posthog-js'
 
 /**
- * Identifies the user in PostHog when signed into Rowboat,
+ * Identifies the user in PostHog when signed into ScholarOS,
  * and sets user properties for connected OAuth providers.
  * Call once at the App level.
  */
@@ -14,15 +14,15 @@ export function useAnalyticsIdentity() {
         const result = await window.ipc.invoke('oauth:getState', null)
         const config = result.config || {}
 
-        // Identify if Rowboat account is connected
-        const rowboat = config.rowboat
-        if (rowboat?.connected && rowboat?.userId) {
-          posthog.identify(rowboat.userId)
+        // Identify if ScholarOS account is connected
+        const scholaros = config.scholaros
+        if (scholaros?.connected && scholaros?.userId) {
+          posthog.identify(scholaros.userId)
         }
 
         // Set provider connection flags
-        const providers = ['gmail', 'calendar', 'slack', 'rowboat']
-        const props: Record<string, boolean> = { signed_in: !!rowboat?.connected }
+        const providers = ['gmail', 'calendar', 'slack', 'scholaros']
+        const props: Record<string, boolean> = { signed_in: !!scholaros?.connected }
         for (const p of providers) {
           props[`${p}_connected`] = !!config[p]?.connected
         }
@@ -60,8 +60,8 @@ export function useAnalyticsIdentity() {
     const cleanup = window.ipc.on('oauth:didConnect', (event) => {
       if (!event.success) return
 
-      // If Rowboat provider connected, identify user
-      if (event.provider === 'rowboat' && event.userId) {
+      // If ScholarOS provider connected, identify user
+      if (event.provider === 'scholaros' && event.userId) {
         posthog.identify(event.userId)
         posthog.people.set({ signed_in: true })
       }

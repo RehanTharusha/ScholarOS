@@ -1,16 +1,20 @@
-import { z } from 'zod';
-import { getRowboatConfig } from '../config/rowboat.js';
+import { z } from "zod";
+import { API_URL } from "../config/env.js";
 
 /**
  * Discovery configuration - how to get OAuth endpoints
  */
-const DiscoverySchema = z.discriminatedUnion('mode', [
+const DiscoverySchema = z.discriminatedUnion("mode", [
   z.object({
-    mode: z.literal('issuer'),
-    issuer: z.url().describe('The issuer base url. To discover the endpoints, the client will fetch the .well-known/oauth-authorization-server from this url.'),
+    mode: z.literal("issuer"),
+    issuer: z
+      .url()
+      .describe(
+        "The issuer base url. To discover the endpoints, the client will fetch the .well-known/oauth-authorization-server from this url.",
+      ),
   }),
   z.object({
-    mode: z.literal('static'),
+    mode: z.literal("static"),
     authorizationEndpoint: z.url(),
     tokenEndpoint: z.url(),
     revocationEndpoint: z.url().optional(),
@@ -20,13 +24,13 @@ const DiscoverySchema = z.discriminatedUnion('mode', [
 /**
  * Client configuration - how to get client credentials
  */
-const ClientSchema = z.discriminatedUnion('mode', [
+const ClientSchema = z.discriminatedUnion("mode", [
   z.object({
-    mode: z.literal('static'),
+    mode: z.literal("static"),
     clientId: z.string().min(1).optional(),
   }),
   z.object({
-    mode: z.literal('dcr'),
+    mode: z.literal("dcr"),
     // If omitted, should be discovered from auth-server metadata as `registration_endpoint`
     registrationEndpoint: z.url().optional(),
   }),
@@ -42,7 +46,7 @@ const ProviderConfigSchema = z.record(
     discovery: DiscoverySchema,
     client: ClientSchema,
     scopes: z.array(z.string()).optional(),
-  })
+  }),
 );
 
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
@@ -52,62 +56,52 @@ export type ProviderConfigEntry = ProviderConfig[string];
  * All configured OAuth providers
  */
 const providerConfigs: ProviderConfig = {
-  rowboat: {
+  scholaros: {
     discovery: {
-      mode: 'issuer',
-      issuer: "TBD",
+      mode: "static",
+      authorizationEndpoint: `${API_URL}/api/oauth/authorize`,
+      tokenEndpoint: `${API_URL}/api/oauth/token`,
     },
     client: {
-      mode: 'dcr',
+      mode: "static",
+      clientId: process.env.SCHOLAROS_CLIENT_ID || "scholaros-desktop",
     },
-    scopes: [
-      "openid",
-      "email",
-      "profile",
-    ],
+    scopes: ["email", "profile", "offline_access"],
   },
   google: {
     discovery: {
-      mode: 'issuer',
-      issuer: 'https://accounts.google.com',
+      mode: "issuer",
+      issuer: "https://accounts.google.com",
     },
     client: {
-      mode: 'static',
+      mode: "static",
     },
     scopes: [
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/drive.readonly',
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/drive.readonly",
     ],
   },
-  'fireflies-ai': {
+  "fireflies-ai": {
     discovery: {
-      mode: 'issuer',
-      issuer: 'https://api.fireflies.ai/.well-known/oauth-authorization-server',
+      mode: "issuer",
+      issuer: "https://api.fireflies.ai/.well-known/oauth-authorization-server",
     },
     client: {
-      mode: 'dcr',
+      mode: "dcr",
     },
-    scopes: [
-      'profile',
-      'email',
-    ]
-  }
+    scopes: ["profile", "email"],
+  },
 };
 
 /**
  * Get provider configuration by name
  */
-export async function getProviderConfig(providerName: string): Promise<ProviderConfigEntry> {
+export async function getProviderConfig(
+  providerName: string,
+): Promise<ProviderConfigEntry> {
   const config = providerConfigs[providerName];
   if (!config) {
     throw new Error(`Unknown OAuth provider: ${providerName}`);
-  }
-  if (providerName === 'rowboat') {
-    const rowboatConfig = await getRowboatConfig();
-    config.discovery = {
-      mode: 'issuer',
-      issuer: `${rowboatConfig.supabaseUrl}/auth/v1/.well-known/oauth-authorization-server`,
-    }
   }
   return config;
 }
@@ -118,4 +112,3 @@ export async function getProviderConfig(providerName: string): Promise<ProviderC
 export function getAvailableProviders(): string[] {
   return Object.keys(providerConfigs);
 }
-

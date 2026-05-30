@@ -1,31 +1,31 @@
 import { z } from 'zod';
 import { useCallback, useEffect, useState } from 'react';
-import { RowboatApiConfig } from '@x/shared/dist/rowboat-account.js';
+import { ScholarOSApiConfig } from '@x/shared/dist/rowboat-account.js';
 
 
-interface RowboatAccountState {
+interface ScholarOSAccountState {
   signedIn: boolean;
   accessToken: string | null;
-  config: z.infer<typeof RowboatApiConfig> | null;
+  config: z.infer<typeof ScholarOSApiConfig> | null;
 }
 
-export type RowboatAccountSnapshot = RowboatAccountState;
+export type ScholarOSAccountSnapshot = ScholarOSAccountState;
 
-const DEFAULT_STATE: RowboatAccountState = {
+const DEFAULT_STATE: ScholarOSAccountState = {
   signedIn: false,
   accessToken: null,
   config: null,
 };
 
-export function useRowboatAccount() {
-  const [state, setState] = useState<RowboatAccountState>(DEFAULT_STATE);
+export function useScholarOSAccount() {
+  const [state, setState] = useState<ScholarOSAccountState>(DEFAULT_STATE);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const refresh = useCallback(async (): Promise<RowboatAccountSnapshot | null> => {
+  const refresh = useCallback(async (): Promise<ScholarOSAccountSnapshot | null> => {
     try {
       setIsLoading(true);
-      const result = await window.ipc.invoke('account:getRowboat', null);
-      const next: RowboatAccountSnapshot = {
+      const result = await window.ipc.invoke('account:getAccount', null);
+      const next: ScholarOSAccountSnapshot = {
         signedIn: result.signedIn,
         accessToken: result.accessToken,
         config: result.config,
@@ -33,7 +33,7 @@ export function useRowboatAccount() {
       setState(next);
       return next;
     } catch (error) {
-      console.error('Failed to load Rowboat account state:', error);
+      console.error('Failed to load ScholarOS account state:', error);
       setState(DEFAULT_STATE);
       return null;
     } finally {
@@ -47,7 +47,7 @@ export function useRowboatAccount() {
 
   useEffect(() => {
     const cleanup = window.ipc.on('oauth:didConnect', (event) => {
-      if (event.provider !== 'rowboat') {
+      if (event.provider !== 'scholaros') {
         return;
       }
       refresh();

@@ -40,7 +40,7 @@ interface OnboardingModalProps {
 
 type Step = 0 | 1 | 2 | 3 | 4
 
-type OnboardingPath = 'rowboat' | 'byok' | null
+type OnboardingPath = 'scholaros' | 'byok' | null
 
 type LlmProviderFlavor = "openai" | "anthropic" | "google" | "openrouter" | "aigateway" | "ollama" | "openai-compatible"
 
@@ -350,7 +350,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
       setCurrentStep(1 as Step)
     } else if (currentStep === 3) {
       // Connect accounts → back depends on path
-      if (onboardingPath === 'rowboat') {
+      if (onboardingPath === 'scholaros') {
         setCurrentStep(0 as Step)
       } else {
         setCurrentStep(2 as Step)
@@ -464,12 +464,12 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     return cleanup
   }, [])
 
-  // Auto-advance from Rowboat sign-in step when OAuth completes
+  // Auto-advance from ScholarOS sign-in step when OAuth completes
   useEffect(() => {
-    if (onboardingPath !== 'rowboat' || currentStep !== 0) return
+    if (onboardingPath !== 'scholaros' || currentStep !== 0) return
 
     const cleanup = window.ipc.on('oauth:didConnect', (event) => {
-      if (event.provider === 'rowboat' && event.success) {
+      if (event.provider === 'scholaros' && event.success) {
         setCurrentStep(3 as Step)
       }
     })
@@ -537,12 +537,12 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
   // Step indicator - dynamic based on path
   const renderStepIndicator = () => {
-    // Rowboat path: Sign In (0), Connect (3), Done (4) = 3 dots
+    // ScholarOS path: Sign In (0), Connect (3), Done (4) = 3 dots
     // BYOK path: Sign In (0), Upsell (1), Model (2), Connect (3), Done (4) = 5 dots
     // Before path is chosen: show 3 dots (minimal)
-    const rowboatSteps = [0, 3, 4]
+    const scholarosSteps = [0, 3, 4]
     const byokSteps = [0, 1, 2, 3, 4]
-    const steps = onboardingPath === 'byok' ? byokSteps : rowboatSteps
+    const steps = onboardingPath === 'byok' ? byokSteps : scholarosSteps
     const currentIndex = steps.indexOf(currentStep)
 
     return (
@@ -740,7 +740,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
   // Step 0: Sign in to ScholarOS (with BYOK option)
   const renderSignInStep = () => {
-    const rowboatState = providerStates['rowboat'] || { isConnected: false, isLoading: false, isConnecting: false }
+    const scholarosState = providerStates['scholaros'] || { isConnected: false, isLoading: false, isConnecting: false }
 
     return (
       <div className="flex flex-col items-center text-center">
@@ -754,7 +754,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
           </DialogDescription>
         </DialogHeader>
 
-        {rowboatState.isConnected ? (
+        {scholarosState.isConnected ? (
           <div className="flex flex-col items-center gap-4">
             <div className="flex items-center gap-2 text-green-600">
               <CheckCircle2 className="size-5" />
@@ -768,20 +768,20 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
           <div className="flex flex-col items-center gap-4 w-full max-w-xs">
             <Button
               onClick={() => {
-                setOnboardingPath('rowboat')
-                startConnect('rowboat')
+                setOnboardingPath('scholaros')
+                startConnect('scholaros')
               }}
               size="lg"
               className="w-full"
-              disabled={rowboatState.isConnecting}
+              disabled={scholarosState.isConnecting}
             >
-              {rowboatState.isConnecting ? (
+              {scholarosState.isConnecting ? (
                 <><Loader2 className="size-4 animate-spin mr-2" />Waiting for sign in...</>
               ) : (
                 "Sign in with ScholarOS"
               )}
             </Button>
-            {rowboatState.isConnecting && (
+            {scholarosState.isConnecting && (
               <p className="text-xs text-muted-foreground">
                 Complete sign in in your browser, then return here.
               </p>

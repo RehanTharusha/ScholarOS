@@ -341,10 +341,7 @@ import {
   normalizeWikiPath,
   wikiLabel,
 } from "@/lib/wiki-links";
-import {
-  extractAllFrontmatterValues,
-  buildFrontmatter,
-} from "@/lib/frontmatter";
+
 import "@/styles/editor.css";
 
 type WikiLinkConfig = {
@@ -381,10 +378,6 @@ type WikiLinkMatch = {
 };
 
 type SelectionHighlightRange = { from: number; to: number } | null;
-
-type MarkdownStorage = {
-  getMarkdown?: () => string;
-};
 
 // Plugin key for the selection highlight
 const selectionHighlightKey = new PluginKey("selectionHighlight");
@@ -1011,8 +1004,8 @@ export const MarkdownEditor = forwardRef<
     }
 
     onHistoryHandlersChange({
-      undo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().undo().run(); },
-      redo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().redo().run(); },
+      undo: () => { if (editor && !editor.isDestroyed) { editor.chain().focus().undo().run(); return true; } return false; },
+      redo: () => { if (editor && !editor.isDestroyed) { editor.chain().focus().redo().run(); return true; } return false; },
     });
 
     return () => {
@@ -1155,7 +1148,7 @@ export const MarkdownEditor = forwardRef<
 
   // @ mention selection handler
   const handleSelectAtMention = useCallback(
-    (value: string) => {
+    (_value: string) => {
       if (!editor || !activeAtMention) return;
 
       setActiveAtMention(null);

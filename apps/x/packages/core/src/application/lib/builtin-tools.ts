@@ -2501,4 +2501,158 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
     },
     isAvailable: async () => isComposioConfigured(),
   },
+
+  // ── Task Tools ───────────────────────────────────────────────────────────────
+
+  "tasks-list": {
+    description:
+      "List all tasks (manual + from MD file frontmatter). Returns tasks sorted by due date. Use to check deadlines, assignments, and upcoming tasks. Filter by status (pending/done), date range, or type.",
+    inputSchema: z.object({
+      startDate: z
+        .string()
+        .optional()
+        .describe("Filter start date (YYYY-MM-DD). Defaults to no lower bound."),
+      endDate: z
+        .string()
+        .optional()
+        .describe("Filter end date (YYYY-MM-DD). Defaults to no upper bound."),
+      status: z
+        .enum(["pending", "done"])
+        .optional()
+        .describe("Filter by task status."),
+      type: z
+        .enum(["manual", "assignment", "lecture", "deadline", "custom"])
+        .optional()
+        .describe("Filter by task type."),
+    }),
+    execute: async ({
+      startDate,
+      endDate,
+      status,
+      type,
+    }: {
+      startDate?: string;
+      endDate?: string;
+      status?: string;
+      type?: string;
+    }) => {
+      try {
+        const { getMergedTasks } = await import(
+          "../../calendar/frontmatter-scanner.js"
+        );
+        let tasks = await getMergedTasks();
+
+        if (startDate) tasks = tasks.filter((t) => t.due >= startDate);
+        if (endDate) tasks = tasks.filter((t) => t.due <= endDate);
+        if (status) tasks = tasks.filter((t) => t.status === status);
+        if (type) tasks = tasks.filter((t) => t.type === type);
+
+        return { tasks, count: tasks.length };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "tasks-create": {
+    description:
+      "Create a new task. Parse natural language like 'assignment due May 12' into structured fields before calling this tool.",
+    inputSchema: z.object({
+      title: z.string().min(1).describe("Task title"),
+      due: z.string().describe("Due date in YYYY-MM-DD format"),
+      dueTime: z
+        .string()
+        .optional()
+        .describe("Optional time in HH:mm format (24-hour)"),
+      type: z
+        .enum(["manual", "assignment", "lecture", "deadline", "custom"])
+        .default("manual")
+        .describe("Task type"),
+      description: z
+        .string()
+        .optional()
+        .describe("Optional description or notes"),
+    }),
+    execute: async ({
+      title,
+      due,
+      dueTime,
+      type,
+      description,
+    }: {
+      title: string;
+      due: string;
+      dueTime?: string;
+      type?: string;
+      description?: string;
+    }) => {
+      try {
+        const { getTaskRepo } = await import("../../calendar/repo.js");
+        const repo = getTaskRepo();
+        const task = await repo.create({
+          title,
+          due,
+          dueTime,
+          type: (type as "manual" | "assignment" | "lecture" | "deadline" | "custom") || "manual",
+          description,
+        });
+        return {
+          success: true,
+          task,
+          message: `Created "${title}" due ${due}`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "tasks-complete": {
+    description: "Mark a task as done by its ID.",
+    inputSchema: z.object({
+      id: z.string().describe("The task ID to mark as done"),
+    }),
+    execute: async ({ id }: { id: string }) => {
+      try {
+        const { getTaskRepo } = await import("../../calendar/repo.js");
+        const repo = getTaskRepo();
+        const task = await repo.complete(id);
+        return {
+          success: true,
+          task,
+          message: `Marked "${task.title}" as done`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
+
+  "tasks-delete": {
+    description: "Delete a task by its ID.",
+    inputSchema: z.object({
+      id: z.string().describe("The task ID to delete"),
+    }),
+    execute: async ({ id }: { id: string }) => {
+      try {
+        const { getTaskRepo } = await import("../../calendar/repo.js");
+        const repo = getTaskRepo();
+        await repo.delete(id);
+        return { success: true, message: `Deleted task ${id}` };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  },
 };

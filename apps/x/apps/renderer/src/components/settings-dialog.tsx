@@ -17,9 +17,7 @@ import {
   Wrench,
   BookOpen,
   Search,
-  ChevronRight,
   Link2,
-  Mail,
   User,
   Plug,
   Type,
@@ -36,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/theme-context";
 import { toast } from "sonner";
@@ -1121,10 +1119,10 @@ interface ToolkitInfo {
 
 function ToolsLibrarySettings({
   dialogOpen,
-  rowboatConnected,
+  scholarosConnected,
 }: {
   dialogOpen: boolean;
-  rowboatConnected: boolean;
+  scholarosConnected: boolean;
 }) {
   // API key state
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
@@ -1280,7 +1278,7 @@ function ToolsLibrarySettings({
   return (
     <div className="space-y-4">
       {/* Section A: API Key (only in BYOK mode) */}
-      {!rowboatConnected && (
+      {!scholarosConnected && (
         <div className="space-y-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Composio API Key
@@ -1486,10 +1484,10 @@ function RowboatModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       try {
         // Fetch gateway models
         const listResult = await window.ipc.invoke("models:list", null);
-        const rowboatProvider = listResult.providers?.find(
-          (p: { id: string }) => p.id === "rowboat",
+        const scholarosProvider = listResult.providers?.find(
+          (p: { id: string }) => p.id === "scholaros",
         );
-        const models = rowboatProvider?.models || [];
+        const models = scholarosProvider?.models || [];
         setGatewayModels(models);
 
         // Read current selection from config
@@ -1601,192 +1599,6 @@ function RowboatModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
   );
 }
 
-// --- Note Tagging Settings ---
-
-interface TagDef {
-  tag: string;
-  type: string;
-  applicability: "email" | "notes" | "both";
-  description: string;
-  example?: string;
-  noteEffect?: "create" | "skip" | "none";
-}
-
-const NOTE_TAG_TYPE_ORDER = [
-  "relationship",
-  "relationship-sub",
-  "topic",
-  "action",
-  "status",
-  "source",
-];
-
-const EMAIL_TAG_TYPE_ORDER = [
-  "relationship",
-  "topic",
-  "email-type",
-  "noise",
-  "action",
-  "status",
-];
-
-const TAG_TYPE_LABELS: Record<string, string> = {
-  relationship: "Relationship",
-  "relationship-sub": "Relationship Sub-Tags",
-  topic: "Topic",
-  "email-type": "Email Type",
-  noise: "Noise",
-  action: "Action",
-  status: "Status",
-  source: "Source",
-};
-
-function TagGroupTable({
-  group,
-  tags: _tags,
-  collapsed,
-  onToggle,
-  onAdd,
-  onUpdate,
-  onRemove,
-  getGlobalIndex,
-  isEmail,
-}: {
-  group: { type: string; label: string; tags: TagDef[] };
-  tags: TagDef[];
-  collapsed: boolean;
-  onToggle: () => void;
-  onAdd: () => void;
-  onUpdate: (
-    index: number,
-    field: keyof TagDef,
-    value: string | boolean,
-  ) => void;
-  onRemove: (index: number) => void;
-  getGlobalIndex: (type: string, localIndex: number) => number;
-  isEmail: boolean;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <button
-          onClick={onToggle}
-          className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronRight
-            className={cn(
-              "size-3.5 transition-transform",
-              !collapsed && "rotate-90",
-            )}
-          />
-          {group.label}
-          <span className="text-[10px] ml-0.5">({group.tags.length})</span>
-        </button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs"
-          onClick={onAdd}
-        >
-          <Plus className="size-3 mr-1" />
-          Add
-        </Button>
-      </div>
-      {!collapsed && group.tags.length > 0 && (
-        <div className="border rounded-md overflow-hidden">
-          <div
-            className={cn(
-              "gap-1 bg-muted/50 px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider grid",
-              isEmail
-                ? "grid-cols-[100px_1fr_1fr_60px_24px]"
-                : "grid-cols-[100px_1fr_1fr_24px]",
-            )}
-          >
-            <div>Label</div>
-            <div>Description</div>
-            <div>Example</div>
-            {isEmail && (
-              <div
-                className="text-center"
-                title="Emails with this label will be excluded from creating notes"
-              >
-                Skip notes
-              </div>
-            )}
-            <div />
-          </div>
-          {group.tags.map((tag, localIdx) => {
-            const globalIdx = getGlobalIndex(group.type, localIdx);
-            return (
-              <div
-                key={globalIdx}
-                className={cn(
-                  "gap-1 border-t px-2 py-0.5 items-center grid",
-                  isEmail
-                    ? "grid-cols-[100px_1fr_1fr_60px_24px]"
-                    : "grid-cols-[100px_1fr_1fr_24px]",
-                )}
-              >
-                <Input
-                  value={tag.tag}
-                  onChange={(e) => onUpdate(globalIdx, "tag", e.target.value)}
-                  className="h-7 text-xs"
-                  placeholder="tag-name"
-                  title={tag.tag}
-                />
-                <Input
-                  value={tag.description}
-                  onChange={(e) =>
-                    onUpdate(globalIdx, "description", e.target.value)
-                  }
-                  className="h-7 text-xs"
-                  placeholder="Description"
-                  title={tag.description}
-                />
-                <Input
-                  value={tag.example || ""}
-                  onChange={(e) =>
-                    onUpdate(globalIdx, "example", e.target.value)
-                  }
-                  className="h-7 text-xs"
-                  placeholder="Example"
-                  title={tag.example || ""}
-                />
-                {isEmail && (
-                  <div className="flex justify-center">
-                    <Switch
-                      checked={tag.noteEffect === "skip"}
-                      onCheckedChange={(checked) =>
-                        onUpdate(
-                          globalIdx,
-                          "noteEffect",
-                          checked ? "skip" : "create",
-                        )
-                      }
-                      className="scale-75"
-                    />
-                  </div>
-                )}
-                <button
-                  onClick={() => onRemove(globalIdx)}
-                  className="flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {!collapsed && group.tags.length === 0 && (
-        <div className="text-xs text-muted-foreground italic px-2">
-          No tags in this group
-        </div>
-      )}
-    </div>
-  );
-}
-
 // --- Main Settings Dialog ---
 
 export function SettingsDialog({ children }: SettingsDialogProps) {
@@ -1797,25 +1609,25 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rowboatConnected, setRowboatConnected] = useState(false);
+  const [scholarosConnected, setScholarOSConnected] = useState(false);
 
-  // Check if user is signed in to Rowboat
+  // Check if user is signed in to ScholarOS
   useEffect(() => {
     if (!open) return;
     window.ipc
       .invoke("oauth:getState", null)
       .then((result) => {
-        const connected = result.config?.rowboat?.connected ?? false;
-        setRowboatConnected(connected);
+        const connected = result.config?.scholaros?.connected ?? false;
+        setScholarOSConnected(connected);
       })
       .catch(() => {
-        setRowboatConnected(false);
+        setScholarOSConnected(false);
       });
   }, [open]);
 
   const visibleTabs = useMemo(
-    () => (rowboatConnected ? tabs.filter((t) => t.id !== "models") : tabs),
-    [rowboatConnected],
+    () => (scholarosConnected ? tabs.filter((t) => t.id !== "models") : tabs),
+    [scholarosConnected],
   );
 
   const activeTabConfig =
@@ -1936,7 +1748,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
             <div className="px-4 py-3 border-b">
               <h3 className="font-medium text-sm">{activeTabConfig.label}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {activeTab === "models" && rowboatConnected
+                {activeTab === "models" && scholarosConnected
                   ? "Select your default models"
                   : activeTabConfig.description}
               </p>
@@ -1959,7 +1771,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
               ) : activeTab === "connected-accounts" ? (
                 <ConnectedAccountsSettings dialogOpen={open} />
               ) : activeTab === "models" ? (
-                rowboatConnected ? (
+                scholarosConnected ? (
                   <RowboatModelSettings dialogOpen={open} />
                 ) : (
                   <ModelSettings dialogOpen={open} />
@@ -1969,7 +1781,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
               ) : activeTab === "tools" ? (
                 <ToolsLibrarySettings
                   dialogOpen={open}
-                  rowboatConnected={rowboatConnected}
+                  scholarosConnected={scholarosConnected}
                 />
               ) : loading ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">

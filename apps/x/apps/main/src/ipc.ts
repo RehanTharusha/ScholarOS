@@ -1,10 +1,4 @@
-import {
-  ipcMain,
-  BrowserWindow,
-  shell,
-  app,
-  dialog,
-} from "electron";
+import { ipcMain, BrowserWindow, shell, app, dialog } from "electron";
 import { ipc } from "@x/shared";
 import path from "node:path";
 import os from "node:os";
@@ -50,7 +44,7 @@ import { search } from "@x/core/dist/search/search.js";
 import { versionHistory, voice } from "@x/core";
 import { getBillingInfo } from "@x/core/dist/billing/billing.js";
 import { getAccessToken } from "@x/core/dist/auth/tokens.js";
-import { getRowboatConfig } from "@x/core/dist/config/rowboat.js";
+import { getScholarOSConfig } from "@x/core/dist/config/rowboat.js";
 import {
   WorkDir,
   saveVaultPath,
@@ -620,13 +614,13 @@ export function setupIpcHandlers() {
       const config = await repo.getClientFacingConfig();
       return { config };
     },
-    "account:getRowboat": async () => {
+    "account:getAccount": async () => {
       const signedIn = await isSignedIn();
       if (!signedIn) {
         return { signedIn: false, accessToken: null, config: null };
       }
 
-      const config = await getRowboatConfig();
+      const config = await getScholarOSConfig();
 
       try {
         const accessToken = await getAccessToken();
@@ -718,6 +712,11 @@ export function setupIpcHandlers() {
       const filePath = resolveShellPath(args.path);
       const error = await shell.openPath(filePath);
       return { error: error || undefined };
+    },
+    "shell:revealInFolder": async (_event, args) => {
+      const filePath = resolveShellPath(args.path);
+      shell.showItemInFolder(filePath);
+      return { success: true as const };
     },
     "shell:readFileBase64": async (_event, args) => {
       const filePath = resolveShellPath(args.path);
@@ -910,6 +909,43 @@ export function setupIpcHandlers() {
     "vault:setPath": async (_event, args) => {
       saveVaultPath(args.path);
       return { success: true as const };
+    },
+    // Calendar / Tasks handlers
+    "calendar:list": async () => {
+      const { getMergedTasks } = await import("@x/core/dist/calendar/frontmatter-scanner.js");
+      const tasks = await getMergedTasks();
+      return { tasks };
+    },
+    "calendar:create": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      const task = await repo.create({
+        title: args.title,
+        due: args.due,
+        dueTime: args.dueTime,
+        type: args.type,
+        source: args.source,
+        description: args.description,
+      });
+      return { task };
+    },
+    "calendar:complete": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      const task = await repo.complete(args.id);
+      return { task };
+    },
+    "calendar:delete": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      await repo.delete(args.id);
+      return { success: true as const };
+    },
+    "calendar:upcoming": async (_event, args) => {
+      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const repo = getTaskRepo();
+      const tasks = await repo.getUpcoming(args.days || 14);
+      return { tasks };
     },
     // Embedded browser handlers (WebContentsView + navigation)
     ...browserIpcHandlers,
