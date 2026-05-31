@@ -27,6 +27,8 @@ const execAsync = promisify(exec);
 import { RunEvent } from "@x/shared/dist/runs.js";
 import { ServiceEvent } from "@x/shared/dist/service-events.js";
 import container from "@x/core/dist/di/container.js";
+import { KnowledgeGraphService } from "@x/core/dist/knowledge/graph/service.js";
+import type { KnowledgeGraph } from "@x/core/dist/knowledge/graph/graph.js";
 import { listOnboardingModels } from "@x/core/dist/models/models-dev.js";
 import { testModelConnection } from "@x/core/dist/models/models.js";
 import { isSignedIn } from "@x/core/dist/account/account.js";
@@ -426,6 +428,36 @@ export function stopServicesWatcher(): void {
     servicesWatcher();
     servicesWatcher = null;
   }
+}
+
+// Knowledge Graph Service lifecycle
+let kgService: KnowledgeGraphService | null = null;
+
+export async function initKnowledgeGraphService(): Promise<void> {
+  if (kgService) return;
+  try {
+    const graph = container.resolve<KnowledgeGraph>('knowledgeGraph');
+    kgService = new KnowledgeGraphService(graph);
+    await kgService.init();
+    console.log('[KnowledgeGraph] Service started');
+  } catch (err) {
+    console.error('[KnowledgeGraph] Failed to initialize service:', err);
+  }
+}
+
+export async function shutdownKnowledgeGraphService(): Promise<void> {
+  if (!kgService) return;
+  try {
+    await kgService.shutdown();
+    kgService = null;
+    console.log('[KnowledgeGraph] Service shut down');
+  } catch (err) {
+    console.error('[KnowledgeGraph] Failed to shut down service:', err);
+  }
+}
+
+export function getKnowledgeGraphService(): KnowledgeGraphService | null {
+  return kgService;
 }
 
 // ============================================================================
@@ -946,6 +978,62 @@ export function setupIpcHandlers() {
       const repo = getTaskRepo();
       const tasks = await repo.getUpcoming(args.days || 14);
       return { tasks };
+    },
+    // Knowledge Graph handlers
+    "knowledge-graph:query": async (_event, args) => {
+      const service = getKnowledgeGraphService();
+      if (!service) return { results: [] };
+      const results = service.getGraph().query(args);
+      return { results };
+    },
+    "knowledge-graph:getStats": async () => {
+      const service = getKnowledgeGraphService();
+      if (!service) return {
+        totalNodes: 0,
+        totalFacts: 0,
+        userBranchNodes: 0,
+        directivesBranchNodes: 0,
+        worldBranchNodes: 0,
+        lastRunTime: null,
+        totalRunsProcessed: 0,
+        archivedNodes: 0,
+      };
+      return service.getGraph().getStats();
+    },
+    "knowledge-graph:getWarmProfile": async () => {
+      const { buildWarmProfile } = await import("@x/core/dist/knowledge/graph/warm-profile.js");
+      const service = getKnowledgeGraphService();
+      if (!service) return { profile: null };
+      const profile = buildWarmProfile(service.getGraph());
+      return { profile };
+    },
+    "knowledge-graph:processNow": async () => {
+      const service = getKnowledgeGraphService();
+      if (!service) return { runsProcessed: 0, factsExtracted: 0 };
+      return service.manualProcess();
+    },
+    "knowledge-graph:suggestTopics": async () => {
+      const service = getKnowledgeGraphService();
+      if (!service) return { topics: [] };
+      const graph = service.getGraph();
+      const topNodes = graph.getTopNodes(15);
+
+      const topics = topNodes
+        .filter((n) => n.facts.length > 0 && n.branch !== 'world')
+        .map((n) => {
+          const path = graph.getPath(n.id);
+          const courseSegment = path.find(
+            (p) => p !== 'root' && p !== 'User' && p !== 'Directives' && p !== 'World',
+          );
+          return {
+            title: n.name,
+            description: n.facts.slice(0, 2).join('. ') + '.',
+            category: n.branch === 'user' ? 'Concepts' : 'Resources',
+            course: courseSegment !== n.name ? courseSegment : undefined,
+          };
+        });
+
+      return { topics };
     },
     // Embedded browser handlers (WebContentsView + navigation)
     ...browserIpcHandlers,

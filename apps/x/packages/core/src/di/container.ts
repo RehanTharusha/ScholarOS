@@ -13,6 +13,7 @@ import { FSClientRegistrationRepo, IClientRegistrationRepo } from "../auth/clien
 import { IAbortRegistry, InMemoryAbortRegistry } from "../runs/abort-registry.js";
 import { FSSlackConfigRepo, ISlackConfigRepo } from "../slack/repo.js";
 import type { IBrowserControlService } from "../application/browser-control/service.js";
+import { KnowledgeGraph } from "../knowledge/graph/graph.js";
 
 const container = createContainer({
     injectionMode: InjectionMode.PROXY,
@@ -34,6 +35,7 @@ container.register({
     oauthRepo: asClass<IOAuthRepo>(FSOAuthRepo).singleton(),
     clientRegistrationRepo: asClass<IClientRegistrationRepo>(FSClientRegistrationRepo).singleton(),
     slackConfigRepo: asClass<ISlackConfigRepo>(FSSlackConfigRepo).singleton(),
+    knowledgeGraph: asClass(KnowledgeGraph).singleton(),
 });
 
 export default container;

@@ -2949,7 +2949,25 @@ function App() {
 
   const closeChatTab = useCallback(
     (tabId: string) => {
-      if (chatTabs.length <= 1) return;
+      if (chatTabs.length <= 1) {
+        handleNewChat();
+        chatDraftsRef.current.delete(tabId);
+        selectedModelByTabRef.current.delete(tabId);
+        chatScrollTopByTabRef.current.delete(tabId);
+        cavemanByTabRef.current.delete(tabId);
+        initialChatContextByTabRef.current.delete(tabId);
+        setToolOpenByTab((prev) => {
+          if (!(tabId in prev)) return prev;
+          const next = { ...prev };
+          delete next[tabId];
+          return next;
+        });
+        setChatViewStateByTab((prev) => ({
+          ...prev,
+          [tabId]: createEmptyChatTabViewState(),
+        }));
+        return;
+      }
       const idx = chatTabs.findIndex((t) => t.id === tabId);
       if (idx === -1) return;
       saveChatScrollForTab(tabId);
@@ -2998,6 +3016,7 @@ function App() {
       loadRun,
       restoreChatTabState,
       saveChatScrollForTab,
+      handleNewChat,
     ],
   );
 
@@ -5393,6 +5412,7 @@ function App() {
                     isProcessing={isChatTabProcessing}
                     onSwitchTab={switchChatTab}
                     onCloseTab={closeChatTab}
+                    allowSingleTabClose={true}
                   />
                 )}
                 {selectedPath && selectedPath.endsWith(".md") && (

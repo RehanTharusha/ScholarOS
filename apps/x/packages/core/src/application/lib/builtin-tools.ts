@@ -1034,42 +1034,77 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
             tool: "ripgrep",
           };
         } catch {
-          // Fallback to basic grep if ripgrep not available or failed
-          const grepArgs = [
-            "-rn",
-            fileGlob ? `--include=${JSON.stringify(fileGlob)}` : "",
-            JSON.stringify(pattern),
-            JSON.stringify(resolvedTargetPath),
-            `| head -${maxResults}`,
-          ]
-            .filter(Boolean)
-            .join(" ");
-
+          // Fallback: Node.js-based file search (cross-platform)
+          // Ripgrep and grep aren't available on all systems (esp. Windows)
           try {
-            const output = execSync(`grep ${grepArgs}`, {
-              encoding: "utf8",
-              maxBuffer: 10 * 1024 * 1024,
-              shell: "/bin/sh",
-            });
+            const regex = new RegExp(pattern, "i");
+            const matches: Array<{
+              line: number;
+              file: string;
+              content: string;
+            }> = [];
 
-            const lines = output.trim().split("\n").filter(Boolean);
-            return {
-              matches: lines.map((line) => {
-                const match = line.match(/^(.+?):(\d+):(.*)$/);
-                if (match) {
-                  return {
-                    file: path.relative(WorkDir, match[1]),
-                    line: parseInt(match[2], 10),
-                    content: match[3].trim(),
-                  };
+            // Build glob to limit which files we search
+            const globPattern = fileGlob || "**/*";
+
+            // Stat the target to check if it's a file or directory
+            let targetFiles: string[];
+            try {
+              const stat = await fs.stat(resolvedTargetPath);
+              if (stat.isFile()) {
+                targetFiles = [resolvedTargetPath];
+              } else {
+                targetFiles = await glob(globPattern, {
+                  cwd: resolvedTargetPath,
+                  nodir: true,
+                  ignore: ["node_modules/**", ".git/**"],
+                  absolute: true,
+                });
+              }
+            } catch {
+              targetFiles = await glob(globPattern, {
+                cwd: resolvedTargetPath,
+                nodir: true,
+                ignore: ["node_modules/**", ".git/**"],
+                absolute: true,
+              });
+            }
+
+            for (const filePath of targetFiles) {
+              if (matches.length >= maxResults) break;
+              try {
+                const rl = createInterface({
+                  input: createReadStream(filePath, {
+                    encoding: "utf-8",
+                    highWaterMark: 64 * 1024,
+                  }),
+                  crlfDelay: Infinity,
+                });
+
+                let lineNum = 0;
+                for await (const line of rl) {
+                  lineNum++;
+                  if (matches.length >= maxResults) break;
+                  if (regex.test(line)) {
+                    matches.push({
+                      file: path.relative(WorkDir, filePath),
+                      line: lineNum,
+                      content: line.trim().slice(0, 500),
+                    });
+                  }
                 }
-                return { file: "", line: 0, content: line };
-              }),
-              count: lines.length,
-              tool: "grep",
+                rl.close();
+              } catch {
+                // Skip unreadable files
+              }
+            }
+
+            return {
+              matches,
+              count: matches.length,
+              tool: "node-grep",
             };
           } catch {
-            // No matches found (grep returns non-zero on no matches)
             return { matches: [], count: 0, tool: "grep" };
           }
         }

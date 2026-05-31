@@ -16,6 +16,8 @@ import {
   stopRunsWatcher,
   stopServicesWatcher,
   stopWorkspaceWatcher,
+  initKnowledgeGraphService,
+  shutdownKnowledgeGraphService,
 } from "./ipc.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname } from "node:path";
@@ -284,6 +286,11 @@ app.whenReady().then(async () => {
       console.error("[LocalSites] Failed to start:", error);
     });
 
+    // start knowledge graph service
+    initKnowledgeGraphService().catch((error) => {
+      console.error("[KnowledgeGraph] Failed to start:", error);
+    });
+
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
@@ -314,6 +321,9 @@ app.on("before-quit", () => {
   stopWorkspaceWatcher();
   stopRunsWatcher();
   stopServicesWatcher();
+  shutdownKnowledgeGraphService().catch((error) => {
+    console.error("[KnowledgeGraph] Failed to shut down cleanly:", error);
+  });
   shutdownLocalSites().catch((error) => {
     console.error("[LocalSites] Failed to shut down cleanly:", error);
   });

@@ -6,6 +6,7 @@ const HIDDEN_SIDEBAR_ROOT_FOLDERS = new Set([
   "logs",
   "runs",
   "sites",
+  "calendar",
 ]);
 
 const HIDDEN_SIDEBAR_ROOT_FILES = new Set([

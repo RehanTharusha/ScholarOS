@@ -1,13 +1,19 @@
-import { randomUUID } from 'node:crypto';
-import { EventEmitter } from 'node:events';
-import { BrowserWindow, WebContentsView, session, shell, type Session } from 'electron';
+import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
+import {
+  BrowserWindow,
+  WebContentsView,
+  session,
+  shell,
+  type Session,
+} from "electron";
 import type {
   BrowserPageElement,
   BrowserPageSnapshot,
   BrowserState,
   BrowserTabState,
-} from '@x/shared/dist/browser-control.js';
-import { normalizeNavigationTarget } from './navigation.js';
+} from "@x/shared/dist/browser-control.js";
+import { normalizeNavigationTarget } from "./navigation.js";
 import {
   buildClickScript,
   buildFocusScript,
@@ -18,7 +24,7 @@ import {
   normalizeKeyCode,
   type ElementTarget,
   type RawBrowserPageSnapshot,
-} from './page-scripts.js';
+} from "./page-scripts.js";
 
 export type { BrowserPageSnapshot, BrowserState, BrowserTabState };
 
@@ -34,14 +40,14 @@ export type { BrowserPageSnapshot, BrowserState, BrowserTabState };
  * standard Chrome UA so sites like Google (OAuth) don't reject it.
  */
 
-export const BROWSER_PARTITION = 'persist:rowboat-browser';
+export const BROWSER_PARTITION = "persist:rowboat-browser";
 
 // Claims Chrome 130 on macOS — close enough to recent stable for OAuth servers
 // that sniff the UA looking for "real browser" shapes.
 const SPOOF_UA =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
-const HOME_URL = 'https://www.google.com';
+const HOME_URL = "https://www.google.com/ai";
 const NAVIGATION_TIMEOUT_MS = 10000;
 const POST_ACTION_IDLE_MS = 400;
 const POST_ACTION_MAX_ELEMENTS = 25;
@@ -75,7 +81,9 @@ const EMPTY_STATE: BrowserState = {
 
 function abortIfNeeded(signal?: AbortSignal): void {
   if (!signal?.aborted) return;
-  throw signal.reason instanceof Error ? signal.reason : new Error('Browser action aborted');
+  throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error("Browser action aborted");
 }
 
 async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -84,20 +92,23 @@ async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const abortSignal = signal;
     const timer = setTimeout(() => {
-      abortSignal?.removeEventListener('abort', onAbort);
+      abortSignal?.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
 
     const onAbort = () => {
       clearTimeout(timer);
-      abortSignal?.removeEventListener('abort', onAbort);
-      reject(abortSignal?.reason instanceof Error ? abortSignal.reason : new Error('Browser action aborted'));
+      abortSignal?.removeEventListener("abort", onAbort);
+      reject(
+        abortSignal?.reason instanceof Error
+          ? abortSignal.reason
+          : new Error("Browser action aborted"),
+      );
     };
 
-    abortSignal?.addEventListener('abort', onAbort, { once: true });
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
   });
 }
-
 
 export class BrowserViewManager extends EventEmitter {
   private window: BrowserWindow | null = null;
@@ -112,7 +123,7 @@ export class BrowserViewManager extends EventEmitter {
 
   attach(window: BrowserWindow): void {
     this.window = window;
-    window.on('closed', () => {
+    window.on("closed", () => {
       this.window = null;
       this.browserSession = null;
       this.tabs.clear();
@@ -133,7 +144,7 @@ export class BrowserViewManager extends EventEmitter {
   }
 
   private emitState(): void {
-    this.emit('state-updated', this.snapshotState());
+    this.emit("state-updated", this.snapshotState());
   }
 
   private getTab(tabId: string | null): BrowserTab | null {
@@ -150,7 +161,7 @@ export class BrowserViewManager extends EventEmitter {
   }
 
   private isEmbeddedTabUrl(url: string): boolean {
-    return /^https?:\/\//i.test(url) || url === 'about:blank';
+    return /^https?:\/\//i.test(url) || url === "about:blank";
   }
 
   private createView(): WebContentsView {
@@ -187,7 +198,7 @@ export class BrowserViewManager extends EventEmitter {
       this.emitState();
     };
 
-    wc.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
+    wc.on("did-start-navigation", (_event, _url, _isInPlace, isMainFrame) => {
       if (isMainFrame !== false) {
         tab.domReadyAt = null;
         tab.loadError = null;
@@ -195,33 +206,48 @@ export class BrowserViewManager extends EventEmitter {
       this.invalidateSnapshot(tabId);
       reapplyBounds();
     });
-    wc.on('did-navigate', () => { reapplyBounds(); invalidateAndEmit(); });
-    wc.on('did-navigate-in-page', () => { reapplyBounds(); invalidateAndEmit(); });
-    wc.on('did-start-loading', () => {
+    wc.on("did-navigate", () => {
+      reapplyBounds();
+      invalidateAndEmit();
+    });
+    wc.on("did-navigate-in-page", () => {
+      reapplyBounds();
+      invalidateAndEmit();
+    });
+    wc.on("did-start-loading", () => {
       tab.loadError = null;
       this.invalidateSnapshot(tabId);
       reapplyBounds();
       this.emitState();
     });
-    wc.on('did-stop-loading', () => { reapplyBounds(); invalidateAndEmit(); });
-    wc.on('did-finish-load', () => { reapplyBounds(); invalidateAndEmit(); });
-    wc.on('dom-ready', () => {
+    wc.on("did-stop-loading", () => {
+      reapplyBounds();
+      invalidateAndEmit();
+    });
+    wc.on("did-finish-load", () => {
+      reapplyBounds();
+      invalidateAndEmit();
+    });
+    wc.on("dom-ready", () => {
       tab.domReadyAt = Date.now();
       reapplyBounds();
       invalidateAndEmit();
     });
-    wc.on('did-frame-finish-load', reapplyBounds);
-    wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-      if (isMainFrame && errorCode !== -3) {
-        const target = validatedURL || wc.getURL() || 'page';
-        tab.loadError = errorDescription
-          ? `Failed to load ${target}: ${errorDescription}.`
-          : `Failed to load ${target}.`;
-      }
-      reapplyBounds();
-      invalidateAndEmit();
-    });
-    wc.on('page-title-updated', this.emitState.bind(this));
+    wc.on("did-frame-finish-load", reapplyBounds);
+    wc.on(
+      "did-fail-load",
+      (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        if (isMainFrame && errorCode !== -3) {
+          const target = validatedURL || wc.getURL() || "page";
+          tab.loadError = errorDescription
+            ? `Failed to load ${target}: ${errorDescription}.`
+            : `Failed to load ${target}.`;
+        }
+        reapplyBounds();
+        invalidateAndEmit();
+      },
+    );
+    wc.on("page-title-updated", this.emitState.bind(this));
 
     wc.setWindowOpenHandler(({ url }) => {
       if (this.isEmbeddedTabUrl(url)) {
@@ -229,7 +255,7 @@ export class BrowserViewManager extends EventEmitter {
       } else {
         void shell.openExternal(url);
       }
-      return { action: 'deny' };
+      return { action: "deny" };
     });
   }
 
@@ -280,7 +306,7 @@ export class BrowserViewManager extends EventEmitter {
 
   private createTab(initialUrl: string): BrowserTab {
     if (!this.window) {
-      throw new Error('BrowserViewManager: no window attached');
+      throw new Error("BrowserViewManager: no window attached");
     }
 
     const tabId = randomUUID();
@@ -300,13 +326,12 @@ export class BrowserViewManager extends EventEmitter {
     this.emitState();
 
     const targetUrl =
-      initialUrl === 'about:blank'
+      initialUrl === "about:blank"
         ? HOME_URL
         : normalizeNavigationTarget(initialUrl);
     void tab.view.webContents.loadURL(targetUrl).catch((error) => {
-      tab.loadError = error instanceof Error
-        ? error.message
-        : `Failed to load ${targetUrl}.`;
+      tab.loadError =
+        error instanceof Error ? error.message : `Failed to load ${targetUrl}.`;
       this.emitState();
     });
 
@@ -378,19 +403,28 @@ export class BrowserViewManager extends EventEmitter {
       await this.waitForWebContentsSettle(activeTab, signal);
     }
     abortIfNeeded(signal);
-    return activeTab.view.webContents.executeJavaScript(script, true) as Promise<T>;
+    return activeTab.view.webContents.executeJavaScript(
+      script,
+      true,
+    ) as Promise<T>;
   }
 
-  private cacheSnapshot(tabId: string, rawSnapshot: RawBrowserPageSnapshot, loading: boolean): BrowserPageSnapshot {
+  private cacheSnapshot(
+    tabId: string,
+    rawSnapshot: RawBrowserPageSnapshot,
+    loading: boolean,
+  ): BrowserPageSnapshot {
     const snapshotId = randomUUID();
-    const elements: BrowserPageElement[] = rawSnapshot.elements.map((element, index) => {
-      const { selector, ...rest } = element;
-      void selector;
-      return {
-        ...rest,
-        index: index + 1,
-      };
-    });
+    const elements: BrowserPageElement[] = rawSnapshot.elements.map(
+      (element, index) => {
+        const { selector, ...rest } = element;
+        void selector;
+        return {
+          ...rest,
+          index: index + 1,
+        };
+      },
+    );
 
     this.snapshotCache.set(tabId, {
       snapshotId,
@@ -410,27 +444,42 @@ export class BrowserViewManager extends EventEmitter {
     };
   }
 
-  private resolveElementSelector(tabId: string, target: ElementTarget): { ok: true; selector: string } | { ok: false; error: string } {
+  private resolveElementSelector(
+    tabId: string,
+    target: ElementTarget,
+  ): { ok: true; selector: string } | { ok: false; error: string } {
     if (target.selector?.trim()) {
       return { ok: true, selector: target.selector.trim() };
     }
 
     if (target.index == null) {
-      return { ok: false, error: 'Provide an element index or selector.' };
+      return { ok: false, error: "Provide an element index or selector." };
     }
 
     const cachedSnapshot = this.snapshotCache.get(tabId);
     if (!cachedSnapshot) {
-      return { ok: false, error: 'No page snapshot is available yet. Call read-page first.' };
+      return {
+        ok: false,
+        error: "No page snapshot is available yet. Call read-page first.",
+      };
     }
 
     if (target.snapshotId && cachedSnapshot.snapshotId !== target.snapshotId) {
-      return { ok: false, error: 'The page changed since the last read-page call. Call read-page again.' };
+      return {
+        ok: false,
+        error:
+          "The page changed since the last read-page call. Call read-page again.",
+      };
     }
 
-    const entry = cachedSnapshot.elements.find((element) => element.index === target.index);
+    const entry = cachedSnapshot.elements.find(
+      (element) => element.index === target.index,
+    );
     if (!entry) {
-      return { ok: false, error: `No element found for index ${target.index}.` };
+      return {
+        ok: false,
+        error: `No element found for index ${target.index}.`,
+      };
     }
 
     return { ok: true, selector: entry.selector };
@@ -457,12 +506,17 @@ export class BrowserViewManager extends EventEmitter {
     await this.waitForWebContentsSettle(activeTab, signal);
   }
 
-  async newTab(rawUrl?: string): Promise<{ ok: boolean; tabId?: string; error?: string }> {
+  async newTab(
+    rawUrl?: string,
+  ): Promise<{ ok: boolean; tabId?: string; error?: string }> {
     try {
       const tab = this.createTab(rawUrl?.trim() ? rawUrl : HOME_URL);
       return { ok: true, tabId: tab.id };
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -483,7 +537,9 @@ export class BrowserViewManager extends EventEmitter {
     const closingIndex = this.tabOrder.indexOf(tabId);
     const nextActiveTabId =
       this.activeTabId === tabId
-        ? this.tabOrder[closingIndex + 1] ?? this.tabOrder[closingIndex - 1] ?? null
+        ? (this.tabOrder[closingIndex + 1] ??
+          this.tabOrder[closingIndex - 1] ??
+          null)
         : this.activeTabId;
 
     if (this.attachedTabId === tabId && this.window) {
@@ -505,10 +561,15 @@ export class BrowserViewManager extends EventEmitter {
     try {
       const activeTab = this.getActiveTab() ?? this.ensureInitialTab();
       this.invalidateSnapshot(activeTab.id);
-      await activeTab.view.webContents.loadURL(normalizeNavigationTarget(rawUrl));
+      await activeTab.view.webContents.loadURL(
+        normalizeNavigationTarget(rawUrl),
+      );
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
@@ -540,7 +601,11 @@ export class BrowserViewManager extends EventEmitter {
   }
 
   async readPage(
-    options?: { maxElements?: number; maxTextLength?: number; waitForReady?: boolean },
+    options?: {
+      maxElements?: number;
+      maxTextLength?: number;
+      waitForReady?: boolean;
+    },
     signal?: AbortSignal,
   ): Promise<{ ok: boolean; page?: BrowserPageSnapshot; error?: string }> {
     try {
@@ -555,12 +620,19 @@ export class BrowserViewManager extends EventEmitter {
       );
       return {
         ok: true,
-        page: this.cacheSnapshot(activeTab.id, rawSnapshot, activeTab.view.webContents.isLoading()),
+        page: this.cacheSnapshot(
+          activeTab.id,
+          rawSnapshot,
+          activeTab.view.webContents.isLoading(),
+        ),
       };
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : 'Failed to read the current page.',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to read the current page.",
       };
     }
   }
@@ -577,13 +649,16 @@ export class BrowserViewManager extends EventEmitter {
       },
       signal,
     );
-    return result.ok ? result.page ?? null : null;
+    return result.ok ? (result.page ?? null) : null;
   }
 
-  async click(target: ElementTarget, signal?: AbortSignal): Promise<{ ok: boolean; error?: string; description?: string }> {
+  async click(
+    target: ElementTarget,
+    signal?: AbortSignal,
+  ): Promise<{ ok: boolean; error?: string; description?: string }> {
     const activeTab = this.getActiveTab();
     if (!activeTab) {
-      return { ok: false, error: 'No active browser tab is open.' };
+      return { ok: false, error: "No active browser tab is open." };
     }
 
     const resolved = this.resolveElementSelector(activeTab.id, target);
@@ -602,39 +677,36 @@ export class BrowserViewManager extends EventEmitter {
           before: unknown;
           targetSelector: string | null;
         };
-      }>(
-        buildClickScript(resolved.selector),
-        signal,
-      );
+      }>(buildClickScript(resolved.selector), signal);
       if (!result.ok) return result;
       if (!result.clickPoint) {
         return {
           ok: false,
-          error: 'Could not determine where to click on the page.',
+          error: "Could not determine where to click on the page.",
         };
       }
 
       this.window?.focus();
       activeTab.view.webContents.focus();
       activeTab.view.webContents.sendInputEvent({
-        type: 'mouseMove',
+        type: "mouseMove",
         x: result.clickPoint.x,
         y: result.clickPoint.y,
         movementX: 0,
         movementY: 0,
       });
       activeTab.view.webContents.sendInputEvent({
-        type: 'mouseDown',
+        type: "mouseDown",
         x: result.clickPoint.x,
         y: result.clickPoint.y,
-        button: 'left',
+        button: "left",
         clickCount: 1,
       });
       activeTab.view.webContents.sendInputEvent({
-        type: 'mouseUp',
+        type: "mouseUp",
         x: result.clickPoint.x,
         y: result.clickPoint.y,
-        button: 'left',
+        button: "left",
         clickCount: 1,
       });
 
@@ -642,8 +714,14 @@ export class BrowserViewManager extends EventEmitter {
       await this.waitForWebContentsSettle(activeTab, signal);
 
       if (result.verification) {
-        const verification = await this.executeOnActiveTab<{ changed: boolean; reasons: string[] }>(
-          buildVerifyClickScript(result.verification.targetSelector, result.verification.before),
+        const verification = await this.executeOnActiveTab<{
+          changed: boolean;
+          reasons: string[];
+        }>(
+          buildVerifyClickScript(
+            result.verification.targetSelector,
+            result.verification.before,
+          ),
           signal,
           { waitForReady: false },
         );
@@ -651,7 +729,8 @@ export class BrowserViewManager extends EventEmitter {
         if (!verification.changed) {
           return {
             ok: false,
-            error: 'Click did not change the page state. Target may not be the correct control.',
+            error:
+              "Click did not change the page state. Target may not be the correct control.",
             description: result.description,
           };
         }
@@ -661,25 +740,33 @@ export class BrowserViewManager extends EventEmitter {
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : 'Failed to click the element.',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to click the element.",
       };
     }
   }
 
-  async type(target: ElementTarget, text: string, signal?: AbortSignal): Promise<{ ok: boolean; error?: string; description?: string }> {
+  async type(
+    target: ElementTarget,
+    text: string,
+    signal?: AbortSignal,
+  ): Promise<{ ok: boolean; error?: string; description?: string }> {
     const activeTab = this.getActiveTab();
     if (!activeTab) {
-      return { ok: false, error: 'No active browser tab is open.' };
+      return { ok: false, error: "No active browser tab is open." };
     }
 
     const resolved = this.resolveElementSelector(activeTab.id, target);
     if (!resolved.ok) return resolved;
 
     try {
-      const result = await this.executeOnActiveTab<{ ok: boolean; error?: string; description?: string }>(
-        buildTypeScript(resolved.selector, text),
-        signal,
-      );
+      const result = await this.executeOnActiveTab<{
+        ok: boolean;
+        error?: string;
+        description?: string;
+      }>(buildTypeScript(resolved.selector, text), signal);
       if (!result.ok) return result;
       this.invalidateSnapshot(activeTab.id);
       await this.waitForWebContentsSettle(activeTab, signal);
@@ -687,7 +774,10 @@ export class BrowserViewManager extends EventEmitter {
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : 'Failed to type into the element.',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to type into the element.",
       };
     }
   }
@@ -699,26 +789,30 @@ export class BrowserViewManager extends EventEmitter {
   ): Promise<{ ok: boolean; error?: string; description?: string }> {
     const activeTab = this.getActiveTab();
     if (!activeTab) {
-      return { ok: false, error: 'No active browser tab is open.' };
+      return { ok: false, error: "No active browser tab is open." };
     }
 
-    let description = 'active element';
+    let description = "active element";
 
     if (target?.index != null || target?.selector?.trim()) {
       const resolved = this.resolveElementSelector(activeTab.id, target);
       if (!resolved.ok) return resolved;
 
       try {
-        const focusResult = await this.executeOnActiveTab<{ ok: boolean; error?: string; description?: string }>(
-          buildFocusScript(resolved.selector),
-          signal,
-        );
+        const focusResult = await this.executeOnActiveTab<{
+          ok: boolean;
+          error?: string;
+          description?: string;
+        }>(buildFocusScript(resolved.selector), signal);
         if (!focusResult.ok) return focusResult;
         description = focusResult.description ?? description;
       } catch (error) {
         return {
           ok: false,
-          error: error instanceof Error ? error.message : 'Failed to focus the element before pressing a key.',
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to focus the element before pressing a key.",
         };
       }
     }
@@ -726,11 +820,11 @@ export class BrowserViewManager extends EventEmitter {
     try {
       const wc = activeTab.view.webContents;
       const keyCode = normalizeKeyCode(key);
-      wc.sendInputEvent({ type: 'keyDown', keyCode });
+      wc.sendInputEvent({ type: "keyDown", keyCode });
       if (keyCode.length === 1) {
-        wc.sendInputEvent({ type: 'char', keyCode });
+        wc.sendInputEvent({ type: "char", keyCode });
       }
-      wc.sendInputEvent({ type: 'keyUp', keyCode });
+      wc.sendInputEvent({ type: "keyUp", keyCode });
 
       this.invalidateSnapshot(activeTab.id);
       await this.waitForWebContentsSettle(activeTab, signal);
@@ -742,23 +836,30 @@ export class BrowserViewManager extends EventEmitter {
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : 'Failed to press the requested key.',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to press the requested key.",
       };
     }
   }
 
-  async scroll(direction: 'up' | 'down' = 'down', amount = 700, signal?: AbortSignal): Promise<{ ok: boolean; error?: string }> {
+  async scroll(
+    direction: "up" | "down" = "down",
+    amount = 700,
+    signal?: AbortSignal,
+  ): Promise<{ ok: boolean; error?: string }> {
     const activeTab = this.getActiveTab();
     if (!activeTab) {
-      return { ok: false, error: 'No active browser tab is open.' };
+      return { ok: false, error: "No active browser tab is open." };
     }
 
     try {
-      const offset = Math.max(1, amount) * (direction === 'up' ? -1 : 1);
-      const result = await this.executeOnActiveTab<{ ok: boolean; error?: string }>(
-        buildScrollScript(offset),
-        signal,
-      );
+      const offset = Math.max(1, amount) * (direction === "up" ? -1 : 1);
+      const result = await this.executeOnActiveTab<{
+        ok: boolean;
+        error?: string;
+      }>(buildScrollScript(offset), signal);
       if (!result.ok) return result;
       this.invalidateSnapshot(activeTab.id);
       await sleep(250, signal);
@@ -766,7 +867,8 @@ export class BrowserViewManager extends EventEmitter {
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : 'Failed to scroll the page.',
+        error:
+          error instanceof Error ? error.message : "Failed to scroll the page.",
       };
     }
   }

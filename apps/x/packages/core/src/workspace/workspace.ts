@@ -9,6 +9,10 @@ import { rewriteWikiLinksForRenamedKnowledgeFile } from './wiki-link-rewrite.js'
 import { commitAll } from '../knowledge/version_history.js';
 import { withFileLock } from '../knowledge/file-lock.js';
 
+function isNodeError(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && 'code' in err;
+}
+
 // ============================================================================
 // Path Utilities
 // ============================================================================
@@ -141,7 +145,13 @@ export async function readdir(
   const entries: Array<z.infer<typeof workspace.DirEntry>> = [];
 
   async function readDir(currentPath: string, currentRelPath: string): Promise<void> {
-    const items = await fs.readdir(currentPath, { withFileTypes: true });
+    let items;
+    try {
+      items = await fs.readdir(currentPath, { withFileTypes: true });
+    } catch (err: unknown) {
+      if (isNodeError(err) && err.code === 'ENOENT') return;
+      throw err;
+    }
 
     for (const item of items) {
       // Skip hidden files unless includeHidden is true
@@ -212,7 +222,22 @@ export async function readFile(
   encoding: z.infer<typeof workspace.Encoding> = 'utf8'
 ): Promise<z.infer<typeof workspace.ReadFileResult>> {
   const filePath = resolveWorkspacePath(relPath);
-  const stats = await fs.lstat(filePath);
+
+  let stats: Stats;
+  try {
+    stats = await fs.lstat(filePath);
+  } catch (err: unknown) {
+    if (isNodeError(err) && err.code === 'ENOENT') {
+      return {
+        path: relPath,
+        encoding,
+        data: '',
+        stat: { kind: 'file', size: 0, mtimeMs: 0, ctimeMs: 0 },
+        etag: '0:0',
+      };
+    }
+    throw err;
+  }
 
   let data: string;
   if (encoding === 'utf8') {

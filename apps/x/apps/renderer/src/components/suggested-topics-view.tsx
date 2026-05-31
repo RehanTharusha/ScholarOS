@@ -8,7 +8,6 @@ import {
 const SUGGESTED_TOPICS_PATH = "suggested-topics.md";
 const LEGACY_SUGGESTED_TOPICS_PATHS = ["config/suggested-topics.md"];
 
-/** Parse suggestedtopic code-fence blocks from the markdown file content. */
 function parseTopics(content: string): SuggestedTopicBlock[] {
   const topics: SuggestedTopicBlock[] = [];
   const regex = /```suggestedtopic\s*\n([\s\S]*?)```/g;
@@ -104,7 +103,7 @@ function TopicCard({ topic, onTrack, isRemoving }: TopicCardProps) {
         {isRemoving ? (
           <>
             <Loader2 className="size-3.5 animate-spin" />
-            Tracking…
+            Tracking...
           </>
         ) : (
           <>
@@ -128,10 +127,27 @@ export function SuggestedTopicsView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+  const [source, setSource] = useState<"graph" | "file" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      try {
+        const graphTopics = await window.ipc.invoke(
+          "knowledge-graph:suggestTopics",
+          null,
+        );
+        if (cancelled) return;
+        if (graphTopics.topics.length > 0) {
+          setTopics(graphTopics.topics);
+          setSource("graph");
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Graph not available, fall back to file
+      }
+
       try {
         let result;
         try {
@@ -152,7 +168,9 @@ export function SuggestedTopicsView({
               // Try next legacy location.
             }
           }
-          if (!legacyResult || !legacyPath || legacyResult.data === undefined) {
+          if (
+            !legacyResult || !legacyPath || legacyResult.data === undefined
+          ) {
             throw new Error("Suggested topics file not found");
           }
           await window.ipc.invoke("workspace:writeFile", {
@@ -168,13 +186,20 @@ export function SuggestedTopicsView({
         }
         if (cancelled) return;
         if (result.data) {
-          setTopics(parseTopics(result.data));
+          const parsed = parseTopics(result.data);
+          if (parsed.length > 0) {
+            setTopics(parsed);
+            setSource("file");
+          } else {
+            throw new Error("No topics parsed");
+          }
         }
       } catch {
-        if (!cancelled)
+        if (!cancelled) {
           setError(
-            "No suggested topics yet. Check back once your knowledge graph has more data.",
+            "No suggested topics yet. Topics appear here as you study — based on what you ask about most.",
           );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -188,27 +213,35 @@ export function SuggestedTopicsView({
   const handleTrack = useCallback(
     async (topic: SuggestedTopicBlock, topicIndex: number) => {
       if (removingIndex !== null) return;
-      const nextTopics = topics.filter((_, idx) => idx !== topicIndex);
-      setRemovingIndex(topicIndex);
-      setError(null);
-      try {
-        await window.ipc.invoke("workspace:writeFile", {
-          path: SUGGESTED_TOPICS_PATH,
-          data: serializeTopics(nextTopics),
-          opts: { encoding: "utf8" },
-        });
+
+      if (source === "file") {
+        const nextTopics = topics.filter((_, idx) => idx !== topicIndex);
+        setRemovingIndex(topicIndex);
+        setError(null);
+        try {
+          await window.ipc.invoke("workspace:writeFile", {
+            path: SUGGESTED_TOPICS_PATH,
+            data: serializeTopics(nextTopics),
+            opts: { encoding: "utf8" },
+          });
+          setTopics(nextTopics);
+        } catch (err) {
+          console.error("Failed to remove suggested topic:", err);
+          setError("Failed to update suggested topics. Please try again.");
+          return;
+        } finally {
+          setRemovingIndex(null);
+        }
+      } else {
+        setRemovingIndex(topicIndex);
+        const nextTopics = topics.filter((_, idx) => idx !== topicIndex);
         setTopics(nextTopics);
-      } catch (err) {
-        console.error("Failed to remove suggested topic:", err);
-        setError("Failed to update suggested topics. Please try again.");
-        return;
-      } finally {
         setRemovingIndex(null);
       }
 
       onExploreTopic(topic);
     },
-    [onExploreTopic, removingIndex, topics],
+    [onExploreTopic, removingIndex, topics, source],
   );
 
   if (loading) {
@@ -227,7 +260,7 @@ export function SuggestedTopicsView({
         </div>
         <p className="text-sm text-muted-foreground">
           {error ??
-            "No suggested topics yet. Check back once your knowledge graph has more data."}
+            "No suggested topics yet. Topics appear here as you study — based on what you ask about most."}
         </p>
       </div>
     );
@@ -243,8 +276,9 @@ export function SuggestedTopicsView({
           </h2>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Study leads surfaced from your knowledge base. Track one to
-          start a live research note.
+          {source === "graph"
+            ? "Topics you study most, surfaced from your conversations."
+            : "Study leads surfaced from your knowledge base. Track one to start a live research note."}
         </p>
       </div>
       <div className="flex-1 overflow-y-auto p-6">

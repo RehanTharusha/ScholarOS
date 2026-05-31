@@ -20,3 +20,6 @@ export * as anki from './anki/service.js';
 export * as tasks from './calendar/repo.js';
 export * as taskTypes from './calendar/types.js';
 export * as taskScanner from './calendar/frontmatter-scanner.js';
+
+// Knowledge graph
+export * as knowledgeGraph from './knowledge/graph/index.js';

@@ -770,6 +770,69 @@ const ipcSchemas = {
       ),
     }),
   },
+  // Knowledge Graph channels
+  "knowledge-graph:query": {
+    req: z.object({
+      query: z.string(),
+      limit: z.number().optional(),
+    }),
+    res: z.object({
+      results: z.array(
+        z.object({
+          nodeId: z.string(),
+          nodeName: z.string(),
+          path: z.array(z.string()),
+          facts: z.array(z.string()),
+          score: z.number(),
+        }),
+      ),
+    }),
+  },
+  "knowledge-graph:getStats": {
+    req: z.null(),
+    res: z.object({
+      totalNodes: z.number(),
+      totalFacts: z.number(),
+      userBranchNodes: z.number(),
+      directivesBranchNodes: z.number(),
+      worldBranchNodes: z.number(),
+      lastRunTime: z.string().nullable(),
+      totalRunsProcessed: z.number(),
+      archivedNodes: z.number(),
+    }),
+  },
+  "knowledge-graph:getWarmProfile": {
+    req: z.null(),
+    res: z.object({
+      profile: z
+        .object({
+          userFacts: z.array(z.string()),
+          directivesFacts: z.array(z.string()),
+          buildTime: z.string(),
+        })
+        .nullable(),
+    }),
+  },
+  "knowledge-graph:processNow": {
+    req: z.null(),
+    res: z.object({
+      runsProcessed: z.number(),
+      factsExtracted: z.number(),
+    }),
+  },
+  "knowledge-graph:suggestTopics": {
+    req: z.null(),
+    res: z.object({
+      topics: z.array(
+        z.object({
+          title: z.string(),
+          description: z.string(),
+          category: z.string().optional(),
+          course: z.string().optional(),
+        }),
+      ),
+    }),
+  },
 } as const;
 
 // ============================================================================

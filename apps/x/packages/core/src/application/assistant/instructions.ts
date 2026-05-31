@@ -6,6 +6,8 @@ import {
 import { composioAccountsRepo } from "../../composio/repo.js";
 import { isConfigured as isComposioConfigured } from "../../composio/client.js";
 import { getMergedTasks } from "../../calendar/frontmatter-scanner.js";
+import { KnowledgeGraph } from "../../knowledge/graph/graph.js";
+import { buildWarmProfile, formatWarmProfileBlock } from "../../knowledge/graph/warm-profile.js";
 
 const runtimeContextPrompt = getRuntimeContextPrompt(getRuntimeContext());
 
@@ -443,6 +445,22 @@ export function invalidateCopilotInstructionsCache(): void {
 }
 
 /**
+ * Generate warm profile prompt from the knowledge graph.
+ * Injects what ScholarOS has learned about the user from prior conversations.
+ */
+async function getWarmProfilePrompt(): Promise<string> {
+  try {
+    const graph = new KnowledgeGraph();
+    await graph.load();
+    const profile = buildWarmProfile(graph);
+    if (!profile) return '';
+    return '\n' + formatWarmProfileBlock(profile);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Build full copilot instructions with dynamic Composio tools section.
  * Results are cached and reused until invalidated via invalidateCopilotInstructionsCache().
  */
@@ -455,9 +473,11 @@ export async function buildCopilotInstructions(): Promise<string> {
   const baseInstructions = buildStaticInstructions(composioEnabled, catalog);
   const composioPrompt = await getComposioToolsPrompt();
   const calendarPrompt = await getCalendarContextPrompt();
+  const warmProfilePrompt = await getWarmProfilePrompt();
 
   let result = composioPrompt ? baseInstructions + "\n" + composioPrompt : baseInstructions;
   if (calendarPrompt) result += "\n" + calendarPrompt;
+  if (warmProfilePrompt) result += "\n" + warmProfilePrompt;
 
   cachedInstructions = result;
   return cachedInstructions;
