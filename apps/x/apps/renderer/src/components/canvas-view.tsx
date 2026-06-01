@@ -1241,6 +1241,7 @@ function ImagePreview({
     <img
       src={src}
       alt=""
+      draggable={false}
       className="w-full h-full object-contain"
       onLoad={handleImgLoad}
     />

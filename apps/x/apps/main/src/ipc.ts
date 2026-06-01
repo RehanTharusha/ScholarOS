@@ -43,6 +43,7 @@ import {
 } from "@x/core/dist/config/config.js";
 import * as composioHandler from "./composio-handler.js";
 import { search } from "@x/core/dist/search/search.js";
+import { ResearchHandler } from "@x/core/dist/research/research-handler.js";
 import { versionHistory, voice } from "@x/core";
 import { getBillingInfo } from "@x/core/dist/billing/billing.js";
 import { getAccessToken } from "@x/core/dist/auth/tokens.js";
@@ -430,6 +431,32 @@ export function stopServicesWatcher(): void {
   }
 }
 
+// Research Handler (singleton, wired to Electron IPC for progress events)
+const researchHandler = new ResearchHandler((sessionId, progress, status) => {
+  emitResearchProgress(sessionId, progress, status);
+});
+
+function emitResearchProgress(sessionId: string, progress: import("@x/shared/dist/research.js").ResearchProgress, status: string): void {
+  const windows = BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    if (!win.isDestroyed() && win.webContents) {
+      win.webContents.send("research:progress", { sessionId, progress, status });
+    }
+  }
+}
+
+export function getResearchHandler(): typeof researchHandler {
+  return researchHandler;
+}
+
+export async function startResearchWatcher(): Promise<void> {
+  // ResearchHandler already wired to emitResearchProgress — nothing extra needed
+}
+
+export function stopResearchWatcher(): void {
+  // No cleanup needed
+}
+
 // Knowledge Graph Service lifecycle
 let kgService: KnowledgeGraphService | null = null;
 
@@ -583,6 +610,11 @@ export function setupIpcHandlers() {
           args.searchEnabled,
           args.middlePaneContext,
         ),
+      };
+    },
+    "runs:appendMessage": async (_event, args) => {
+      return {
+        messageId: await runsCore.appendMessage(args.runId, args.role, args.content),
       };
     },
     "runs:authorizePermission": async (_event, args) => {
@@ -1034,6 +1066,34 @@ export function setupIpcHandlers() {
         });
 
       return { topics };
+    },
+    // Deep Research handlers
+    "research:start": async (_event, args) => {
+      const sessionId = await researchHandler.startResearch(
+        args.query,
+        args.category as any,
+        { rounds: args.rounds, model: args.model, provider: args.provider }
+      );
+      return { sessionId };
+    },
+    "research:status": async (_event, args) => {
+      return researchHandler.getProgress(args.sessionId);
+    },
+    "research:cancel": async (_event, args) => {
+      researchHandler.cancelResearch(args.sessionId);
+      return { success: true };
+    },
+    "research:result": async (_event, args) => {
+      const session = researchHandler.getResult(args.sessionId);
+      return session;
+    },
+    "research:list": async () => {
+      const sessions = await researchHandler.listCompleted();
+      return { sessions };
+    },
+    "research:delete": async (_event, args) => {
+      await researchHandler.deleteResearch(args.sessionId);
+      return { success: true };
     },
     // Embedded browser handlers (WebContentsView + navigation)
     ...browserIpcHandlers,

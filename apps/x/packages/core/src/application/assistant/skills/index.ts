@@ -18,6 +18,7 @@ import { skill as docxSkill } from "./docx/skill.js";
 import { skill as xlsxSkill } from "./xlsx/skill.js";
 import { skill as webArtifactsBuilderSkill } from "./web-artifacts-builder/skill.js";
 import { skill as ankiFlashcardsSkill } from "./anki-flashcards/skill.js";
+import { skill as deepResearchSkill } from "./deep-research/skill.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_PREFIX = "src/application/assistant/skills";
@@ -156,6 +157,13 @@ const definitions: SkillDefinition[] = [
     summary:
       "Create, manage, and push Anki flashcards from course materials. Generates high-quality Q&A and cloze-deletion cards and syncs them to the user's Anki desktop app via AnkiConnect.",
     content: ankiFlashcardsSkill,
+  },
+  {
+    id: "deep-research",
+    title: "Deep Research",
+    summary:
+      "Perform iterative multi-round academic research with web search, source extraction, and report synthesis. Use for literature reviews, comparisons, methodology research, fact-checking, concept exploration, and problem-solving.",
+    content: deepResearchSkill,
   },
 ];
 

@@ -52,6 +52,41 @@ export type ChatTabViewState = {
     z.infer<typeof ToolPermissionRequestEvent>
   >;
   permissionResponses: Map<string, PermissionResponse>;
+  // Per-tab deep research state (embedded in the originating tab)
+  research: {
+    sessionId: string;
+    query: string;
+    startedAt: number;
+    progress: {
+      phase: string;
+      round: number;
+      totalRounds: number;
+      queriesFound: number;
+      sourcesFound: number;
+      findingsCount: number;
+      message?: string;
+    } | null;
+    session: {
+      sessionId: string;
+      query: string;
+      status: string;
+      category: string;
+      result?: string;
+      sources: Array<{ url: string; title: string; snippet?: string }>;
+      findings: Array<{ url: string; title: string; summary: string }>;
+      stats?: {
+        duration: number;
+        rounds: number;
+        queries: number;
+        urls: number;
+        model: string;
+        searchProvider: string;
+        category: string;
+      };
+      startedAt: number;
+      completedAt?: number;
+    } | null;
+  } | null;
 };
 
 export type ChatViewportAnchorState = {
@@ -67,6 +102,7 @@ export const createEmptyChatTabViewState = (): ChatTabViewState => ({
   pendingAskHumanRequests: new Map(),
   allPermissionRequests: new Map(),
   permissionResponses: new Map(),
+  research: null,
 });
 
 export type ToolState =

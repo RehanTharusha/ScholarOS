@@ -8,6 +8,7 @@ import {
 import {
   ArrowUp,
   AudioLines,
+  BookOpen,
   ChevronDown,
   FileArchive,
   FileCode2,
@@ -134,6 +135,7 @@ interface ChatInputInnerProps {
     mentions?: FileMention[],
     attachments?: StagedAttachment[],
     searchEnabled?: boolean,
+    researchEnabled?: boolean,
   ) => void;
   onStop?: () => void;
   isProcessing: boolean;
@@ -160,6 +162,7 @@ interface ChatInputInnerProps {
   onSelectedModelChange?: (model: SelectedModel | null) => void;
   cavemanEnabled?: boolean;
   onToggleCaveman?: () => void;
+  researchAvailable?: boolean;
 }
 
 function ChatInputInner({
@@ -188,6 +191,7 @@ function ChatInputInner({
   onSelectedModelChange,
   cavemanEnabled = false,
   onToggleCaveman,
+  researchAvailable = true,
 }: ChatInputInnerProps) {
   const controller = usePromptInputController();
   const message = controller.textInput.value;
@@ -204,6 +208,7 @@ function ChatInputInner({
   const [lockedModel, setLockedModel] = useState<SelectedModel | null>(null);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [searchAvailable, setSearchAvailable] = useState(false);
+  const [researchEnabled, setResearchEnabled] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
 
   // When a run exists, freeze the dropdown to the run's resolved model+provider.
@@ -399,12 +404,14 @@ function ChatInputInner({
       controller.mentions.mentions,
       attachments,
       searchEnabled || undefined,
+      researchEnabled || undefined,
     );
     controller.textInput.clear();
     controller.mentions.clearMentions();
     setAttachments([]);
     setSearchEnabled(false);
-  }, [attachments, canSubmit, controller, message, onSubmit, searchEnabled]);
+    setResearchEnabled(false);
+  }, [attachments, canSubmit, controller, message, onSubmit, searchEnabled, researchEnabled]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -632,6 +639,27 @@ function ChatInputInner({
                   <Globe className="h-4 w-4" />
                 </button>
               ))}
+            {researchAvailable &&
+              (researchEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => setResearchEnabled(false)}
+                  className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 text-emerald-600 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400 dark:hover:bg-emerald-900"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">Research</span>
+                  <X className="h-3 w-3" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setResearchEnabled(true)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Deep Research"
+                >
+                  <BookOpen className="h-4 w-4" />
+                </button>
+              ))}
             <div className="flex-1" />
             {lockedModel ? (
               <span
@@ -824,6 +852,8 @@ export interface ChatInputWithMentionsProps {
     message: PromptInputMessage,
     mentions?: FileMention[],
     attachments?: StagedAttachment[],
+    searchEnabled?: boolean,
+    researchEnabled?: boolean,
   ) => void;
   onStop?: () => void;
   isProcessing: boolean;
@@ -849,6 +879,7 @@ export interface ChatInputWithMentionsProps {
   onSelectedModelChange?: (model: SelectedModel | null) => void;
   cavemanEnabled?: boolean;
   onToggleCaveman?: () => void;
+  researchAvailable?: boolean;
 }
 
 export function ChatInputWithMentions({
@@ -880,6 +911,7 @@ export function ChatInputWithMentions({
   onSelectedModelChange,
   cavemanEnabled = false,
   onToggleCaveman,
+  researchAvailable = true,
 }: ChatInputWithMentionsProps) {
   return (
     <PromptInputProvider
@@ -913,6 +945,7 @@ export function ChatInputWithMentions({
         onSelectedModelChange={onSelectedModelChange}
         cavemanEnabled={cavemanEnabled}
         onToggleCaveman={onToggleCaveman}
+        researchAvailable={researchAvailable}
       />
     </PromptInputProvider>
   );

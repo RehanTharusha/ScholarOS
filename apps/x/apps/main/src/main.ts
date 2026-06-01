@@ -12,9 +12,11 @@ import {
   setupIpcHandlers,
   startRunsWatcher,
   startServicesWatcher,
+  startResearchWatcher,
   startWorkspaceWatcher,
   stopRunsWatcher,
   stopServicesWatcher,
+  stopResearchWatcher,
   stopWorkspaceWatcher,
   initKnowledgeGraphService,
   shutdownKnowledgeGraphService,
@@ -281,6 +283,9 @@ app.whenReady().then(async () => {
     // start services watcher
     startServicesWatcher();
 
+    // start research watcher
+    startResearchWatcher();
+
     // start local sites server for iframe dashboards and other mini apps
     initLocalSites().catch((error) => {
       console.error("[LocalSites] Failed to start:", error);
@@ -321,6 +326,7 @@ app.on("before-quit", () => {
   stopWorkspaceWatcher();
   stopRunsWatcher();
   stopServicesWatcher();
+  stopResearchWatcher();
   shutdownKnowledgeGraphService().catch((error) => {
     console.error("[KnowledgeGraph] Failed to shut down cleanly:", error);
   });

@@ -49,6 +49,10 @@ import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
 import { TabBar, type ChatTab } from "@/components/tab-bar";
 import {
+  ChatResearchProgress,
+  ChatResearchComplete,
+} from "@/components/research";
+import {
   ChatInputWithMentions,
   type StagedAttachment,
   type SelectedModel,
@@ -200,6 +204,8 @@ interface ChatSidebarProps {
     message: PromptInputMessage,
     mentions?: FileMention[],
     attachments?: StagedAttachment[],
+    searchEnabled?: boolean,
+    researchEnabled?: boolean,
   ) => void;
   knowledgeFiles?: string[];
   recentFiles?: string[];
@@ -251,6 +257,13 @@ interface ChatSidebarProps {
   onComposioConnected?: (toolkitSlug: string) => void;
   cavemanEnabled?: boolean;
   onToggleCaveman?: () => void;
+  researchAvailable?: boolean;
+  onCopyResearch?: () => void;
+  onDeleteResearch?: () => void;
+  onDiscussResearch?: () => void;
+  onShowResearchInPanel?: () => void;
+  onOpenResearchHtml?: () => void;
+  onCancelResearch?: () => void;
 }
 
 export function ChatSidebar({
@@ -307,6 +320,13 @@ export function ChatSidebar({
   onComposioConnected,
   cavemanEnabled = false,
   onToggleCaveman,
+  researchAvailable = true,
+  onCopyResearch,
+  onDeleteResearch,
+  onDiscussResearch,
+  onShowResearchInPanel,
+  onOpenResearchHtml,
+  onCancelResearch,
 }: ChatSidebarProps) {
   const [width, setWidth] = useState(() => getInitialPaneWidth(defaultWidth));
   const [isResizing, setIsResizing] = useState(false);
@@ -411,6 +431,7 @@ export function ChatSidebar({
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
+      research: chatTabStates[activeChatTabId]?.research ?? null,
     }),
     [
       runId,
@@ -420,6 +441,8 @@ export function ChatSidebar({
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
+      chatTabStates,
+      activeChatTabId,
     ],
   );
   const emptyTabState = useMemo<ChatTabViewState>(
@@ -524,6 +547,44 @@ export function ChatSidebar({
           />
         );
       }
+      if (item.name === "deep-research") {
+        const result = item.result as any;
+        const session = result?.session ?? null;
+        const progress = result?.progress ?? null;
+        return (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {session ? (
+              <ChatResearchComplete
+                session={session}
+                onCopy={onCopyResearch ?? (() => {})}
+                onDelete={onDeleteResearch ?? (() => {})}
+                onDiscuss={onDiscussResearch ?? (() => {})}
+                onShowInPanel={onShowResearchInPanel ?? (() => {})}
+                onOpenHtml={onOpenResearchHtml ?? (() => {})}
+              />
+            ) : (
+              <ChatResearchProgress
+                progress={(progress ?? {
+                  phase: "planning" as const,
+                  round: 0,
+                  totalRounds: 6,
+                  queriesFound: 0,
+                  sourcesFound: 0,
+                  findingsCount: 0,
+                }) as any}
+                startedAt={item.timestamp}
+                onCancel={onCancelResearch ?? (() => {})}
+              />
+            )}
+          </motion.div>
+        );
+      }
+
       const toolTitle = getToolDisplayName(item);
       const errorText = item.status === "error" ? "Tool error" : "";
       const output = normalizeToolOutput(item.result, item.status);
@@ -935,6 +996,7 @@ export function ChatSidebar({
                           onToggleCaveman={
                             isActive ? onToggleCaveman : undefined
                           }
+                          researchAvailable={researchAvailable}
                         />
                       </div>
                     );

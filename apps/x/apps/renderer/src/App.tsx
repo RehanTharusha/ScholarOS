@@ -15,6 +15,7 @@ import {
   ChevronRightIcon,
   SquarePen,
   HistoryIcon,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -118,6 +119,8 @@ import { isHiddenSidebarRootEntry } from "@/config/sidebar-visibility";
 
 import { IngestWindow } from "@/components/ingest-window";
 import { PdfViewer } from "@/components/pdf-viewer";
+import { ResearchPanel, ChatResearchProgress, ChatResearchComplete } from "@/components/research";
+
 import { HtmlViewer } from "@/components/html-viewer";
 import { getExtension, getMimeFromExtension } from "@/lib/file-utils";
 import { motion } from "motion/react";
@@ -358,7 +361,8 @@ const isGraphTabPath = (path: string) => path === GRAPH_TAB_PATH;
 const isSuggestedTopicsTabPath = (path: string) =>
   path === SUGGESTED_TOPICS_TAB_PATH;
 const isArtifactsTabPath = (path: string) => path === ARTIFACTS_TAB_PATH;
-const isCanvasTabPath = (path: string) => path === CANVAS_TAB_PATH;
+const isCanvasTabPath = (path: string) =>
+  path === CANVAS_TAB_PATH || path.endsWith(".canvas");
 const isCanvasesTabPath = (path: string) => path === CANVASES_TAB_PATH;
 const isCalendarTabPath = (path: string) => path === CALENDAR_TAB_PATH;
 
@@ -818,6 +822,8 @@ function App() {
   const spokenIndexRef = useRef(0);
   const isRecordingRef = useRef(false);
 
+  // Deep research state — uses chatViewStateByTab per-tab storage (no global vars)
+
   const tts = useVoiceTTS();
   const ttsRef = useRef(tts);
   ttsRef.current = tts;
@@ -943,6 +949,33 @@ function App() {
     }
   }, []);
 
+  // Check for any running research sessions on startup (e.g. from a previous session)
+  useEffect(() => {
+    window.ipc.invoke("research:list", null).then(({ sessions }) => {
+      const runningSession = sessions?.find((s: any) => s.status === "running");
+      if (runningSession) {
+        const tabId = `chat-${Date.now()}`;
+        setChatTabs((prev) => [...prev, { id: tabId, title: `Research: ${runningSession.query.slice(0, 50)}`, runId: null }]);
+        setActiveChatTabId(tabId);
+        setChatViewStateByTab((prev) => ({
+          ...prev,
+          [tabId]: {
+            ...createEmptyChatTabViewState(),
+            conversation: [{ id: `user-${Date.now()}`, role: "user" as const, content: runningSession.query, timestamp: Date.now() }],
+            research: {
+              sessionId: runningSession.sessionId,
+              query: runningSession.query,
+              startedAt: Date.now(),
+              progress: runningSession.progress || null,
+              session: null,
+            },
+          },
+        }));
+        setConversation([{ id: `user-${Date.now()}`, role: "user", content: runningSession.query, timestamp: Date.now() }]);
+      }
+    }).catch(() => {});
+  }, []);
+
   // Runs history state
   type RunListItem = {
     id: string;
@@ -982,6 +1015,8 @@ function App() {
   >({});
   const activeChatTabIdRef = useRef(activeChatTabId);
   activeChatTabIdRef.current = activeChatTabId;
+  const navigateToFileRef = useRef<(path: string) => void>(() => {});
+  const loadDirectoryRef = useRef<() => Promise<any>>(async () => {});
   const setChatDraftForTab = useCallback((tabId: string, text: string) => {
     if (text) {
       chatDraftsRef.current.set(tabId, text);
@@ -1057,7 +1092,15 @@ function App() {
 
   const getChatTabTitle = useCallback(
     (tab: ChatTab) => {
-      if (!tab.runId) return "New chat";
+      if (!tab.runId) {
+        const state = chatViewStateByTabRef.current[tab.id];
+        if (state?.research) {
+          const prefix = state.research.session?.result ? "Done" : "Research";
+          const query = state.research.query;
+          return query ? `${prefix}: ${query.slice(0, 40)}` : prefix;
+        }
+        return "New chat";
+      }
       return runs.find((r) => r.id === tab.runId)?.title || "(Untitled chat)";
     },
     [runs],
@@ -1092,7 +1135,7 @@ function App() {
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
     if (isArtifactsTabPath(tab.path)) return "Artifacts";
     if (isCalendarTabPath(tab.path)) return "Calendar";
-    if (isCanvasTabPath(tab.path)) return "Canvas";
+    if (isCanvasTabPath(tab.path) && tab.path === CANVAS_TAB_PATH) return "Canvas";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
     if (tab.path.endsWith(".base"))
       return (
@@ -1101,7 +1144,7 @@ function App() {
           .pop()
           ?.replace(/\.base$/i, "") || "Base"
       );
-    return tab.path.split("/").pop()?.replace(/\.md$/i, "") || tab.path;
+    return tab.path.split("/").pop()?.replace(/\.(canvas|md)$/i, "") || tab.path;
   }, []);
 
   // Pending requests state
@@ -1125,16 +1168,20 @@ function App() {
   }, [chatViewStateByTab]);
 
   useEffect(() => {
-    const snapshot: ChatTabViewState = {
-      runId,
-      conversation,
-      currentAssistantMessage,
-      currentToolDraftActive,
-      pendingAskHumanRequests: new Map(pendingAskHumanRequests),
-      allPermissionRequests: new Map(allPermissionRequests),
-      permissionResponses: new Map(permissionResponses),
-    };
-    setChatViewStateByTab((prev) => ({ ...prev, [activeChatTabId]: snapshot }));
+    setChatViewStateByTab((prev) => {
+      const existing = prev[activeChatTabId];
+      const snapshot: ChatTabViewState = {
+        runId,
+        conversation,
+        currentAssistantMessage,
+        currentToolDraftActive,
+        pendingAskHumanRequests: new Map(pendingAskHumanRequests),
+        allPermissionRequests: new Map(allPermissionRequests),
+        permissionResponses: new Map(permissionResponses),
+        research: existing?.research ?? null,
+      };
+      return { ...prev, [activeChatTabId]: snapshot };
+    });
   }, [
     activeChatTabId,
     runId,
@@ -2493,6 +2540,113 @@ function App() {
     return cleanup;
   }, [handleRunEvent]);
 
+  // Listen for in-chat research progress — updates BOTH per-tab state and global conversation
+  // so the active tab shows live progress and tab state is preserved on switch.
+  useEffect(() => {
+    const cleanup = window.ipc.on("research:progress", (data: any) => {
+      const researchItemId = `research-${data.sessionId}`;
+
+      // Update per-tab state (preserved across tab switches)
+      setChatViewStateByTab((prev) => {
+        for (const [tabId, state] of Object.entries(prev)) {
+          const r = state.research;
+          if (r && r.sessionId === data.sessionId) {
+            const updatedResearch: NonNullable<ChatTabViewState["research"]> = {
+              sessionId: r.sessionId,
+              query: r.query,
+              startedAt: r.startedAt,
+              progress: data.progress ?? r.progress,
+              session: r.session,
+            };
+            const conversation = state.conversation.map((item) => {
+              if (isToolCall(item) && item.id === researchItemId) {
+                if (data.status === "done" || data.status === "error" || data.status === "cancelled") {
+                  return { ...item, status: "completed" as const };
+                }
+                return {
+                  ...item,
+                  status: "running" as const,
+                  result: data.progress ? { progress: data.progress } : item.result,
+                };
+              }
+              return item;
+            });
+            if (data.status === "done" || data.status === "error" || data.status === "cancelled") {
+              window.ipc.invoke("research:result", { sessionId: data.sessionId }).then((session: any) => {
+                if (session) {
+                  setChatViewStateByTab((p) => {
+                    const s = p[tabId];
+                    if (!s?.research || s.research.sessionId !== data.sessionId) return p;
+                    const conv = (s.conversation ?? []).map((item) => {
+                      if (isToolCall(item) && item.id === researchItemId) {
+                        return {
+                          ...item,
+                          status: "completed" as const,
+                          result: { session },
+                        };
+                      }
+                      return item;
+                    });
+                    return {
+                      ...p,
+                      [tabId]: {
+                        ...s,
+                        conversation: conv,
+                        research: { ...s.research, session },
+                      },
+                    };
+                  });
+                  // Sync global conversation on completion
+                  setConversation((prevConv) => {
+                    let changed = false;
+                    const next = prevConv.map((item) => {
+                      if (isToolCall(item) && item.id === researchItemId) {
+                        changed = true;
+                        return { ...item, status: "completed" as const, result: { session } };
+                      }
+                      return item;
+                    });
+                    return changed ? next : prevConv;
+                  });
+                  if (session.result) {
+                    window.ipc.invoke("runs:appendMessage", {
+                      runId: s.runId,
+                      role: "assistant",
+                      content: session.result.slice(0, 50000),
+                    }).catch(() => {});
+                  }
+                }
+              });
+            }
+            return { ...prev, [tabId]: { ...state, conversation, research: updatedResearch } };
+          }
+        }
+        return prev;
+      });
+
+      // Sync global conversation so the active tab renders live progress
+      setConversation((prevConv) => {
+        let changed = false;
+        const next = prevConv.map((item) => {
+          if (isToolCall(item) && item.id === researchItemId) {
+            changed = true;
+            if (data.status === "done" || data.status === "error" || data.status === "cancelled") {
+              return { ...item, status: "completed" as const };
+            }
+            return {
+              ...item,
+              status: "running" as const,
+              result: data.progress ? { progress: data.progress } : item.result,
+            };
+          }
+          return item;
+        });
+        return changed ? next : prevConv;
+      });
+    });
+    return cleanup;
+  }, []);
+
   type MiddlePaneContextPayload =
     | { kind: "file"; path: string; content?: string }
     | { kind: "note"; path: string; content: string }
@@ -2539,6 +2693,7 @@ function App() {
     mentions?: FileMention[],
     stagedAttachments: StagedAttachment[] = [],
     searchEnabled?: boolean,
+    researchEnabled?: boolean,
   ) => {
     if (isProcessing) return;
 
@@ -2547,6 +2702,112 @@ function App() {
     const userMessage = text.trim();
     const hasAttachments = stagedAttachments.length > 0;
     if (!userMessage && !hasAttachments) return;
+
+    // Bypass normal chat and start deep research instead
+    if (researchEnabled) {
+      const researchTabId = `chat-${Date.now()}`;
+      setChatTabs((prev) => [
+        ...prev,
+        {
+          id: researchTabId,
+          title: `Research: ${userMessage.slice(0, 50)}`,
+          runId: null,
+        },
+      ]);
+      setActiveChatTabId(researchTabId);
+      // Initialize tab view state with the user message
+      setChatViewStateByTab((prev) => ({
+        ...prev,
+        [researchTabId]: createEmptyChatTabViewState(),
+      }));
+      const researchUserMsgId = `user-${Date.now()}`;
+      setConversation([
+        {
+          id: researchUserMsgId,
+          role: "user",
+          content: userMessage,
+          timestamp: Date.now(),
+        },
+      ]);
+      setChatViewportAnchor(researchTabId, null);
+      try {
+        const { sessionId } = await window.ipc.invoke("research:start", {
+          query: userMessage,
+          category: "concept-exploration",
+          rounds: 6,
+        });
+        const researchItemId = `research-${sessionId}`;
+        const researchItem: ToolCall = {
+          id: researchItemId,
+          name: "deep-research",
+          input: { query: userMessage, sessionId },
+          status: "running",
+          timestamp: Date.now(),
+        };
+        setConversation((prev) => [...prev, researchItem]);
+        // Create a run for chat history
+        let researchRunId: string | null = null;
+        try {
+          const run = await window.ipc.invoke("runs:create", {
+            agentId: "copilot",
+          });
+          researchRunId = run.id;
+          await window.ipc.invoke("runs:appendMessage", {
+            runId: researchRunId,
+            role: "user",
+            content: userMessage,
+          });
+        } catch {
+          // Run creation is best-effort
+        }
+        setChatViewStateByTab((prev) => {
+          const existing = prev[researchTabId];
+          if (!existing) return prev;
+          return {
+            ...prev,
+            [researchTabId]: {
+              ...existing,
+              conversation: existing.conversation.length > 0
+                ? [...existing.conversation, researchItem]
+                : [
+                    { id: researchUserMsgId, role: "user" as const, content: userMessage, timestamp: Date.now() },
+                    researchItem,
+                  ],
+              research: {
+                sessionId,
+                query: userMessage,
+                startedAt: Date.now(),
+                progress: null,
+                session: null,
+              },
+            },
+          };
+        });
+        if (researchRunId) {
+          setChatTabs((prev) =>
+            prev.map((t) =>
+              t.id === researchTabId ? { ...t, runId: researchRunId } : t,
+            ),
+          );
+          setRunId(researchRunId);
+          setRuns((prev) => {
+            if (prev.some((r) => r.id === researchRunId)) return prev;
+            return [
+              {
+                id: researchRunId,
+                title: userMessage.length > 100 ? userMessage.slice(0, 100) : userMessage,
+                createdAt: new Date().toISOString(),
+                agentId: "copilot",
+              },
+              ...prev,
+            ];
+          });
+        }
+      } catch (err) {
+        console.error("Failed to start research:", err);
+      }
+      return;
+    }
 
     setMessage("");
 
@@ -2737,6 +2998,119 @@ function App() {
     });
   }, []);
 
+  // Deep research action handlers — read/write per-tab research state
+  const handleCopyResearch = useCallback(async () => {
+    const tabId = activeChatTabIdRef.current;
+    const research = chatViewStateByTabRef.current[tabId]?.research;
+    if (!research?.session?.result) return;
+    await navigator.clipboard.writeText(research.session.result);
+  }, []);
+
+  const handleDeleteResearch = useCallback(async () => {
+    const tabId = activeChatTabIdRef.current;
+    const research = chatViewStateByTabRef.current[tabId]?.research;
+    if (!research) return;
+    await window.ipc.invoke("research:delete", { sessionId: research.sessionId });
+    setChatViewStateByTab((prev) => {
+      const existing = prev[tabId];
+      if (!existing) return prev;
+      const conv = (existing.conversation ?? []).map((item) => {
+        if (isToolCall(item) && item.id === `research-${research.sessionId}`) {
+          return { ...item, status: "completed" as const, result: null };
+        }
+        return item;
+      });
+      return { ...prev, [tabId]: { ...existing, conversation: conv, research: null } };
+    });
+  }, []);
+
+  const handleResearchCancelInChat = useCallback(async () => {
+    const tabId = activeChatTabIdRef.current;
+    const research = chatViewStateByTabRef.current[tabId]?.research;
+    if (!research) return;
+    await window.ipc.invoke("research:cancel", { sessionId: research.sessionId });
+    setChatViewStateByTab((prev) => {
+      const existing = prev[tabId];
+      if (!existing) return prev;
+      const conv = (existing.conversation ?? []).map((item) => {
+        if (isToolCall(item) && item.id === `research-${research.sessionId}`) {
+          return { ...item, status: "completed" as const, result: null };
+        }
+        return item;
+      });
+      return { ...prev, [tabId]: { ...existing, conversation: conv, research: null } };
+    });
+  }, []);
+
+  const handleDiscussResearch = useCallback(() => {
+    const tabId = activeChatTabIdRef.current;
+    const research = chatViewStateByTabRef.current[tabId]?.research;
+    if (!research?.session?.result) return;
+    const reportText = research.session.result.slice(0, 2000);
+    const newTabId = `chat-${Date.now()}`;
+    setChatTabs((prev) => [
+      ...prev,
+      {
+        id: newTabId,
+        title: `Discuss: ${research.query.slice(0, 50)}`,
+        runId: null,
+      },
+    ]);
+    setActiveChatTabId(newTabId);
+    setPresetMessage(`Discuss the research on "${research.query}"`);
+    initialChatContextByTabRef.current.set(newTabId, {
+      kind: "file",
+      path: "",
+      content: `I just completed research on "${research.query}". Here is the report:\n\n${reportText}\n\n---\n\nWhat would you like to discuss about this research?`,
+    });
+  }, []);
+
+  const handlePanelDiscussResearch = useCallback((query: string, report: string) => {
+    const reportText = report.slice(0, 2000);
+    const newTabId = `chat-${Date.now()}`;
+    setChatTabs((prev) => [
+      ...prev,
+      {
+        id: newTabId,
+        title: `Discuss: ${query.slice(0, 50)}`,
+        runId: null,
+      },
+    ]);
+    setActiveChatTabId(newTabId);
+    initialChatContextByTabRef.current.set(newTabId, {
+      kind: "file",
+      path: "",
+      content: `I just completed research on "${query}". Here is the report:\n\n${reportText}\n\n---\n\nWhat would you like to discuss about this research?`,
+    });
+  }, []);
+
+  const handleOpenResearchHtml = useCallback(() => {
+    const tabId = activeChatTabIdRef.current;
+    const research = chatViewStateByTabRef.current[tabId]?.research;
+    const session = research?.session;
+    if (!session?.result) return;
+    import("@/lib/research-html-report").then(async ({ generateResearchHtmlReport }) => {
+      const html = generateResearchHtmlReport(session as any);
+      const safeName = session.query.replace(/[<>:"/\\|?*]/g, "_").slice(0, 80);
+      const artifactPath = `artifacts/${safeName} Research Report.html`;
+      try {
+        await window.ipc.invoke("workspace:writeFile", {
+          path: artifactPath,
+          data: html,
+        });
+        await loadDirectoryRef.current();
+        navigateToFileRef.current(artifactPath);
+      } catch (err) {
+        console.error("Failed to save research HTML:", err);
+      }
+    });
+  }, []);
+
+  const handleShowResearchInPanel = useCallback(() => {
+    // Focus will be handled by the ResearchPanel's Sheet component
+    // For now, we just keep the research visible in-chat
+  }, []);
+
   const handleStop = useCallback(async () => {
     if (!runId) return;
     const now = Date.now();
@@ -2808,9 +3182,15 @@ function App() {
   );
 
   const handleNewChat = useCallback(() => {
+    // Preserve research state and conversation items if the current tab has active/completed research
+    const currentState = chatViewStateByTabRef.current[activeChatTabIdRef.current];
+    const existingResearch = currentState?.research ?? null;
+    const existingResearchItems = currentState?.conversation.filter(
+      (item): item is ToolCall => isToolCall(item) && item.name === "deep-research",
+    ) ?? [];
     // Invalidate any in-flight run loads (rapid switching can otherwise "pop" old conversations back in)
     loadRunRequestIdRef.current += 1;
-    setConversation([]);
+    setConversation(existingResearchItems);
     setCurrentAssistantMessage("");
     setCurrentToolDraftActive(false);
     setRunId(null);
@@ -2822,10 +3202,18 @@ function App() {
     setAllPermissionRequests(new Map());
     setPermissionResponses(new Map());
     setChatViewportAnchor(activeChatTabIdRef.current, null);
-    setChatViewStateByTab((prev) => ({
-      ...prev,
-      [activeChatTabIdRef.current]: createEmptyChatTabViewState(),
-    }));
+    setChatViewStateByTab((prev) => {
+      const existing = prev[activeChatTabIdRef.current];
+      const research = existing?.research ?? existingResearch;
+      return {
+        ...prev,
+        [activeChatTabIdRef.current]: {
+          ...createEmptyChatTabViewState(),
+          conversation: existingResearchItems,
+          research,
+        },
+      };
+    });
   }, [setChatViewportAnchor]);
 
   // Chat tab operations
@@ -3311,8 +3699,10 @@ function App() {
   );
 
   const handleNewChatTab = useCallback(() => {
-    // If there's already an empty "New chat" tab, switch to it
-    const emptyTab = chatTabs.find((t) => !t.runId);
+    // If there's already an empty "New chat" tab (without active research), switch to it
+    const emptyTab = chatTabs.find(
+      (t) => !t.runId && !chatViewStateByTabRef.current[t.id]?.research,
+    );
     let newTabId: string | null = null;
     if (emptyTab) {
       if (emptyTab.id !== activeChatTabId) {
@@ -3380,7 +3770,9 @@ function App() {
 
   // Sidebar variant: create/switch chat tab without leaving file/graph context.
   const handleNewChatTabInSidebar = useCallback(() => {
-    const emptyTab = chatTabs.find((t) => !t.runId);
+    const emptyTab = chatTabs.find(
+      (t) => !t.runId && !chatViewStateByTabRef.current[t.id]?.research,
+    );
     if (emptyTab) {
       if (emptyTab.id !== activeChatTabId) {
         setActiveChatTabId(emptyTab.id);
@@ -3906,6 +4298,8 @@ function App() {
     },
     [navigateToView],
   );
+  navigateToFileRef.current = navigateToFile;
+  loadDirectoryRef.current = loadDirectory;
 
   const handleBaseConfigChange = useCallback(
     (path: string, config: BaseConfig) => {
@@ -5062,6 +5456,44 @@ function App() {
           />
         );
       }
+      if (item.name === "deep-research") {
+        const result = item.result as any;
+        const session = result?.session ?? null;
+        const progress = result?.progress ?? null;
+        return (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {session ? (
+              <ChatResearchComplete
+                session={session}
+                onCopy={handleCopyResearch}
+                onDelete={handleDeleteResearch}
+                onDiscuss={handleDiscussResearch}
+                onShowInPanel={handleShowResearchInPanel}
+                onOpenHtml={handleOpenResearchHtml}
+              />
+            ) : (
+              <ChatResearchProgress
+                progress={(progress ?? {
+                  phase: "planning" as const,
+                  round: 0,
+                  totalRounds: 6,
+                  queriesFound: 0,
+                  sourcesFound: 0,
+                  findingsCount: 0,
+                }) as any}
+                startedAt={item.timestamp}
+                onCancel={handleResearchCancelInChat}
+              />
+            )}
+          </motion.div>
+        );
+      }
+
       const toolTitle = getToolDisplayName(item);
       const errorText = item.status === "error" ? "Tool error" : "";
       const output = normalizeToolOutput(item.result, item.status);
@@ -5112,6 +5544,7 @@ function App() {
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
+      research: chatViewStateByTab[activeChatTabId]?.research ?? null,
     }),
     [
       runId,
@@ -5121,6 +5554,8 @@ function App() {
       pendingAskHumanRequests,
       allPermissionRequests,
       permissionResponses,
+      chatViewStateByTab,
+      activeChatTabId,
     ],
   );
   const emptyChatTabState = React.useMemo<ChatTabViewState>(
@@ -5392,7 +5827,8 @@ function App() {
                   isSuggestedTopicsOpen ||
                   isArtifactsOpen ||
                   isCanvasOpen ||
-                  isCalendarOpen) &&
+                  isCalendarOpen ||
+                  isCanvasesOpen) &&
                 fileTabs.length >= 1 ? (
                   <TabBar
                     tabs={fileTabs}
@@ -5476,6 +5912,27 @@ function App() {
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
                         New chat tab
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                {!selectedPath &&
+                  !isGraphOpen &&
+                  !isSuggestedTopicsOpen &&
+                  !isBrowserOpen && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <ResearchPanel onDiscuss={handlePanelDiscussResearch}>
+                          <button
+                            type="button"
+                            className="titlebar-no-drag flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors self-center shrink-0"
+                            aria-label="Deep Research"
+                          >
+                            <BookOpen className="size-4" />
+                          </button>
+                        </ResearchPanel>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Deep Research
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -6155,9 +6612,10 @@ function App() {
                                       ? () => handleToggleCaveman(tab.id)
                                       : undefined
                                   }
-                                  onTtsModeChange={
+                                   onTtsModeChange={
                                     isActive ? handleTtsModeChange : undefined
                                   }
+                                  researchAvailable={true}
                                 />
                               </div>
                             );
@@ -6238,6 +6696,13 @@ function App() {
                   cavemanByTabRef.current.get(activeChatTabId) ?? false
                 }
                 onToggleCaveman={() => handleToggleCaveman(activeChatTabId)}
+                researchAvailable={true}
+                onCopyResearch={handleCopyResearch}
+                onDeleteResearch={handleDeleteResearch}
+                onDiscussResearch={handleDiscussResearch}
+                onShowResearchInPanel={handleShowResearchInPanel}
+                onOpenResearchHtml={handleOpenResearchHtml}
+                onCancelResearch={handleResearchCancelInChat}
               />
             )}
             {/* Rendered last so its no-drag region paints over the sidebar drag region */}

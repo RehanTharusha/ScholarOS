@@ -26,6 +26,7 @@ import { UserMessageContent } from "./message.js";
 import { ScholarOSApiConfig } from "./rowboat-account.js";
 import { ZListToolkitsResponse } from "./composio.js";
 import { BrowserStateSchema } from "./browser-control.js";
+import { ResearchQuery, ResearchProgress, ResearchSession } from "./research.js";
 // ============================================================================
 // Runtime Validation Schemas (Single Source of Truth)
 // ============================================================================
@@ -184,6 +185,16 @@ const ipcSchemas = {
           }),
         ])
         .optional(),
+    }),
+    res: z.object({
+      messageId: z.string(),
+    }),
+  },
+  "runs:appendMessage": {
+    req: z.object({
+      runId: z.string(),
+      role: z.enum(["user", "assistant"]),
+      content: z.string(),
     }),
     res: z.object({
       messageId: z.string(),
@@ -832,6 +843,58 @@ const ipcSchemas = {
         }),
       ),
     }),
+  },
+  // Deep Research channels
+  "research:start": {
+    req: ResearchQuery,
+    res: z.object({
+      sessionId: z.string(),
+    }),
+  },
+  "research:status": {
+    req: z.object({
+      sessionId: z.string(),
+    }),
+    res: z.object({
+      progress: ResearchProgress,
+      status: z.string(),
+    }).nullable(),
+  },
+  "research:cancel": {
+    req: z.object({
+      sessionId: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+    }),
+  },
+  "research:result": {
+    req: z.object({
+      sessionId: z.string(),
+    }),
+    res: ResearchSession.nullable(),
+  },
+  "research:list": {
+    req: z.null(),
+    res: z.object({
+      sessions: z.array(ResearchSession),
+    }),
+  },
+  "research:delete": {
+    req: z.object({
+      sessionId: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+    }),
+  },
+  "research:progress": {
+    req: z.object({
+      sessionId: z.string(),
+      progress: ResearchProgress,
+      status: z.string(),
+    }),
+    res: z.null(),
   },
 } as const;
 

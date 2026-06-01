@@ -2690,4 +2690,29 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       }
     },
   },
+  "deep-research": {
+    description: "Perform deep multi-round academic research on a topic. Use for complex questions requiring synthesis from multiple sources. Returns immediately with a sessionId — the user tracks progress in the Deep Research panel.",
+    inputSchema: z.object({
+      query: z.string().describe("The research question or topic to investigate"),
+      category: z.enum(["literature-review", "compare-contrast", "methodology", "fact-check", "concept-exploration", "problem-solving"]).optional().describe("Academic category for the research"),
+      rounds: z.number().int().min(2).max(12).optional().default(6).describe("Number of research rounds (more = deeper but slower)"),
+    }),
+    execute: async (input: { query: string; category?: string; rounds?: number }) => {
+      try {
+        const { ResearchHandler } = await import("../../research/research-handler.js");
+        const handler = new ResearchHandler(() => {});
+        const sessionId = await handler.startResearch(input.query, input.category as any, { rounds: input.rounds });
+        return {
+          sessionId,
+          message: `Started deep research on "${input.query}". Track progress in the Deep Research panel.`,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Failed to start research",
+          message: "Failed to start research. Please try again or check model configuration.",
+        };
+      }
+    },
+    isAvailable: async () => true,
+  },
 };

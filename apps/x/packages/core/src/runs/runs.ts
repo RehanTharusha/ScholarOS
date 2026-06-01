@@ -1,7 +1,7 @@
 import z from "zod";
 import container from "../di/container.js";
 import { IMessageQueue, UserMessageContentType, VoiceOutputMode, MiddlePaneContext } from "../application/lib/message-queue.js";
-import { AskHumanResponseEvent, ToolPermissionRequestEvent, ToolPermissionResponseEvent, CreateRunOptions, Run, ListRunsResponse, ToolPermissionAuthorizePayload, AskHumanResponsePayload } from "@x/shared/dist/runs.js";
+import { AskHumanResponseEvent, ToolPermissionRequestEvent, ToolPermissionResponseEvent, CreateRunOptions, Run, ListRunsResponse, ToolPermissionAuthorizePayload, AskHumanResponsePayload, MessageEvent as MessageEventSchema } from "@x/shared/dist/runs.js";
 import { IRunsRepo } from "./repo.js";
 import { IAgentRuntime } from "../agents/runtime.js";
 import { IBus } from "../application/lib/bus.js";
@@ -35,6 +35,23 @@ export async function createMessage(runId: string, message: UserMessageContentTy
     const runtime = container.resolve<IAgentRuntime>('agentRuntime');
     runtime.trigger(runId);
     return id;
+}
+
+export async function appendMessage(runId: string, role: "user" | "assistant", content: string): Promise<string> {
+    const repo = container.resolve<IRunsRepo>('runsRepo');
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const event: z.infer<typeof MessageEventSchema> = {
+        type: "message",
+        runId,
+        messageId,
+        message: role === "user"
+            ? { role: "user" as const, content }
+            : { role: "assistant" as const, content },
+        subflow: [],
+        ts: new Date().toISOString(),
+    };
+    await repo.appendEvents(runId, [event]);
+    return messageId;
 }
 
 export async function authorizePermission(runId: string, ev: z.infer<typeof ToolPermissionAuthorizePayload>): Promise<void> {

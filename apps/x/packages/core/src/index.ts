@@ -23,3 +23,6 @@ export * as taskScanner from './calendar/frontmatter-scanner.js';
 
 // Knowledge graph
 export * as knowledgeGraph from './knowledge/graph/index.js';
+
+// Deep research
+export * as research from './research/index.js';
