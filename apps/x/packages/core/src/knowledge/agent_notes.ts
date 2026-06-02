@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { WorkDir } from "../config/config.js";
+import { getScholarOSPath } from "../config/config.js";
 import { createRun, createMessage } from "../runs/runs.js";
 import { getKgModel } from "../models/defaults.js";
 import { waitForRunCompletion } from "../agents/utils.js";
@@ -16,12 +16,12 @@ import {
   type AgentNotesState,
 } from "./agent_notes_state.js";
 
-const SYNC_INTERVAL_MS = 10 * 1000; // 10 seconds (for testing)
+export const SYNC_INTERVAL_MS = 10 * 1000; // 10 seconds (for testing)
 const EMAIL_BATCH_SIZE = 5;
 const RUNS_BATCH_SIZE = 5;
-const GMAIL_SYNC_DIR = path.join(WorkDir, "gmail_sync");
-const RUNS_DIR = path.join(WorkDir, "runs");
-const AGENT_NOTES_DIR = path.join(WorkDir, "agent-notes");
+const GMAIL_SYNC_DIR = getScholarOSPath("gmail_sync");
+const RUNS_DIR = getScholarOSPath("runs");
+const AGENT_NOTES_DIR = getScholarOSPath("agent-notes");
 const INBOX_FILE = path.join(AGENT_NOTES_DIR, "inbox.md");
 const AGENT_ID = "agent_notes_agent";
 
@@ -244,7 +244,7 @@ async function ensureUserEmail(): Promise<string | null> {
 
 // --- Main processing ---
 
-async function processAgentNotes(): Promise<void> {
+export async function processAgentNotes(): Promise<void> {
   ensureAgentNotesDir();
   const state = loadAgentNotesState();
   const userEmail = await ensureUserEmail();

@@ -1,12 +1,16 @@
 const HIDDEN_SIDEBAR_ROOT_FOLDERS = new Set([
+  ".scholarOS",
   "agents",
   "bases",
+  "calendar",
   "config",
   "events",
   "logs",
   "runs",
   "sites",
-  "calendar",
+  ".knowledge-graph",
+  ".knowledge-history",
+  ".trash",
 ]);
 
 const HIDDEN_SIDEBAR_ROOT_FILES = new Set([

@@ -1,37 +1,43 @@
-import path from 'path';
-import fs from 'fs';
-import fsp from 'fs/promises';
-import readline from 'readline';
-import { execFile } from 'child_process';
-import { WorkDir } from '../config/config.js';
+import path from "path";
+import fs from "fs";
+import fsp from "fs/promises";
+import readline from "readline";
+import { execFile } from "child_process";
+import { WorkDir, getScholarOSPath } from "../config/config.js";
 
 interface SearchResult {
-  type: 'knowledge' | 'chat';
+  type: "knowledge" | "chat";
   title: string;
   preview: string;
   path: string;
 }
 
 const KNOWLEDGE_DIR = WorkDir;
-const RUNS_DIR = path.join(WorkDir, 'runs');
+const RUNS_DIR = getScholarOSPath("runs");
 
-type SearchType = 'knowledge' | 'chat';
+type SearchType = "knowledge" | "chat";
 
 /**
  * Search across knowledge files and chat history.
  * @param types - optional filter to search only specific types (default: both)
  */
-export async function search(query: string, limit = 20, types?: SearchType[]): Promise<{ results: SearchResult[] }> {
+export async function search(
+  query: string,
+  limit = 20,
+  types?: SearchType[],
+): Promise<{ results: SearchResult[] }> {
   const trimmed = query.trim();
   if (!trimmed) {
     return { results: [] };
   }
 
-  const searchKnowledgeEnabled = !types || types.includes('knowledge');
-  const searchChatsEnabled = !types || types.includes('chat');
+  const searchKnowledgeEnabled = !types || types.includes("knowledge");
+  const searchChatsEnabled = !types || types.includes("chat");
 
   const [knowledgeResults, chatResults] = await Promise.all([
-    searchKnowledgeEnabled ? searchKnowledge(trimmed, limit) : Promise.resolve([]),
+    searchKnowledgeEnabled
+      ? searchKnowledge(trimmed, limit)
+      : Promise.resolve([]),
     searchChatsEnabled ? searchChats(trimmed, limit) : Promise.resolve([]),
   ]);
 
@@ -42,7 +48,10 @@ export async function search(query: string, limit = 20, types?: SearchType[]): P
 /**
  * Search knowledge markdown files by content and filename.
  */
-async function searchKnowledge(query: string, limit: number): Promise<SearchResult[]> {
+async function searchKnowledge(
+  query: string,
+  limit: number,
+): Promise<SearchResult[]> {
   if (!fs.existsSync(KNOWLEDGE_DIR)) {
     return [];
   }
@@ -53,16 +62,16 @@ async function searchKnowledge(query: string, limit: number): Promise<SearchResu
 
   // Content search via grep
   try {
-    const grepMatches = await grepFiles(query, KNOWLEDGE_DIR, '*.md');
+    const grepMatches = await grepFiles(query, KNOWLEDGE_DIR, "*.md");
     for (const match of grepMatches) {
       if (results.length >= limit) break;
       const relPath = path.relative(WorkDir, match.file);
       if (seenPaths.has(relPath)) continue;
       seenPaths.add(relPath);
 
-      const title = path.basename(match.file, '.md');
+      const title = path.basename(match.file, ".md");
       results.push({
-        type: 'knowledge',
+        type: "knowledge",
         title,
         preview: match.line.trim().substring(0, 150),
         path: relPath,
@@ -80,12 +89,12 @@ async function searchKnowledge(query: string, limit: number): Promise<SearchResu
       const relPath = path.relative(WorkDir, file);
       if (seenPaths.has(relPath)) continue;
 
-      const basename = path.basename(file, '.md');
+      const basename = path.basename(file, ".md");
       if (basename.toLowerCase().includes(lowerQuery)) {
         seenPaths.add(relPath);
         const preview = await readFirstLines(file, 2);
         results.push({
-          type: 'knowledge',
+          type: "knowledge",
           title: basename,
           preview,
           path: relPath,
@@ -102,7 +111,10 @@ async function searchKnowledge(query: string, limit: number): Promise<SearchResu
 /**
  * Search chat history by title and message content.
  */
-async function searchChats(query: string, limit: number): Promise<SearchResult[]> {
+async function searchChats(
+  query: string,
+  limit: number,
+): Promise<SearchResult[]> {
   if (!fs.existsSync(RUNS_DIR)) {
     return [];
   }
@@ -113,32 +125,38 @@ async function searchChats(query: string, limit: number): Promise<SearchResult[]
 
   // Content search via grep on JSONL files
   try {
-    const grepMatches = await grepFiles(query, RUNS_DIR, '*.jsonl');
+    const grepMatches = await grepFiles(query, RUNS_DIR, "*.jsonl");
     for (const match of grepMatches) {
       if (results.length >= limit) break;
-      const runId = path.basename(match.file, '.jsonl');
+      const runId = path.basename(match.file, ".jsonl");
       if (seenIds.has(runId)) continue;
 
       const meta = await readRunMetadata(match.file);
-      if (meta.agentName !== 'copilot') {
+      if (meta.agentName !== "copilot") {
         seenIds.add(runId);
         continue;
       }
       seenIds.add(runId);
 
       // Extract a content preview from the matching line
-      let preview = '';
+      let preview = "";
       try {
         const parsed = JSON.parse(match.line);
-        if (parsed.message?.content && typeof parsed.message.content === 'string') {
-          preview = parsed.message.content.replace(/<attached-files>[\s\S]*?<\/attached-files>/g, '').trim().substring(0, 150);
+        if (
+          parsed.message?.content &&
+          typeof parsed.message.content === "string"
+        ) {
+          preview = parsed.message.content
+            .replace(/<attached-files>[\s\S]*?<\/attached-files>/g, "")
+            .trim()
+            .substring(0, 150);
         }
       } catch {
         preview = match.line.substring(0, 150);
       }
 
       results.push({
-        type: 'chat',
+        type: "chat",
         title: meta.title || runId,
         preview,
         path: runId,
@@ -152,26 +170,26 @@ async function searchChats(query: string, limit: number): Promise<SearchResult[]
   try {
     const entries = await fsp.readdir(RUNS_DIR, { withFileTypes: true });
     const jsonlFiles = entries
-      .filter(e => e.isFile() && e.name.endsWith('.jsonl'))
-      .map(e => e.name)
+      .filter((e) => e.isFile() && e.name.endsWith(".jsonl"))
+      .map((e) => e.name)
       .sort()
       .reverse(); // newest first
 
     for (const name of jsonlFiles) {
       if (results.length >= limit) break;
-      const runId = path.basename(name, '.jsonl');
+      const runId = path.basename(name, ".jsonl");
       if (seenIds.has(runId)) continue;
 
       const filePath = path.join(RUNS_DIR, name);
       const meta = await readRunMetadata(filePath);
-      if (meta.agentName !== 'copilot') {
+      if (meta.agentName !== "copilot") {
         seenIds.add(runId);
         continue;
       }
       if (meta.title && meta.title.toLowerCase().includes(lowerQuery)) {
         seenIds.add(runId);
         results.push({
-          type: 'chat',
+          type: "chat",
           title: meta.title,
           preview: meta.title,
           path: runId,
@@ -188,11 +206,21 @@ async function searchChats(query: string, limit: number): Promise<SearchResult[]
 /**
  * Use grep to find files matching a query.
  */
-function grepFiles(query: string, dir: string, includeGlob: string): Promise<Array<{ file: string; line: string }>> {
+function grepFiles(
+  query: string,
+  dir: string,
+  includeGlob: string,
+): Promise<Array<{ file: string; line: string }>> {
   return new Promise((resolve, reject) => {
     execFile(
-      'grep',
-      ['-ril', '--include=' + includeGlob, query, dir],
+      "grep",
+      [
+        "-ril",
+        "--exclude-dir=.scholarOS",
+        "--include=" + includeGlob,
+        query,
+        dir,
+      ],
       { maxBuffer: 1024 * 1024 },
       (error, stdout) => {
         if (error) {
@@ -205,13 +233,13 @@ function grepFiles(query: string, dir: string, includeGlob: string): Promise<Arr
           return;
         }
 
-        const files = stdout.trim().split('\n').filter(Boolean);
+        const files = stdout.trim().split("\n").filter(Boolean);
         // For each matching file, get the first matching line
-        const promises = files.map(file =>
-          getFirstMatchingLine(file, query).then(line => ({ file, line }))
+        const promises = files.map((file) =>
+          getFirstMatchingLine(file, query).then((line) => ({ file, line })),
         );
         Promise.all(promises).then(resolve).catch(reject);
-      }
+      },
     );
   });
 }
@@ -219,7 +247,10 @@ function grepFiles(query: string, dir: string, includeGlob: string): Promise<Arr
 /**
  * Get the first line in a file that matches the query (case-insensitive).
  */
-function getFirstMatchingLine(filePath: string, query: string): Promise<string> {
+function getFirstMatchingLine(
+  filePath: string,
+  query: string,
+): Promise<string> {
   return new Promise((resolve) => {
     let resolved = false;
     const done = (value: string) => {
@@ -229,10 +260,10 @@ function getFirstMatchingLine(filePath: string, query: string): Promise<string> 
     };
 
     const lowerQuery = query.toLowerCase();
-    const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const stream = fs.createReadStream(filePath, { encoding: "utf8" });
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
-    rl.on('line', (line) => {
+    rl.on("line", (line) => {
       if (line.toLowerCase().includes(lowerQuery)) {
         done(line);
         rl.close();
@@ -240,8 +271,8 @@ function getFirstMatchingLine(filePath: string, query: string): Promise<string> 
       }
     });
 
-    rl.on('close', () => done(''));
-    stream.on('error', () => done(''));
+    rl.on("close", () => done(""));
+    stream.on("error", () => done(""));
   });
 }
 
@@ -262,12 +293,12 @@ function readRunMetadata(filePath: string): Promise<RunMetadata> {
       resolve(value);
     };
 
-    const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const stream = fs.createReadStream(filePath, { encoding: "utf8" });
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     let lineIndex = 0;
     let agentName: string | undefined;
 
-    rl.on('line', (line) => {
+    rl.on("line", (line) => {
       if (resolved) return;
       const trimmed = line.trim();
       if (!trimmed) return;
@@ -282,15 +313,22 @@ function readRunMetadata(filePath: string): Promise<RunMetadata> {
         }
 
         const event = JSON.parse(trimmed);
-        if (event.type === 'message') {
+        if (event.type === "message") {
           const msg = event.message;
-          if (msg?.role === 'user') {
+          if (msg?.role === "user") {
             const content = msg.content;
-            if (typeof content === 'string' && content.trim()) {
-              let cleaned = content.replace(/<attached-files>[\s\S]*?<\/attached-files>/g, '');
-              cleaned = cleaned.replace(/\s+/g, ' ').trim();
+            if (typeof content === "string" && content.trim()) {
+              let cleaned = content.replace(
+                /<attached-files>[\s\S]*?<\/attached-files>/g,
+                "",
+              );
+              cleaned = cleaned.replace(/\s+/g, " ").trim();
               if (cleaned) {
-                done({ title: cleaned.length > 100 ? cleaned.substring(0, 100) : cleaned, agentName });
+                done({
+                  title:
+                    cleaned.length > 100 ? cleaned.substring(0, 100) : cleaned,
+                  agentName,
+                });
                 rl.close();
                 stream.destroy();
                 return;
@@ -300,7 +338,7 @@ function readRunMetadata(filePath: string): Promise<RunMetadata> {
             rl.close();
             stream.destroy();
             return;
-          } else if (msg?.role === 'assistant') {
+          } else if (msg?.role === "assistant") {
             done({ title: undefined, agentName });
             rl.close();
             stream.destroy();
@@ -313,9 +351,9 @@ function readRunMetadata(filePath: string): Promise<RunMetadata> {
       }
     });
 
-    rl.on('close', () => done({ title: undefined, agentName }));
-    rl.on('error', () => done({ title: undefined, agentName: undefined }));
-    stream.on('error', () => {
+    rl.on("close", () => done({ title: undefined, agentName }));
+    rl.on("error", () => done({ title: undefined, agentName: undefined }));
+    stream.on("error", () => {
       rl.close();
       done({ title: undefined, agentName: undefined });
     });
@@ -330,11 +368,14 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
   try {
     const entries = await fsp.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
+      if (entry.name.startsWith(".")) {
+        continue;
+      }
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         const nested = await listMarkdownFiles(fullPath);
         results.push(...nested);
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
         results.push(fullPath);
       }
     }
@@ -349,13 +390,13 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
  */
 async function readFirstLines(filePath: string, n: number): Promise<string> {
   return new Promise((resolve) => {
-    const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const stream = fs.createReadStream(filePath, { encoding: "utf8" });
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     const lines: string[] = [];
 
-    rl.on('line', (line) => {
+    rl.on("line", (line) => {
       const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith('#')) {
+      if (trimmed && !trimmed.startsWith("#")) {
         lines.push(trimmed);
       }
       if (lines.length >= n) {
@@ -364,12 +405,12 @@ async function readFirstLines(filePath: string, n: number): Promise<string> {
       }
     });
 
-    rl.on('close', () => {
-      resolve(lines.join(' ').substring(0, 150));
+    rl.on("close", () => {
+      resolve(lines.join(" ").substring(0, 150));
     });
 
-    stream.on('error', () => {
-      resolve('');
+    stream.on("error", () => {
+      resolve("");
     });
   });
 }

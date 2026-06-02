@@ -1,16 +1,22 @@
-import fsp from 'fs/promises';
-import path from 'path';
-import { WorkDir } from '../../config/config.js';
-import type { GraphNode, Branch, GraphStats, GraphQuery, GraphQueryResult } from './types.js';
+import fsp from "fs/promises";
+import path from "path";
+import { getScholarOSPath } from "../../config/config.js";
+import type {
+  GraphNode,
+  Branch,
+  GraphStats,
+  GraphQuery,
+  GraphQueryResult,
+} from "./types.js";
 
-const GRAPH_DIR = path.join(WorkDir, '.knowledge-graph');
-const GRAPH_FILE = path.join(GRAPH_DIR, 'graph.json');
+const GRAPH_DIR = getScholarOSPath(".knowledge-graph");
+const GRAPH_FILE = path.join(GRAPH_DIR, "graph.json");
 
-const ROOT_ID = 'root';
+const ROOT_ID = "root";
 const BRANCH_IDS: Record<Branch, string> = {
-  user: 'branch_user',
-  directives: 'branch_directives',
-  world: 'branch_world',
+  user: "branch_user",
+  directives: "branch_directives",
+  world: "branch_world",
 };
 
 const DECAY_HALF_LIFE_DAYS = 14;
@@ -28,7 +34,7 @@ export class KnowledgeGraph {
       // ignore
     }
     try {
-      const raw = await fsp.readFile(GRAPH_FILE, 'utf-8');
+      const raw = await fsp.readFile(GRAPH_FILE, "utf-8");
       const data = JSON.parse(raw) as GraphNode[];
       for (const node of data) {
         this.nodes.set(node.id, node);
@@ -41,15 +47,15 @@ export class KnowledgeGraph {
 
   async save(): Promise<void> {
     const data = Array.from(this.nodes.values());
-    await fsp.writeFile(GRAPH_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    await fsp.writeFile(GRAPH_FILE, JSON.stringify(data, null, 2), "utf-8");
   }
 
   private async seed(): Promise<void> {
     const now = new Date().toISOString();
     const root: GraphNode = {
       id: ROOT_ID,
-      name: 'root',
-      description: 'Root node of the knowledge graph',
+      name: "root",
+      description: "Root node of the knowledge graph",
       facts: [],
       parentId: null,
       branch: null,
@@ -63,9 +69,9 @@ export class KnowledgeGraph {
 
     for (const [branch, id] of Object.entries(BRANCH_IDS)) {
       const labels: Record<string, string> = {
-        user: 'User',
-        directives: 'Directives',
-        world: 'World',
+        user: "User",
+        directives: "Directives",
+        world: "World",
       };
       this.nodes.set(id, {
         id,
@@ -90,8 +96,8 @@ export class KnowledgeGraph {
       const now = new Date().toISOString();
       this.nodes.set(ROOT_ID, {
         id: ROOT_ID,
-        name: 'root',
-        description: 'Root node of the knowledge graph',
+        name: "root",
+        description: "Root node of the knowledge graph",
         facts: [],
         parentId: null,
         branch: null,
@@ -105,9 +111,9 @@ export class KnowledgeGraph {
     for (const [branch, id] of Object.entries(BRANCH_IDS)) {
       if (!this.nodes.has(id)) {
         const labels: Record<string, string> = {
-          user: 'User',
-          directives: 'Directives',
-          world: 'World',
+          user: "User",
+          directives: "Directives",
+          world: "World",
         };
         const now = new Date().toISOString();
         this.nodes.set(id, {
@@ -139,7 +145,7 @@ export class KnowledgeGraph {
     this.nodes.set(id, {
       id,
       name,
-      description: '',
+      description: "",
       facts: [],
       parentId,
       branch: resolvedBranch,
@@ -220,7 +226,9 @@ export class KnowledgeGraph {
     let current = this.nodes.get(id) ?? null;
     while (current) {
       pathNodes.unshift(current.name);
-      current = current.parentId ? this.nodes.get(current.parentId) ?? null : null;
+      current = current.parentId
+        ? (this.nodes.get(current.parentId) ?? null)
+        : null;
     }
     return pathNodes;
   }
@@ -230,7 +238,9 @@ export class KnowledgeGraph {
     let current = this.nodes.get(id) ?? null;
     while (current) {
       ids.unshift(current.id);
-      current = current.parentId ? this.nodes.get(current.parentId) ?? null : null;
+      current = current.parentId
+        ? (this.nodes.get(current.parentId) ?? null)
+        : null;
     }
     return ids;
   }
@@ -259,7 +269,11 @@ export class KnowledgeGraph {
   getRecentNodes(count: number): GraphNode[] {
     return Array.from(this.nodes.values())
       .filter((n) => n.id !== ROOT_ID && !n.archived)
-      .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.lastAccessed).getTime() -
+          new Date(a.lastAccessed).getTime(),
+      )
       .slice(0, count);
   }
 
@@ -278,14 +292,18 @@ export class KnowledgeGraph {
     });
     if (toArchive.length === 0) return;
 
-    const archiveDir = path.join(GRAPH_DIR, 'archive');
+    const archiveDir = path.join(GRAPH_DIR, "archive");
     await fsp.mkdir(archiveDir, { recursive: true });
     const archiveFile = path.join(archiveDir, `archive_${Date.now()}.json`);
 
     for (const node of toArchive) {
       node.archived = true;
     }
-    await fsp.writeFile(archiveFile, JSON.stringify(toArchive, null, 2), 'utf-8');
+    await fsp.writeFile(
+      archiveFile,
+      JSON.stringify(toArchive, null, 2),
+      "utf-8",
+    );
     await this.save();
   }
 
@@ -296,9 +314,10 @@ export class KnowledgeGraph {
     return {
       totalNodes: active.length,
       totalFacts,
-      userBranchNodes: active.filter((n) => n.branch === 'user').length,
-      directivesBranchNodes: active.filter((n) => n.branch === 'directives').length,
-      worldBranchNodes: active.filter((n) => n.branch === 'world').length,
+      userBranchNodes: active.filter((n) => n.branch === "user").length,
+      directivesBranchNodes: active.filter((n) => n.branch === "directives")
+        .length,
+      worldBranchNodes: active.filter((n) => n.branch === "world").length,
       lastRunTime: null,
       totalRunsProcessed: 0,
       archivedNodes: all.filter((n) => n.archived).length,

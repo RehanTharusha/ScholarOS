@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { WorkDir } from "../config/config.js";
+import { getScholarOSPath } from "../config/config.js";
 import { Task, TaskSchema, CreateTask } from "./types.js";
 
 export interface ITaskRepo {
@@ -16,7 +16,7 @@ export interface ITaskRepo {
 
 export class FSTaskRepo implements ITaskRepo {
   private get tasksPath(): string {
-    return path.join(WorkDir, "calendar", "tasks.json");
+    return path.join(getScholarOSPath("calendar"), "tasks.json");
   }
 
   private async ensureFile(): Promise<void> {

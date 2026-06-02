@@ -1,51 +1,51 @@
-import fs from 'node:fs';
-import fsp from 'node:fs/promises';
-import path from 'node:path';
-import type { Server } from 'node:http';
-import chokidar, { type FSWatcher } from 'chokidar';
-import express from 'express';
-import { WorkDir } from '../config/config.js';
-import { LOCAL_SITE_SCAFFOLD } from './templates.js';
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
+import type { Server } from "node:http";
+import chokidar, { type FSWatcher } from "chokidar";
+import express from "express";
+import { getScholarOSPath } from "../config/config.js";
+import { LOCAL_SITE_SCAFFOLD } from "./templates.js";
 
 export const LOCAL_SITES_PORT = 3210;
 export const LOCAL_SITES_BASE_URL = `http://localhost:${LOCAL_SITES_PORT}`;
 
-const LOCAL_SITES_DIR = path.join(WorkDir, 'sites');
+const LOCAL_SITES_DIR = getScholarOSPath("sites");
 const SITE_SLUG_RE = /^[a-z0-9][a-z0-9-_]*$/i;
-const IFRAME_HEIGHT_MESSAGE = 'scholaros:iframe-height';
-const SITE_RELOAD_MESSAGE = 'scholaros:site-changed';
-const SITE_EVENTS_PATH = '__scholaros_events';
+const IFRAME_HEIGHT_MESSAGE = "scholaros:iframe-height";
+const SITE_RELOAD_MESSAGE = "scholaros:site-changed";
+const SITE_EVENTS_PATH = "__scholaros_events";
 const SITE_RELOAD_DEBOUNCE_MS = 140;
 const SITE_EVENTS_RETRY_MS = 1000;
 const SITE_EVENTS_HEARTBEAT_MS = 15000;
 const TEXT_EXTENSIONS = new Set([
-  '.css',
-  '.html',
-  '.js',
-  '.json',
-  '.map',
-  '.mjs',
-  '.svg',
-  '.txt',
-  '.xml',
+  ".css",
+  ".html",
+  ".js",
+  ".json",
+  ".map",
+  ".mjs",
+  ".svg",
+  ".txt",
+  ".xml",
 ]);
 const MIME_TYPES: Record<string, string> = {
-  '.css': 'text/css; charset=utf-8',
-  '.gif': 'image/gif',
-  '.html': 'text/html; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.jpeg': 'image/jpeg',
-  '.jpg': 'image/jpeg',
-  '.js': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-  '.mjs': 'application/javascript; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml; charset=utf-8',
-  '.txt': 'text/plain; charset=utf-8',
-  '.wasm': 'application/wasm',
-  '.webp': 'image/webp',
-  '.xml': 'application/xml; charset=utf-8',
+  ".css": "text/css; charset=utf-8",
+  ".gif": "image/gif",
+  ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".wasm": "application/wasm",
+  ".webp": "image/webp",
+  ".xml": "application/xml; charset=utf-8",
 };
 const IFRAME_AUTOSIZE_BOOTSTRAP = String.raw`<script>
 (() => {
@@ -192,17 +192,28 @@ function resolveSiteDir(siteSlug: string): string | null {
   return path.join(LOCAL_SITES_DIR, siteSlug);
 }
 
-function resolveRequestedPath(siteDir: string, requestPath: string): string | null {
-  const candidate = requestPath === '/' ? '/index.html' : requestPath;
+function resolveRequestedPath(
+  siteDir: string,
+  requestPath: string,
+): string | null {
+  const candidate = requestPath === "/" ? "/index.html" : requestPath;
   const normalized = path.posix.normalize(candidate);
-  const relativePath = normalized.replace(/^\/+/, '');
+  const relativePath = normalized.replace(/^\/+/, "");
 
-  if (!relativePath || relativePath === '.' || relativePath.startsWith('..') || relativePath.includes('\0')) {
+  if (
+    !relativePath ||
+    relativePath === "." ||
+    relativePath.startsWith("..") ||
+    relativePath.includes("\0")
+  ) {
     return null;
   }
 
   const absolutePath = path.resolve(siteDir, relativePath);
-  if (!absolutePath.startsWith(siteDir + path.sep) && absolutePath !== siteDir) {
+  if (
+    !absolutePath.startsWith(siteDir + path.sep) &&
+    absolutePath !== siteDir
+  ) {
     return null;
   }
 
@@ -210,14 +221,15 @@ function resolveRequestedPath(siteDir: string, requestPath: string): string | nu
 }
 
 function getRequestPath(req: express.Request): string {
-  const rawPath = req.url.split('?')[0] || '/';
-  return rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+  const rawPath = req.url.split("?")[0] || "/";
+  return rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
 }
 
 function listLocalSites(): Array<{ slug: string; url: string }> {
   if (!fs.existsSync(LOCAL_SITES_DIR)) return [];
 
-  return fs.readdirSync(LOCAL_SITES_DIR, { withFileTypes: true })
+  return fs
+    .readdirSync(LOCAL_SITES_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && isSafeSiteSlug(entry.name))
     .map((entry) => ({
       slug: entry.name,
@@ -227,15 +239,20 @@ function listLocalSites(): Array<{ slug: string; url: string }> {
 }
 
 function isPathInsideRoot(rootPath: string, candidatePath: string): boolean {
-  return candidatePath === rootPath || candidatePath.startsWith(rootPath + path.sep);
+  return (
+    candidatePath === rootPath || candidatePath.startsWith(rootPath + path.sep)
+  );
 }
 
-async function writeIfMissing(filePath: string, content: string): Promise<void> {
+async function writeIfMissing(
+  filePath: string,
+  content: string,
+): Promise<void> {
   try {
     await fsp.access(filePath);
   } catch {
     await fsp.mkdir(path.dirname(filePath), { recursive: true });
-    await fsp.writeFile(filePath, content, 'utf8');
+    await fsp.writeFile(filePath, content, "utf8");
   }
 }
 
@@ -250,19 +267,26 @@ async function ensureLocalSiteScaffold(): Promise<void> {
 }
 
 function injectIframeAutosizeBootstrap(html: string): string {
-  const bootstrap = IFRAME_AUTOSIZE_BOOTSTRAP
-    .replace('__ROWBOAT_IFRAME_HEIGHT_MESSAGE__', IFRAME_HEIGHT_MESSAGE)
-    .replace('__ROWBOAT_SITE_CHANGED_MESSAGE__', SITE_RELOAD_MESSAGE)
-    .replace('__ROWBOAT_SITE_EVENTS_PATH__', SITE_EVENTS_PATH)
+  const bootstrap = IFRAME_AUTOSIZE_BOOTSTRAP.replace(
+    "__ROWBOAT_IFRAME_HEIGHT_MESSAGE__",
+    IFRAME_HEIGHT_MESSAGE,
+  )
+    .replace("__ROWBOAT_SITE_CHANGED_MESSAGE__", SITE_RELOAD_MESSAGE)
+    .replace("__ROWBOAT_SITE_EVENTS_PATH__", SITE_EVENTS_PATH);
   if (/<\/body>/i.test(html)) {
-    return html.replace(/<\/body>/i, `${bootstrap}\n</body>`)
+    return html.replace(/<\/body>/i, `${bootstrap}\n</body>`);
   }
-  return `${html}\n${bootstrap}`
+  return `${html}\n${bootstrap}`;
 }
 
 function getSiteSlugFromAbsolutePath(absolutePath: string): string | null {
   const relativePath = path.relative(LOCAL_SITES_DIR, absolutePath);
-  if (!relativePath || relativePath === '.' || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+  if (
+    !relativePath ||
+    relativePath === "." ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
     return null;
   }
 
@@ -325,32 +349,41 @@ async function startSiteWatcher(): Promise<void> {
   });
 
   watcher
-    .on('all', (eventName, absolutePath) => {
-      if (!['add', 'addDir', 'change', 'unlink', 'unlinkDir'].includes(eventName)) return;
+    .on("all", (eventName, absolutePath) => {
+      if (
+        !["add", "addDir", "change", "unlink", "unlinkDir"].includes(eventName)
+      )
+        return;
 
       const siteSlug = getSiteSlugFromAbsolutePath(absolutePath);
       if (!siteSlug) return;
 
       const siteRoot = path.join(LOCAL_SITES_DIR, siteSlug);
       const relativePath = path.relative(siteRoot, absolutePath);
-      const normalizedPath = !relativePath || relativePath === '.'
-        ? '.'
-        : relativePath.split(path.sep).join('/');
+      const normalizedPath =
+        !relativePath || relativePath === "."
+          ? "."
+          : relativePath.split(path.sep).join("/");
 
       scheduleSiteReload(siteSlug, normalizedPath);
     })
-    .on('error', (error: unknown) => {
-      console.error('[LocalSites] Watcher error:', error);
+    .on("error", (error: unknown) => {
+      console.error("[LocalSites] Watcher error:", error);
     });
 
   localSitesWatcher = watcher;
 }
 
-function handleSiteEventsRequest(req: express.Request, res: express.Response): void {
+function handleSiteEventsRequest(
+  req: express.Request,
+  res: express.Response,
+): void {
   const siteSlugParam = req.params.siteSlug;
-  const siteSlug = Array.isArray(siteSlugParam) ? siteSlugParam[0] : siteSlugParam;
+  const siteSlug = Array.isArray(siteSlugParam)
+    ? siteSlugParam[0]
+    : siteSlugParam;
   if (!siteSlug || !isSafeSiteSlug(siteSlug)) {
-    res.status(400).json({ error: 'Invalid site slug' });
+    res.status(400).json({ error: "Invalid site slug" });
     return;
   }
 
@@ -359,10 +392,10 @@ function handleSiteEventsRequest(req: express.Request, res: express.Response): v
   clients.add(res);
 
   res.status(200);
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
   res.write(`retry: ${SITE_EVENTS_RETRY_MS}\n`);
   res.write(`event: ready\ndata: {"ok":true}\n\n`);
@@ -381,32 +414,36 @@ function handleSiteEventsRequest(req: express.Request, res: express.Response): v
     removeSiteEventClient(siteSlug, res);
   };
 
-  req.on('close', cleanup);
-  res.on('close', cleanup);
+  req.on("close", cleanup);
+  res.on("close", cleanup);
 }
 
-async function respondWithFile(res: express.Response, filePath: string, method: string): Promise<void> {
+async function respondWithFile(
+  res: express.Response,
+  filePath: string,
+  method: string,
+): Promise<void> {
   const extension = path.extname(filePath).toLowerCase();
-  const mimeType = MIME_TYPES[extension] || 'application/octet-stream';
+  const mimeType = MIME_TYPES[extension] || "application/octet-stream";
   const stats = await fsp.stat(filePath);
 
   res.status(200);
-  res.setHeader('Content-Type', mimeType);
-  res.setHeader('Content-Length', String(stats.size));
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Pragma', 'no-cache');
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Content-Length", String(stats.size));
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
 
-  if (method === 'HEAD') {
+  if (method === "HEAD") {
     res.end();
     return;
   }
 
   if (TEXT_EXTENSIONS.has(extension)) {
-    let text = await fsp.readFile(filePath, 'utf8');
-    if (extension === '.html') {
+    let text = await fsp.readFile(filePath, "utf8");
+    if (extension === ".html") {
       text = injectIframeAutosizeBootstrap(text);
     }
-    res.setHeader('Content-Length', String(Buffer.byteLength(text)));
+    res.setHeader("Content-Length", String(Buffer.byteLength(text)));
     res.end(text);
     return;
   }
@@ -415,30 +452,35 @@ async function respondWithFile(res: express.Response, filePath: string, method: 
   res.end(data);
 }
 
-async function sendSiteResponse(req: express.Request, res: express.Response): Promise<void> {
+async function sendSiteResponse(
+  req: express.Request,
+  res: express.Response,
+): Promise<void> {
   const siteSlugParam = req.params.siteSlug;
-  const siteSlug = Array.isArray(siteSlugParam) ? siteSlugParam[0] : siteSlugParam;
+  const siteSlug = Array.isArray(siteSlugParam)
+    ? siteSlugParam[0]
+    : siteSlugParam;
   const siteDir = siteSlug ? resolveSiteDir(siteSlug) : null;
   if (!siteDir) {
-    res.status(400).json({ error: 'Invalid site slug' });
+    res.status(400).json({ error: "Invalid site slug" });
     return;
   }
 
   if (!fs.existsSync(siteDir) || !fs.statSync(siteDir).isDirectory()) {
-    res.status(404).json({ error: 'Site not found' });
+    res.status(404).json({ error: "Site not found" });
     return;
   }
 
   const realSitesDir = fs.realpathSync(LOCAL_SITES_DIR);
   const realSiteDir = fs.realpathSync(siteDir);
   if (!isPathInsideRoot(realSitesDir, realSiteDir)) {
-    res.status(403).json({ error: 'Site path escapes sites directory' });
+    res.status(403).json({ error: "Site path escapes sites directory" });
     return;
   }
 
   const requestedPath = resolveRequestedPath(siteDir, getRequestPath(req));
   if (!requestedPath) {
-    res.status(400).json({ error: 'Invalid site path' });
+    res.status(400).json({ error: "Invalid site path" });
     return;
   }
 
@@ -446,11 +488,11 @@ async function sendSiteResponse(req: express.Request, res: express.Response): Pr
   if (fs.existsSync(requestedPath)) {
     const stat = fs.statSync(requestedPath);
     if (stat.isDirectory()) {
-      const indexPath = path.join(requestedPath, 'index.html');
+      const indexPath = path.join(requestedPath, "index.html");
       if (fs.existsSync(indexPath) && fs.statSync(indexPath).isFile()) {
         const realIndexPath = fs.realpathSync(indexPath);
         if (!isPathInsideRoot(realSiteDir, realIndexPath)) {
-          res.status(403).json({ error: 'Site path escapes root' });
+          res.status(403).json({ error: "Site path escapes root" });
           return;
         }
         await respondWithFile(res, indexPath, req.method);
@@ -459,7 +501,7 @@ async function sendSiteResponse(req: express.Request, res: express.Response): Pr
     } else if (stat.isFile()) {
       const realRequestedPath = fs.realpathSync(requestedPath);
       if (!isPathInsideRoot(realSiteDir, realRequestedPath)) {
-        res.status(403).json({ error: 'Site path escapes root' });
+        res.status(403).json({ error: "Site path escapes root" });
         return;
       }
       await respondWithFile(res, requestedPath, req.method);
@@ -468,19 +510,19 @@ async function sendSiteResponse(req: express.Request, res: express.Response): Pr
   }
 
   if (requestedExt) {
-    res.status(404).json({ error: 'Asset not found' });
+    res.status(404).json({ error: "Asset not found" });
     return;
   }
 
-  const spaFallback = path.join(siteDir, 'index.html');
+  const spaFallback = path.join(siteDir, "index.html");
   if (!fs.existsSync(spaFallback) || !fs.statSync(spaFallback).isFile()) {
-    res.status(404).json({ error: 'Site entrypoint not found' });
+    res.status(404).json({ error: "Site entrypoint not found" });
     return;
   }
 
   const realFallback = fs.realpathSync(spaFallback);
   if (!isPathInsideRoot(realSiteDir, realFallback)) {
-    res.status(403).json({ error: 'Site path escapes root' });
+    res.status(403).json({ error: "Site path escapes root" });
     return;
   }
 
@@ -490,7 +532,7 @@ async function sendSiteResponse(req: express.Request, res: express.Response): Pr
 function createLocalSitesApp(): express.Express {
   const app = express();
 
-  app.get('/health', (_req, res) => {
+  app.get("/health", (_req, res) => {
     res.json({
       ok: true,
       baseUrl: LOCAL_SITES_BASE_URL,
@@ -498,7 +540,7 @@ function createLocalSitesApp(): express.Express {
     });
   });
 
-  app.get('/sites', (_req, res) => {
+  app.get("/sites", (_req, res) => {
     res.json({
       sites: listLocalSites(),
     });
@@ -508,14 +550,14 @@ function createLocalSitesApp(): express.Express {
     handleSiteEventsRequest(req, res);
   });
 
-  app.use('/sites/:siteSlug', (req, res) => {
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.status(405).json({ error: 'Method not allowed' });
+  app.use("/sites/:siteSlug", (req, res) => {
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      res.status(405).json({ error: "Method not allowed" });
       return;
     }
 
     void sendSiteResponse(req, res).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : "Unknown error";
       res.status(500).json({ error: message });
     });
   });
@@ -529,16 +571,16 @@ async function startServer(): Promise<void> {
   const app = createLocalSitesApp();
 
   await new Promise<void>((resolve, reject) => {
-    const server = app.listen(LOCAL_SITES_PORT, 'localhost', () => {
+    const server = app.listen(LOCAL_SITES_PORT, "localhost", () => {
       localSitesServer = server;
-      console.log('[LocalSites] Server starting.');
+      console.log("[LocalSites] Server starting.");
       console.log(`  Sites directory: ${LOCAL_SITES_DIR}`);
       console.log(`  Base URL: ${LOCAL_SITES_BASE_URL}`);
       resolve();
     });
 
-    server.on('error', (error: NodeJS.ErrnoException) => {
-      if (error.code === 'EADDRINUSE') {
+    server.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code === "EADDRINUSE") {
         reject(new Error(`Port ${LOCAL_SITES_PORT} is already in use.`));
         return;
       }

@@ -1,6 +1,5 @@
-import path from "path";
 import fs from "fs";
-import { WorkDir } from "../config/config.js";
+import { getScholarOSPath } from "../config/config.js";
 
 export interface NoteTypeDefinition {
   type: string;
@@ -241,7 +240,7 @@ const DEFAULT_NOTE_TYPE_DEFINITIONS: NoteTypeDefinition[] = [
 
 // ── Disk-backed config with mtime caching ──────────────────────────────────
 
-export const NOTES_CONFIG_PATH = path.join(WorkDir, "config", "notes.json");
+export const NOTES_CONFIG_PATH = getScholarOSPath("config", "notes.json");
 
 let cachedNoteTypeDefinitions: NoteTypeDefinition[] | null = null;
 let cachedMtimeMs: number | null = null;
@@ -279,8 +278,7 @@ export function getNoteTypeDefinitions(): NoteTypeDefinition[] {
 export function renderNoteTypesBlock(): string {
   const defs = getNoteTypeDefinitions();
   const sections = defs.map(
-    (d) =>
-      `## ${d.type}\n\`\`\`markdown\n${d.template}\n\`\`\``,
+    (d) => `## ${d.type}\n\`\`\`markdown\n${d.template}\n\`\`\``,
   );
   return `# Note Templates\n\n${sections.join("\n\n")}`;
 }

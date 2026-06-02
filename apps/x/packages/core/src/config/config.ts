@@ -1,7 +1,51 @@
 import path from "path";
 import fs from "fs";
 import { homedir } from "os";
-import { fileURLToPath } from "url";
+
+export const SCHOLAROS_INTERNAL_ROOT = ".scholarOS";
+export const SCHOLAROS_INTERNAL_TOP_LEVEL_NAMES = new Set([
+  "agents",
+  "bases",
+  "calendar",
+  "config",
+  "data",
+  "events",
+  "logs",
+  "runs",
+  "sites",
+  "agent-notes",
+  "gmail_sync",
+  ".knowledge-graph",
+  ".knowledge-history",
+  ".trash",
+  "agent_notes_state.json",
+]);
+
+export function getScholarOSDir(): string {
+  return path.join(WorkDir, SCHOLAROS_INTERNAL_ROOT);
+}
+
+export function getScholarOSPath(...segments: string[]): string {
+  return path.join(getScholarOSDir(), ...segments);
+}
+
+export function mapWorkspaceRelPath(relPath: string): string {
+  const normalized = relPath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized) return normalized;
+  if (
+    normalized === SCHOLAROS_INTERNAL_ROOT ||
+    normalized.startsWith(`${SCHOLAROS_INTERNAL_ROOT}/`)
+  ) {
+    return normalized;
+  }
+
+  const topLevel = normalized.split("/")[0]?.toLowerCase() ?? "";
+  if (SCHOLAROS_INTERNAL_TOP_LEVEL_NAMES.has(topLevel)) {
+    return path.posix.join(SCHOLAROS_INTERNAL_ROOT, normalized);
+  }
+
+  return normalized;
+}
 
 function resolveWorkDir(): string {
   // Check for saved vault path first
@@ -140,22 +184,43 @@ export function getVaultPath(): string | null {
   return null;
 }
 
-// Get the directory of this file (for locating bundled assets)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 function ensureDirs() {
   const ensure = (p: string) => {
     if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
   };
   ensure(WorkDir);
-  ensure(path.join(WorkDir, "agents"));
-  ensure(path.join(WorkDir, "config"));
+  ensure(getScholarOSDir());
+
+  // Migrate legacy top-level folders into .scholarOS/ BEFORE creating
+  // subdirs so rename doesn't conflict with an empty target directory.
+  const moveLegacyInternalPath = (name: string) => {
+    const legacyPath = path.join(WorkDir, name);
+    const nextPath = getScholarOSPath(name);
+    if (!fs.existsSync(legacyPath) || fs.existsSync(nextPath)) return;
+    try {
+      fs.renameSync(legacyPath, nextPath);
+      console.log(`[Config] Moved legacy internal path ${name} -> ${nextPath}`);
+    } catch (error) {
+      console.warn(
+        `[Config] Failed to move legacy internal path ${name}:`,
+        error,
+      );
+    }
+  };
+
+  for (const name of SCHOLAROS_INTERNAL_TOP_LEVEL_NAMES) {
+    moveLegacyInternalPath(name);
+  }
+
+  // Now ensure required subdirs exist (after migration so empty dirs don't
+  // block rename of a legacy folder with the same name)
+  ensure(getScholarOSPath("agents"));
+  ensure(getScholarOSPath("config"));
 }
 
 function ensureDefaultConfigs() {
   // Create note_creation.json with default strictness if it doesn't exist
-  const noteCreationConfig = path.join(WorkDir, "config", "note_creation.json");
+  const noteCreationConfig = getScholarOSPath("config", "note_creation.json");
   if (!fs.existsSync(noteCreationConfig)) {
     fs.writeFileSync(
       noteCreationConfig,
@@ -239,7 +304,7 @@ export function shouldDisableTools(): boolean {
 
   // Check dev config file
   try {
-    const devConfigPath = path.join(WorkDir, "config", "dev.json");
+    const devConfigPath = getScholarOSPath("config", "dev.json");
     if (fs.existsSync(devConfigPath)) {
       const config = JSON.parse(fs.readFileSync(devConfigPath, "utf-8"));
       if (config.disableTools === true) {
@@ -268,7 +333,7 @@ export function shouldShowOnboardingOverride(): boolean {
   }
 
   try {
-    const devConfigPath = path.join(WorkDir, "config", "dev.json");
+    const devConfigPath = getScholarOSPath("config", "dev.json");
     if (fs.existsSync(devConfigPath)) {
       const config = JSON.parse(fs.readFileSync(devConfigPath, "utf-8"));
       if (config.showOnboarding === true) {

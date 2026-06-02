@@ -7,7 +7,10 @@ import { composioAccountsRepo } from "../../composio/repo.js";
 import { isConfigured as isComposioConfigured } from "../../composio/client.js";
 import { getMergedTasks } from "../../calendar/frontmatter-scanner.js";
 import { KnowledgeGraph } from "../../knowledge/graph/graph.js";
-import { buildWarmProfile, formatWarmProfileBlock } from "../../knowledge/graph/warm-profile.js";
+import {
+  buildWarmProfile,
+  formatWarmProfileBlock,
+} from "../../knowledge/graph/warm-profile.js";
 
 const runtimeContextPrompt = getRuntimeContextPrompt(getRuntimeContext());
 
@@ -51,7 +54,8 @@ function buildStaticInstructions(
     ? `- \`composio-list-toolkits\`, \`composio-search-tools\`, \`composio-execute-tool\`, \`composio-connect-toolkit\` — Composio integration tools. Load the \`composio-integration\` skill for usage guidance.\n`
     : "";
 
-  return `You are ScholarOS Copilot - an AI academic assistant that helps students master complex subjects through intelligent learning systems. You help with anything academic: ingesting course materials, building concept wikis, tracking assignments, and answering questions - with a knowledge base that compounds from PDFs, lectures, and your own notes. Everything runs locally on the student's machine. Your role is to be their personal tutor and study companion.
+  return (
+    `You are ScholarOS Copilot - an AI academic assistant that helps students master complex subjects through intelligent learning systems. You help with anything academic: ingesting course materials, building concept wikis, tracking assignments, and answering questions - with a knowledge base that compounds from PDFs, lectures, and your own notes. Everything runs locally on the student's machine. Your role is to be their personal tutor and study companion.
 
 You're an encouraging, patient assistant who combines clear explanation with genuine enthusiasm for learning and strategic study advice.
 
@@ -175,7 +179,7 @@ Unlike other AI assistants that start cold every session, you have access to a l
 When a student asks about a concept, you already know every prior discussion, related topics, and prerequisite knowledge — because the wiki has been accumulating across every document and conversation, not just this one session.
 
 ## The Knowledge Base (Academic Wiki)
-The knowledge base is stored as plain markdown with Obsidian-style backlinks. The workspace root contains these knowledge directories alongside \`raw/\`, \`meta/\`, and \`assets/\`:
+The knowledge base is stored as plain markdown with Obsidian-style backlinks. User notes live at workspace root, while ScholarOS internal state lives under \`.scholarOS/\`. The workspace root contains these knowledge directories alongside \`raw/\`, \`meta/\`, and \`assets/\`:
 
 - **courses/** - Per-course folders containing all course-specific materials:
   - \`<course-name>/concepts/\` - Subject matter for that course (e.g., \`Biology 101/concepts/Photosynthesis.md\`)
@@ -376,7 +380,8 @@ For browser pages, mention the URL in plain text or use the browser-control tool
 
 **IMPORTANT:** Only use filepath blocks for files that already exist. The card is clickable and opens the file, so it must point to a real file. If you are proposing a path for a file that hasn't been created yet (e.g., "Shall I save it at ~/Documents/report.pdf?"), use inline code (\`~/Documents/report.pdf\`) instead of a filepath block. Use the filepath block only after the file has been written/created successfully.
 
-Never output raw file paths in plain text when they could be wrapped in a filepath block — unless the file does not exist yet.`;
+Never output raw file paths in plain text when they could be wrapped in a filepath block — unless the file does not exist yet.`
+  );
 }
 
 /**
@@ -453,10 +458,10 @@ async function getWarmProfilePrompt(): Promise<string> {
     const graph = new KnowledgeGraph();
     await graph.load();
     const profile = buildWarmProfile(graph);
-    if (!profile) return '';
-    return '\n' + formatWarmProfileBlock(profile);
+    if (!profile) return "";
+    return "\n" + formatWarmProfileBlock(profile);
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -475,7 +480,9 @@ export async function buildCopilotInstructions(): Promise<string> {
   const calendarPrompt = await getCalendarContextPrompt();
   const warmProfilePrompt = await getWarmProfilePrompt();
 
-  let result = composioPrompt ? baseInstructions + "\n" + composioPrompt : baseInstructions;
+  let result = composioPrompt
+    ? baseInstructions + "\n" + composioPrompt
+    : baseInstructions;
   if (calendarPrompt) result += "\n" + calendarPrompt;
   if (warmProfilePrompt) result += "\n" + warmProfilePrompt;
 

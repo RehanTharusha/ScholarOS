@@ -12,6 +12,9 @@ function scanMdFiles(dir: string): string[] {
   const entries = fs.readdirSync(dir);
 
   for (const entry of entries) {
+    if (entry.startsWith(".")) {
+      continue;
+    }
     const fullPath = path.join(dir, entry);
     const stat = fs.statSync(fullPath);
 
@@ -81,15 +84,9 @@ function determineTaskType(
   filePath: string,
 ): Task["type"] {
   const relPath = path.relative(WorkDir, filePath);
-  if (
-    relPath.includes("/assignments/") ||
-    fields["type"] === "assignment"
-  )
+  if (relPath.includes("/assignments/") || fields["type"] === "assignment")
     return "assignment";
-  if (
-    relPath.includes("/lectures/") ||
-    fields["type"] === "lecture"
-  )
+  if (relPath.includes("/lectures/") || fields["type"] === "lecture")
     return "lecture";
   if (fields["due"] || fields["deadline"]) return "deadline";
   return "custom";

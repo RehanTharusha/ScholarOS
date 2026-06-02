@@ -1,7 +1,7 @@
 import { jsonSchema, ModelMessage } from "ai";
 import fs from "fs";
 import path from "path";
-import { WorkDir } from "../config/config.js";
+import { getScholarOSPath } from "../config/config.js";
 import { Agent, ToolAttachment } from "@x/shared/dist/agent.js";
 import {
   AssistantContentPart,
@@ -31,7 +31,6 @@ import {
 import { BuiltinTools } from "../application/lib/builtin-tools.js";
 import { buildCopilotAgent } from "../application/assistant/agent.js";
 import {
-  isBlocked,
   isDestructive,
   extractCommandNames,
 } from "../application/lib/command-executor.js";
@@ -243,7 +242,7 @@ export class RunLogger {
   private fileHandle: fs.WriteStream;
 
   ensureRunsDir() {
-    const runsDir = path.join(WorkDir, "runs");
+    const runsDir = getScholarOSPath("runs");
     if (!fs.existsSync(runsDir)) {
       fs.mkdirSync(runsDir, { recursive: true });
     }
@@ -251,7 +250,7 @@ export class RunLogger {
 
   constructor(runId: string) {
     this.ensureRunsDir();
-    this.logFile = path.join(WorkDir, "runs", `${runId}.jsonl`);
+    this.logFile = path.join(getScholarOSPath("runs"), `${runId}.jsonl`);
     this.fileHandle = fs.createWriteStream(this.logFile, {
       flags: "a",
       encoding: "utf8",
