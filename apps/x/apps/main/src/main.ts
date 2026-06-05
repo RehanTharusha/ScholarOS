@@ -38,6 +38,12 @@ import { setupBrowserEventForwarding } from "./browser/ipc.js";
 import { ElectronBrowserControlService } from "./browser/control-service.js";
 import { getRendererUrl } from "./app-url.js";
 import { configureSessionPermissions } from "./session-utils.js";
+import {
+  cleanupPreviousInstall,
+  shouldRunCleanup,
+  markCleanupDone,
+} from "./cleanup.js";
+import pkg from "../package.json" with { type: "json" };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -64,8 +70,17 @@ if (process.stderr) {
   });
 }
 
-// run this as early in the main process as possible
-if (started) app.quit();
+// Clean up old rowboat/scholarOS cache/config on Squirrel install/update
+// (Windows). Never touches the user's vault.
+if (started) {
+  const isInstallOrUpdate = process.argv.some(
+    (arg) => arg === "--squirrel-install" || arg === "--squirrel-updated",
+  );
+  if (isInstallOrUpdate) {
+    cleanupPreviousInstall();
+  }
+  app.quit();
+}
 
 // Fix PATH for packaged Electron apps on macOS/Linux.
 // Packaged apps inherit a minimal environment that doesn't include paths from
@@ -233,6 +248,13 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   try {
+    // Clean up old cache/config from previous versions (runs once per version).
+    // On Windows this is already handled by squirrel install/update events above.
+    if (shouldRunCleanup(pkg.version)) {
+      cleanupPreviousInstall();
+      markCleanupDone(pkg.version);
+    }
+
     // Register custom protocol before creating window (for production builds)
     if (app.isPackaged) {
       registerAppProtocol();

@@ -4,6 +4,26 @@ All notable features and capabilities of ScholarOS.
 
 ---
 
+## v0.1.5 (2026-06-05)
+
+### New Features
+
+- **Knowledge Graph** — fully functional knowledge graph with CRUD operations, merging, and summarization
+- **Deep Research** — deep research capabilities with canvas integration and bug fixes
+- **Revision Guide** — updated to Paper design system with KaTeX math rendering and Mermaid diagram support
+- **.scholar folder** — internal workspace folder setup for better organization
+
+### Fixes & Improvements
+
+- **Canvas & Calendar** — improved state management and UI consistency across canvas and calendar components
+- **Cleanup on Install** — automatic cleanup of old cache/config/temp files from previous versions when installing or updating; never touches user vault
+
+### Technical
+
+- **Content Security Policy** — updated CSP to allow CDN resources for KaTeX and Mermaid
+
+---
+
 ## AI Copilot & Chat
 
 - **AI-powered chat** with multi-turn conversations across multiple concurrent chat tabs
