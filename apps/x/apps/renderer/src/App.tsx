@@ -16,6 +16,7 @@ import {
   SquarePen,
   HistoryIcon,
   BookOpen,
+  Maximize,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,12 +29,7 @@ import {
   type StagedAttachment,
 } from "./components/chat-input-with-mentions";
 import { ChatMessageAttachments } from "@/components/chat-message-attachments";
-import {
-  GraphView,
-  type GraphEdge,
-  type GraphNode,
-} from "@/components/graph-view";
-import { CanvasView } from "@/components/canvas-view";
+import { type GraphEdge, type GraphNode } from "@/components/graph-view";
 import { CalendarView } from "@/components/calendar-view";
 import {
   parseCanvas,
@@ -118,12 +114,11 @@ import { FileCardProvider } from "@/contexts/file-card-context";
 import { isHiddenSidebarRootEntry } from "@/config/sidebar-visibility";
 
 import { IngestWindow } from "@/components/ingest-window";
-import { PdfViewer } from "@/components/pdf-viewer";
 import { ResearchPanel, ChatResearchProgress, ChatResearchComplete } from "@/components/research";
 
 import { HtmlViewer } from "@/components/html-viewer";
 import { getExtension, getMimeFromExtension } from "@/lib/file-utils";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { defaultRemarkPlugins } from "streamdown";
 import remarkBreaks from "remark-breaks";
@@ -153,6 +148,7 @@ import { toast } from "sonner";
 import { useVoiceMode } from "@/hooks/useVoiceMode";
 import { useVoiceTTS } from "@/hooks/useVoiceTTS";
 import { useAnalyticsIdentity } from "@/hooks/useAnalyticsIdentity";
+import { useFocusMode } from "@/hooks/useFocusMode";
 import * as analytics from "@/lib/analytics";
 
 type DirEntry = z.infer<typeof workspace.DirEntry>;
@@ -165,6 +161,22 @@ interface TreeNode extends DirEntry {
 }
 
 const streamdownComponents = { pre: MarkdownPreOverride };
+
+// --- Code-split heavy views via React.lazy -----------------------------------
+const LazyPdfViewer = React.lazy(() =>
+  import("./components/pdf-viewer").then((m) => ({ default: m.PdfViewer })),
+);
+const LazyGraphView = React.lazy(() =>
+  import("./components/graph-view").then((m) => ({ default: m.GraphView })),
+);
+const LazyCanvasView = React.lazy(() => import("./components/canvas-view"));
+
+/** Lightweight skeleton shown while a lazy chunk loads. */
+function ViewFallback() {
+  return (
+    <div className="flex-1 min-h-0 animate-pulse rounded-lg bg-muted/50" />
+  );
+}
 
 // Render user messages with markdown so bullets, bold, links, etc. survive the
 // round-trip from the input textarea. `remarkBreaks` turns single newlines
@@ -643,7 +655,7 @@ function ContentHeader({
       style={{
         paddingLeft: isCollapsed ? (collapsedLeftPaddingPx ?? 196) : 12,
         paddingRight: 12,
-        transition: "padding-left 200ms linear",
+        transition: "padding-left 180ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
       {onNavigateBack && onNavigateForward ? (
@@ -684,6 +696,13 @@ function App() {
   type MarkdownHistoryHandlers = { undo: () => boolean; redo: () => boolean };
 
   useAnalyticsIdentity();
+
+  // Focus/zen mode
+  const { isFocusMode, toggleFocusMode } = useFocusMode();
+
+  // Controlled left sidebar state for focus mode
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const isLeftSidebarOpenRef = useRef(isLeftSidebarOpen);
 
   // File browser state (for Knowledge section)
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -4559,6 +4578,19 @@ function App() {
     navigateToFullScreenChat,
   ]);
 
+  // Focus/zen mode: collapse left sidebar and hide chat sidebar when enabled
+  useEffect(() => {
+    if (isFocusMode) {
+      // Remember current sidebar state before collapsing
+      isLeftSidebarOpenRef.current = isLeftSidebarOpen;
+      setIsLeftSidebarOpen(false);
+      setIsChatSidebarOpen(false);
+    } else {
+      // Restore previous sidebar state
+      setIsLeftSidebarOpen(isLeftSidebarOpenRef.current);
+    }
+  }, [isFocusMode]);
+
   // Keyboard shortcut: Cmd+K / Ctrl+K opens the unified palette (defaults to Chat mode).
   // If an editor tab is currently active, capture cursor context so Chat mode shows the
   // note + line as a removable chip.
@@ -5608,12 +5640,14 @@ function App() {
   const viewKey = React.useMemo(() => {
     if (isBrowserOpen) return "browser";
     if (isArtifactsOpen) return "artifacts";
+    if (isCanvasesOpen) return "canvases";
     if (selectedPath === INGEST_TAB_PATH) return "ingest";
     if (isSuggestedTopicsOpen) return "suggested-topics";
     if (isCanvasOpen) {
       const canvasPath = fileTabs.find((t) => isCanvasTabPath(t.path))?.path;
       return `canvas:${canvasPath ?? CANVAS_TAB_PATH}`;
     }
+    if (isCalendarOpen) return "calendar";
     if (selectedPath && isBaseFilePath(selectedPath))
       return `bases:${selectedPath}`;
     if (isGraphOpen) return "graph";
@@ -5626,17 +5660,25 @@ function App() {
   }, [
     isBrowserOpen,
     isArtifactsOpen,
+    isCanvasesOpen,
     selectedPath,
     isSuggestedTopicsOpen,
+    isCanvasOpen,
+    isCalendarOpen,
     isGraphOpen,
   ]);
 
   return (
     <TooltipProvider delayDuration={0}>
       <SidebarSectionProvider defaultSection="knowledge">
-        <div className="flex h-svh w-full overflow-hidden">
+        <div
+          className="flex h-svh w-full overflow-hidden"
+          data-focus-mode={isFocusMode || undefined}
+        >
           {/* Content sidebar with SidebarProvider for collapse functionality */}
           <SidebarProvider
+            open={isLeftSidebarOpen}
+            onOpenChange={setIsLeftSidebarOpen}
             style={
               {
                 "--sidebar-width": `${DEFAULT_SIDEBAR_WIDTH}px`,
@@ -5822,6 +5864,8 @@ function App() {
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
               >
+                {!isFocusMode && (
+                  <>
                 {(selectedPath ||
                   isGraphOpen ||
                   isSuggestedTopicsOpen ||
@@ -5850,6 +5894,8 @@ function App() {
                     onCloseTab={closeChatTab}
                     allowSingleTabClose={true}
                   />
+                )}
+                </>
                 )}
                 {selectedPath && selectedPath.endsWith(".md") && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground self-center shrink-0 pl-2">
@@ -5991,11 +6037,37 @@ function App() {
                     </TooltipContent>
                   </Tooltip>
                 )}
+                {/* Focus/zen mode toggle */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={toggleFocusMode}
+                      className={cn(
+                        "titlebar-no-drag flex h-8 w-8 items-center justify-center rounded-md transition-colors self-center shrink-0",
+                        isFocusMode
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )}
+                      aria-label={isFocusMode ? "Exit focus mode" : "Enter focus mode"}
+                    >
+                      <Maximize className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {isFocusMode ? "Exit focus mode (Shift+Cmd+F)" : "Focus mode (Shift+Cmd+F)"}
+                  </TooltipContent>
+                </Tooltip>
               </ContentHeader>
 
-              <div
+              <AnimatePresence mode="wait">
+              <motion.div
                 key={viewKey}
-                className="flex-1 flex flex-col min-h-0 overflow-hidden animate-[enter-fade_0.15s_ease-out]"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+                className="flex-1 flex flex-col min-h-0 overflow-hidden"
               >
                 {isBrowserOpen ? (
                   <BrowserPane onClose={handleCloseBrowser} />
@@ -6062,49 +6134,53 @@ function App() {
                     />
                   </div>
                 ) : isGraphOpen ? (
-                  <div className="flex-1 min-h-0">
-                    <GraphView
-                      nodes={graphData.nodes}
-                      edges={graphData.edges}
-                      isLoading={false}
-                      error={
-                        graphStatus === "error"
-                          ? (graphError ?? "Failed to build graph")
-                          : null
+                  <React.Suspense fallback={<ViewFallback />}>
+                    <div className="flex-1 min-h-0">
+                      <LazyGraphView
+                        nodes={graphData.nodes}
+                        edges={graphData.edges}
+                        isLoading={false}
+                        error={
+                          graphStatus === "error"
+                            ? (graphError ?? "Failed to build graph")
+                            : null
+                        }
+                        onSelectNode={(path) => {
+                          navigateToFile(path);
+                        }}
+                      />
+                    </div>
+                  </React.Suspense>
+                ) : isCanvasOpen ? (
+                  <React.Suspense fallback={<ViewFallback />}>
+                    <LazyCanvasView
+                      data={
+                        canvasDataByPath[
+                          fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
+                            CANVAS_TAB_PATH
+                        ] ?? createEmptyCanvas()
                       }
-                      onSelectNode={(path) => {
-                        navigateToFile(path);
+                      onDataChange={(newData) => {
+                        const canvasPath =
+                          fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
+                          CANVAS_TAB_PATH;
+                        setCanvasDataByPath((prev) => ({
+                          ...prev,
+                          [canvasPath]: newData,
+                        }));
+                        if (canvasSaveTimerRef.current) {
+                          clearTimeout(canvasSaveTimerRef.current);
+                        }
+                        canvasSaveTimerRef.current = setTimeout(() => {
+                          void window.ipc.invoke("workspace:writeFile", {
+                            path: canvasPath,
+                            data: serializeCanvas(newData),
+                            opts: { encoding: "utf8" },
+                          });
+                        }, 300);
                       }}
                     />
-                  </div>
-                ) : isCanvasOpen ? (
-                  <CanvasView
-                    data={
-                      canvasDataByPath[
-                        fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
-                          CANVAS_TAB_PATH
-                      ] ?? createEmptyCanvas()
-                    }
-                    onDataChange={(newData) => {
-                      const canvasPath =
-                        fileTabs.find((t) => isCanvasTabPath(t.path))?.path ??
-                        CANVAS_TAB_PATH;
-                      setCanvasDataByPath((prev) => ({
-                        ...prev,
-                        [canvasPath]: newData,
-                      }));
-                      if (canvasSaveTimerRef.current) {
-                        clearTimeout(canvasSaveTimerRef.current);
-                      }
-                      canvasSaveTimerRef.current = setTimeout(() => {
-                        void window.ipc.invoke("workspace:writeFile", {
-                          path: canvasPath,
-                          data: serializeCanvas(newData),
-                          opts: { encoding: "utf8" },
-                        });
-                      }, 300);
-                    }}
-                  />
+                  </React.Suspense>
                 ) : isCalendarOpen ? (
                   <CalendarView onSelectFile={(path) => navigateToFile(path)} />
                 ) : selectedPath ? (
@@ -6263,7 +6339,9 @@ function App() {
                       )}
                     </div>
                   ) : selectedPath.endsWith(".pdf") && fileContent ? (
-                    <PdfViewer base64Data={fileContent} />
+                    <React.Suspense fallback={<ViewFallback />}>
+                      <LazyPdfViewer base64Data={fileContent} />
+                    </React.Suspense>
                   ) : /\.html?$/i.test(selectedPath) && fileContent ? (
                     <HtmlViewer
                       htmlContent={fileContent}
@@ -6625,7 +6703,8 @@ function App() {
                     </div>
                   </FileCardProvider>
                 )}
-              </div>
+              </motion.div>
+              </AnimatePresence>
             </SidebarInset>
 
             {/* Chat sidebar - shown when viewing files/graph */}
@@ -6726,6 +6805,9 @@ function App() {
       <OnboardingModal
         open={showOnboarding}
         onComplete={handleOnboardingComplete}
+        onNavigateToIngest={() => {
+          void navigateToView({ type: "file", path: INGEST_TAB_PATH })
+        }}
         devMode={onboardingDevMode}
       />
     </TooltipProvider>

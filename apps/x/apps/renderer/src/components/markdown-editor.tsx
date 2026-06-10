@@ -29,6 +29,7 @@ import {
   useRef,
   useState,
   forwardRef,
+  memo,
   useImperativeHandle,
 } from "react";
 
@@ -323,6 +324,7 @@ function computeWithinBlockOffset(
   }
 }
 import { EditorToolbar } from "./editor-toolbar";
+import { WordCountBar } from "./word-count-bar";
 import { FrontmatterProperties } from "./frontmatter-properties";
 import { WikiLink } from "@/extensions/wiki-link";
 import {
@@ -454,7 +456,7 @@ export interface MarkdownEditorHandle {
   getCursorContext: () => { path: string; lineNumber: number } | null;
 }
 
-export const MarkdownEditor = forwardRef<
+export const MarkdownEditor = memo(forwardRef<
   MarkdownEditorHandle,
   MarkdownEditorProps
 >(function MarkdownEditor(
@@ -478,6 +480,7 @@ export const MarkdownEditor = forwardRef<
 ) {
   const isInternalUpdate = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [wordCountText, setWordCountText] = useState<string>("");
   const [activeWikiLink, setActiveWikiLink] = useState<WikiLinkMatch | null>(
     null,
   );
@@ -662,6 +665,7 @@ export const MarkdownEditor = forwardRef<
         // Post-process to clean up any markers and ensure blank lines are preserved
         markdown = postprocessMarkdown(markdown);
         onChange(markdown);
+        setWordCountText(editor.getText());
       },
       onBlur: ({ editor }) => {
         maybeCommitPrimaryHeading(editor.view);
@@ -992,6 +996,7 @@ export const MarkdownEditor = forwardRef<
           .setContent(preprocessed)
           .run();
         isInternalUpdate.current = false;
+        setWordCountText(content);
       }
     }
   }, [editor, content]);
@@ -1028,9 +1033,10 @@ export const MarkdownEditor = forwardRef<
     }
   }, [editor, selectionHighlight]);
 
-  const normalizedQuery = normalizeWikiPath(
-    activeWikiLink?.query ?? "",
-  ).toLowerCase();
+  const normalizedQuery = useMemo(
+    () => normalizeWikiPath(activeWikiLink?.query ?? "").toLowerCase(),
+    [activeWikiLink?.query],
+  );
   const filteredFiles = useMemo(() => {
     if (!activeWikiLink) return [];
     if (!normalizedQuery) return orderedFiles;
@@ -1039,19 +1045,27 @@ export const MarkdownEditor = forwardRef<
     );
   }, [activeWikiLink, normalizedQuery, orderedFiles]);
 
-  const visibleFiles = filteredFiles.slice(0, 12);
-  const rawCreateCandidate = activeWikiLink
-    ? normalizeWikiPath(activeWikiLink.query)
-    : "";
-  const createCandidate =
-    rawCreateCandidate && !rawCreateCandidate.endsWith("/")
-      ? ensureMarkdownExtension(rawCreateCandidate)
-      : "";
-  const canCreate = Boolean(
-    createCandidate &&
-    !orderedFiles.some(
-      (path) => path.toLowerCase() === createCandidate.toLowerCase(),
-    ),
+  const visibleFiles = useMemo(() => filteredFiles.slice(0, 12), [filteredFiles]);
+  const rawCreateCandidate = useMemo(
+    () => (activeWikiLink ? normalizeWikiPath(activeWikiLink.query) : ""),
+    [activeWikiLink],
+  );
+  const createCandidate = useMemo(
+    () =>
+      rawCreateCandidate && !rawCreateCandidate.endsWith("/")
+        ? ensureMarkdownExtension(rawCreateCandidate)
+        : "",
+    [rawCreateCandidate],
+  );
+  const canCreate = useMemo(
+    () =>
+      Boolean(
+        createCandidate &&
+          !orderedFiles.some(
+            (path) => path.toLowerCase() === createCandidate.toLowerCase(),
+          ),
+      ),
+    [createCandidate, orderedFiles],
   );
 
   const handleSelectWikiLink = useCallback(
@@ -1088,8 +1102,9 @@ export const MarkdownEditor = forwardRef<
     updateAtMentionState();
   }, [updateWikiLinkState, updateAtMentionState]);
 
-  const showWikiPopover = Boolean(
-    wikiLinks && activeWikiLink && anchorPosition,
+  const showWikiPopover = useMemo(
+    () => Boolean(wikiLinks && activeWikiLink && anchorPosition),
+    [wikiLinks, activeWikiLink, anchorPosition],
   );
   const wikiOptions = useMemo(() => {
     if (!showWikiPopover) return [];
@@ -1099,9 +1114,10 @@ export const MarkdownEditor = forwardRef<
     return options;
   }, [showWikiPopover, canCreate, createCandidate, visibleFiles]);
 
-  const wikiCommandValueForPopover = showWikiPopover
-    ? wikiCommandValue || wikiOptions[0] || ""
-    : "";
+  const wikiCommandValueForPopover = useMemo(
+    () => (showWikiPopover ? wikiCommandValue || wikiOptions[0] || "" : ""),
+    [showWikiPopover, wikiCommandValue, wikiOptions],
+  );
 
   useEffect(() => {
     wikiKeyStateRef.current = {
@@ -1130,13 +1146,15 @@ export const MarkdownEditor = forwardRef<
     () => filteredAtOptions.map((o) => o.value),
     [filteredAtOptions],
   );
-  const showAtPopover = Boolean(
-    activeAtMention && atAnchorPosition && filteredAtOptions.length > 0,
+  const showAtPopover = useMemo(
+    () => Boolean(activeAtMention && atAnchorPosition && filteredAtOptions.length > 0),
+    [activeAtMention, atAnchorPosition, filteredAtOptions.length],
   );
 
-  const atCommandValueForPopover = showAtPopover
-    ? atCommandValue || atOptionValues[0] || ""
-    : "";
+  const atCommandValueForPopover = useMemo(
+    () => (showAtPopover ? atCommandValue || atOptionValues[0] || "" : ""),
+    [showAtPopover, atCommandValue, atOptionValues],
+  );
 
   useEffect(() => {
     atKeyStateRef.current = {
@@ -1313,6 +1331,9 @@ export const MarkdownEditor = forwardRef<
           </PopoverContent>
         </Popover>
       </div>
+      <WordCountBar text={wordCountText} />
     </div>
   );
-});
+}));
+
+MarkdownEditor.displayName = "MarkdownEditor";

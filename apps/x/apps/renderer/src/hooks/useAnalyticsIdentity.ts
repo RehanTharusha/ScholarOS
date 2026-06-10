@@ -11,6 +11,7 @@ export function useAnalyticsIdentity() {
   useEffect(() => {
     async function init() {
       try {
+        if (!window.ipc) return;
         const result = await window.ipc.invoke('oauth:getState', null)
         const config = result.config || {}
 
@@ -57,6 +58,7 @@ export function useAnalyticsIdentity() {
 
   // Listen for OAuth connect/disconnect events to update identity
   useEffect(() => {
+    if (!window.ipc) return;
     const cleanup = window.ipc.on('oauth:didConnect', (event) => {
       if (!event.success) return
 

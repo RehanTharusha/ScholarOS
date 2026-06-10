@@ -5,7 +5,7 @@ type IPCChannels = ipc.IPCChannels;
 
 declare global {
   interface Window {
-    ipc: {
+    ipc?: {
       /**
        * Invoke a channel that expects a response (request/response pattern)
        * Only channels with non-null responses can be invoked

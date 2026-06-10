@@ -1,12 +1,12 @@
-import { motion } from "motion/react";
-import { Sun, BookOpen, Moon, Monitor, Type, TextSelect } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useTheme } from "@/contexts/theme-context";
-import type { OnboardingState } from "../use-onboarding-state";
+import { motion } from "motion/react"
+import { Sun, BookOpen, Moon, Monitor, Type, TextSelect, ArrowLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { useTheme } from "@/contexts/theme-context"
+import type { OnboardingState } from "../use-onboarding-state"
 
 interface AppearanceStepProps {
-  state: OnboardingState;
+  state: OnboardingState
 }
 
 function ThemeCard({
@@ -15,10 +15,10 @@ function ThemeCard({
   isSelected,
   onClick,
 }: {
-  label: string;
-  icon: React.ElementType;
-  isSelected: boolean;
-  onClick: () => void;
+  label: string
+  icon: React.ElementType
+  isSelected: boolean
+  onClick: () => void
 }) {
   return (
     <button
@@ -35,7 +35,7 @@ function ThemeCard({
         {label}
       </span>
     </button>
-  );
+  )
 }
 
 function OptionButton({
@@ -43,9 +43,9 @@ function OptionButton({
   isSelected,
   onClick,
 }: {
-  label: string;
-  isSelected: boolean;
-  onClick: () => void;
+  label: string
+  isSelected: boolean
+  onClick: () => void
 }) {
   return (
     <button
@@ -59,11 +59,11 @@ function OptionButton({
     >
       {label}
     </button>
-  );
+  )
 }
 
 export function AppearanceStep({ state }: AppearanceStepProps) {
-  const { theme, setTheme, fontStyle, setFontStyle, fontSize, setFontSize } = useTheme();
+  const { theme, setTheme, fontStyle, setFontStyle, fontSize, setFontSize } = useTheme()
 
   return (
     <div className="flex flex-col flex-1">
@@ -73,9 +73,17 @@ export function AppearanceStep({ state }: AppearanceStepProps) {
         transition={{ delay: 0.1 }}
         className="flex-1 space-y-8"
       >
+        {/* Title */}
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight mb-2">Make it yours</h2>
+          <p className="text-base text-muted-foreground">
+            Customize how ScholarOS looks and feels
+          </p>
+        </div>
+
         {/* Theme */}
         <div>
-          <h2 className="text-lg font-semibold mb-1">Choose your theme</h2>
+          <h3 className="text-lg font-semibold mb-1">Theme</h3>
           <p className="text-sm text-muted-foreground mb-4">
             Pick a color scheme that works for you
           </p>
@@ -89,7 +97,7 @@ export function AppearanceStep({ state }: AppearanceStepProps) {
 
         {/* Typography */}
         <div>
-          <h2 className="text-lg font-semibold mb-1">Typography</h2>
+          <h3 className="text-lg font-semibold mb-1">Typography</h3>
           <p className="text-sm text-muted-foreground mb-4">
             Set your preferred font style and base size
           </p>
@@ -120,7 +128,8 @@ export function AppearanceStep({ state }: AppearanceStepProps) {
         transition={{ delay: 0.3 }}
         className="flex items-center justify-between border-t mt-8 pt-6"
       >
-        <Button variant="ghost" onClick={state.handleBack} className="text-sm">
+        <Button variant="ghost" onClick={state.handleBack} className="gap-1">
+          <ArrowLeft className="size-4" />
           Back
         </Button>
         <Button onClick={state.handleNext} size="lg" className="text-base font-medium">
@@ -128,5 +137,5 @@ export function AppearanceStep({ state }: AppearanceStepProps) {
         </Button>
       </motion.div>
     </div>
-  );
+  )
 }

@@ -39,6 +39,7 @@ import { ISlackConfigRepo } from "@x/core/dist/slack/repo.js";
 import {
   isOnboardingComplete,
   markOnboardingComplete,
+  resetOnboarding,
   shouldShowOnboardingOverride,
 } from "@x/core/dist/config/config.js";
 import * as composioHandler from "./composio-handler.js";
@@ -737,6 +738,10 @@ export function setupIpcHandlers() {
     },
     "onboarding:markComplete": async () => {
       markOnboardingComplete();
+      return { success: true };
+    },
+    "onboarding:reset": async () => {
+      resetOnboarding();
       return { success: true };
     },
     // Composio integration handlers

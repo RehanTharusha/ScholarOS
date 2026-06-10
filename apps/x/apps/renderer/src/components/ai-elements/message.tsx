@@ -18,7 +18,15 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
-import { createContext, memo, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Streamdown } from "streamdown";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
@@ -38,7 +46,7 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
 
 export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 
-export const MessageContent = ({
+export const MessageContent = memo(({
   children,
   className,
   ...props
@@ -55,7 +63,9 @@ export const MessageContent = ({
   >
     {children}
   </div>
-);
+));
+
+MessageContent.displayName = "MessageContent";
 
 export type MessageActionsProps = ComponentProps<"div">;
 
@@ -411,6 +421,14 @@ export function MessageAttachment({
   const isImage = mediaType === "image";
   const attachmentLabel = filename || (isImage ? "Image" : "Attachment");
 
+  const handleRemove = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onRemove?.();
+    },
+    [onRemove],
+  );
+
   return (
     <div
       className={cn(
@@ -432,10 +450,7 @@ export function MessageAttachment({
             <Button
               aria-label="Remove attachment"
               className="absolute top-2 right-2 size-6 rounded-full bg-background/80 p-0 opacity-0 backdrop-blur-sm transition-opacity hover:bg-background group-hover:opacity-100 [&>svg]:size-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
+              onClick={handleRemove}
               type="button"
               variant="ghost"
             >
@@ -460,10 +475,7 @@ export function MessageAttachment({
             <Button
               aria-label="Remove attachment"
               className="size-6 shrink-0 rounded-full p-0 opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100 [&>svg]:size-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
+              onClick={handleRemove}
               type="button"
               variant="ghost"
             >
@@ -503,7 +515,7 @@ export function MessageAttachments({
 
 export type MessageToolbarProps = ComponentProps<"div">;
 
-export const MessageToolbar = ({
+export const MessageToolbar = memo(({
   className,
   children,
   ...props
@@ -517,4 +529,6 @@ export const MessageToolbar = ({
   >
     {children}
   </div>
-);
+));
+
+MessageToolbar.displayName = "MessageToolbar";

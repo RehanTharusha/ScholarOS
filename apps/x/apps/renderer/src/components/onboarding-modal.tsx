@@ -42,7 +42,7 @@ type Step = 0 | 1 | 2 | 3 | 4
 
 type OnboardingPath = 'scholaros' | 'byok' | null
 
-type LlmProviderFlavor = "openai" | "anthropic" | "google" | "openrouter" | "aigateway" | "ollama" | "openai-compatible"
+type LlmProviderFlavor = "openai" | "anthropic" | "google" | "opencode" | "openrouter" | "aigateway" | "ollama" | "openai-compatible"
 
 interface LlmModelOption {
   id: string
@@ -63,6 +63,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     openai: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     anthropic: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     google: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
+    opencode: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     openrouter: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     aigateway: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     ollama: { apiKey: "", baseURL: "http://localhost:11434", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
@@ -111,7 +112,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   )
 
   const activeConfig = providerConfigs[llmProvider]
-  const showApiKey = llmProvider === "openai" || llmProvider === "anthropic" || llmProvider === "google" || llmProvider === "openrouter" || llmProvider === "aigateway" || llmProvider === "openai-compatible"
+  const showApiKey = llmProvider === "openai" || llmProvider === "anthropic" || llmProvider === "google" || llmProvider === "opencode" || llmProvider === "openrouter" || llmProvider === "aigateway" || llmProvider === "openai-compatible"
   const requiresApiKey = llmProvider === "openai" || llmProvider === "anthropic" || llmProvider === "google" || llmProvider === "openrouter" || llmProvider === "aigateway"
   const requiresBaseURL = llmProvider === "ollama" || llmProvider === "openai-compatible"
   const showBaseURL = llmProvider === "ollama" || llmProvider === "openai-compatible" || llmProvider === "aigateway"
@@ -861,6 +862,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
       { id: "anthropic", name: "Anthropic", description: "Use your Anthropic API key" },
       { id: "google", name: "Gemini", description: "Use your Google AI Studio key" },
       { id: "ollama", name: "Ollama (Local)", description: "Run a local model via Ollama" },
+      { id: "opencode", name: "OpenCode", description: "OpenCode models" },
     ]
 
     const moreProviders: Array<{ id: LlmProviderFlavor; name: string; description: string }> = [

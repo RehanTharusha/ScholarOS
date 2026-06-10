@@ -3,17 +3,21 @@ import { CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Step, OnboardingPath } from "./use-onboarding-state"
 
-const DIRECT_STEPS = [
-  { step: 0 as Step, label: "Welcome" },
-  { step: 1 as Step, label: "Appearance" },
-  { step: 3 as Step, label: "Start" },
-]
-
+// Byok path: 0 (welcome) → 1 (llm) → 2 (appearance) → 3 (tour) → 4 (done)
 const BYOK_STEPS = [
   { step: 0 as Step, label: "Welcome" },
-  { step: 1 as Step, label: "Appearance" },
-  { step: 2 as Step, label: "Model" },
-  { step: 3 as Step, label: "Start" },
+  { step: 1 as Step, label: "AI" },
+  { step: 2 as Step, label: "Appearance" },
+  { step: 3 as Step, label: "Tour" },
+  { step: 4 as Step, label: "Done" },
+]
+
+// Direct path: 0 (welcome) → 2 (appearance) → 3 (tour) → 4 (done)
+const DIRECT_STEPS = [
+  { step: 0 as Step, label: "Welcome" },
+  { step: 2 as Step, label: "Appearance" },
+  { step: 3 as Step, label: "Tour" },
+  { step: 4 as Step, label: "Done" },
 ]
 
 interface StepIndicatorProps {

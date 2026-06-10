@@ -5,6 +5,10 @@ import {
 } from "@/lib/google-credentials-store";
 import { toast } from "sonner";
 
+// Safe accessor for window.ipc — returns undefined when running outside Electron
+const getIpc = () =>
+  typeof window !== "undefined" ? (window as any).ipc : undefined;
+
 export interface ProviderState {
   isConnected: boolean;
   isLoading: boolean;
@@ -58,7 +62,7 @@ export function useConnectors(active: boolean) {
     async function loadProviders() {
       try {
         setProvidersLoading(true);
-        const result = await window.ipc.invoke("oauth:list-providers", null);
+        const result = await getIpc()?.invoke("oauth:list-providers", null);
         setProviders(result.providers || []);
       } catch (error) {
         console.error("Failed to get available providers:", error);
@@ -74,7 +78,7 @@ export function useConnectors(active: boolean) {
   const refreshSlackConfig = useCallback(async () => {
     try {
       setSlackLoading(true);
-      const result = await window.ipc.invoke("slack:getConfig", null);
+      const result = await getIpc()?.invoke("slack:getConfig", null);
       setSlackEnabled(result.enabled);
       setSlackWorkspaces(result.workspaces || []);
     } catch (error) {
@@ -90,7 +94,7 @@ export function useConnectors(active: boolean) {
     setSlackDiscovering(true);
     setSlackDiscoverError(null);
     try {
-      const result = await window.ipc.invoke("slack:listWorkspaces", null);
+      const result = await getIpc()?.invoke("slack:listWorkspaces", null);
       if (result.error || result.workspaces.length === 0) {
         setSlackDiscoverError(
           result.error ||
@@ -120,7 +124,7 @@ export function useConnectors(active: boolean) {
     );
     try {
       setSlackLoading(true);
-      await window.ipc.invoke("slack:setConfig", {
+      await getIpc()?.invoke("slack:setConfig", {
         enabled: true,
         workspaces: selected,
       });
@@ -139,7 +143,7 @@ export function useConnectors(active: boolean) {
   const handleSlackDisable = useCallback(async () => {
     try {
       setSlackLoading(true);
-      await window.ipc.invoke("slack:setConfig", {
+      await getIpc()?.invoke("slack:setConfig", {
         enabled: false,
         workspaces: [],
       });
@@ -158,7 +162,7 @@ export function useConnectors(active: boolean) {
   // Composio API key
   const handleComposioApiKeySubmit = useCallback(async (apiKey: string) => {
     try {
-      await window.ipc.invoke("composio:set-api-key", { apiKey });
+      await getIpc()?.invoke("composio:set-api-key", { apiKey });
       setComposioApiKeyOpen(false);
       toast.success("Composio API key saved");
     } catch (error) {
@@ -179,7 +183,7 @@ export function useConnectors(active: boolean) {
       }));
 
       try {
-        const result = await window.ipc.invoke("oauth:connect", {
+        const result = await getIpc()?.invoke("oauth:connect", {
           provider,
           clientId: credentials?.clientId,
           clientSecret: credentials?.clientSecret,
@@ -243,7 +247,7 @@ export function useConnectors(active: boolean) {
     }));
 
     try {
-      const result = await window.ipc.invoke("oauth:disconnect", { provider });
+      const result = await getIpc()?.invoke("oauth:disconnect", { provider });
 
       if (result.success) {
         if (provider === "google") {
@@ -300,7 +304,7 @@ export function useConnectors(active: boolean) {
     const newStates: Record<string, ProviderState> = {};
 
     try {
-      const result = await window.ipc.invoke("oauth:getState", null);
+      const result = await getIpc()?.invoke("oauth:getState", null);
       const config = result.config || {};
       const statusMap: Record<string, ProviderStatus> = {};
 
@@ -341,7 +345,7 @@ export function useConnectors(active: boolean) {
 
   // Listen for OAuth events
   useEffect(() => {
-    const cleanup = window.ipc.on("oauth:didConnect", async (event) => {
+    const cleanup = getIpc()?.on("oauth:didConnect", async (event) => {
       const { provider, success } = event;
 
       setProviderStates((prev) => ({

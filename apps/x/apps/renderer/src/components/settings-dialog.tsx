@@ -257,11 +257,31 @@ function AppearanceSettings() {
           </div>
         </div>
       </div>
+
+      {/* Dev Only: Replay Onboarding */}
+      <div className="border-t pt-4">
+        <h4 className="text-sm font-medium mb-2 text-muted-foreground">Developer</h4>
+        <p className="text-xs text-muted-foreground mb-3">
+          Re-run the onboarding flow to test or update your setup
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            try {
+              await window.ipc.invoke("onboarding:reset", null);
+              window.location.reload();
+            } catch (err) {
+              console.error("Failed to reset onboarding:", err);
+            }
+          }}
+        >
+          Replay Onboarding
+        </Button>
+      </div>
     </div>
   );
 }
-
-// --- Model Settings UI ---
 
 type LlmProviderFlavor =
   | "openai"
@@ -270,7 +290,8 @@ type LlmProviderFlavor =
   | "openrouter"
   | "aigateway"
   | "ollama"
-  | "openai-compatible";
+  | "openai-compatible"
+  | "opencode";
 
 interface LlmModelOption {
   id: string;
@@ -287,6 +308,7 @@ const primaryProviders: Array<{
   { id: "anthropic", name: "Anthropic", description: "Claude models" },
   { id: "google", name: "Gemini", description: "Google AI Studio" },
   { id: "ollama", name: "Ollama (Local)", description: "Run models locally" },
+  { id: "opencode", name: "OpenCode", description: "OpenCode models" },
 ];
 
 const moreProviders: Array<{
@@ -394,6 +416,14 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       meetingNotesModel: "",
       trackBlockModel: "",
     },
+    opencode: {
+      apiKey: "",
+      baseURL: "",
+      models: [""],
+      knowledgeGraphModel: "",
+      meetingNotesModel: "",
+      trackBlockModel: "",
+    },
   });
   const [modelsCatalog, setModelsCatalog] = useState<
     Record<string, LlmModelOption[]>
@@ -414,7 +444,8 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
     provider === "google" ||
     provider === "openrouter" ||
     provider === "aigateway" ||
-    provider === "openai-compatible";
+    provider === "openai-compatible" ||
+    provider === "opencode";
   const requiresApiKey =
     provider === "openai" ||
     provider === "anthropic" ||

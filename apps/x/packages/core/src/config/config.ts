@@ -288,6 +288,15 @@ export function markOnboardingComplete(): void {
 }
 
 /**
+ * Reset onboarding to incomplete state (dev only — for re-running onboarding).
+ */
+export function resetOnboarding(): void {
+  const config = readAppConfig();
+  config.onboardingComplete = false;
+  writeAppConfig(config);
+}
+
+/**
  * Check if tools should be disabled for development/testing.
  * Useful for testing LLMs that don't support tool_choice parameter.
  *

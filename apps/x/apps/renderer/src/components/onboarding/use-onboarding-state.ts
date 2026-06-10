@@ -7,7 +7,7 @@ export interface ProviderState {
   isConnecting: boolean;
 }
 
-export type Step = 0 | 1 | 2 | 3;
+export type Step = 0 | 1 | 2 | 3 | 4;
 
 export type OnboardingPath = "byok" | null;
 
@@ -15,6 +15,7 @@ export type LlmProviderFlavor =
   | "openai"
   | "anthropic"
   | "google"
+  | "opencode"
   | "openrouter"
   | "aigateway"
   | "ollama"
@@ -67,6 +68,14 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
       trackBlockModel: "",
     },
     google: {
+      apiKey: "",
+      baseURL: "",
+      model: "",
+      knowledgeGraphModel: "",
+      meetingNotesModel: "",
+      trackBlockModel: "",
+    },
+    opencode: {
       apiKey: "",
       baseURL: "",
       model: "",
@@ -144,6 +153,7 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     llmProvider === "openai" ||
     llmProvider === "anthropic" ||
     llmProvider === "google" ||
+    llmProvider === "opencode" ||
     llmProvider === "openrouter" ||
     llmProvider === "aigateway" ||
     llmProvider === "openai-compatible";
@@ -234,20 +244,25 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     });
   }, [modelsCatalog]);
 
-  // Step flow:
-  // Direct path: 0 (welcome) → 1 (appearance) → 3 (completion)
-  // BYOK path:   0 (welcome) → 1 (appearance) → 2 (llm setup) → 3 (completion)
+  // Step flow (5 steps, 0-4):
+  // 0: Welcome + Vault Selection
+  // 1: AI Provider Setup (if BYOK)
+  // 2: Appearance
+  // 3: Feature Tour
+  // 4: Completion
   const handleNext = useCallback(() => {
     if (currentStep === 0) {
-      setCurrentStep(1);
-    } else if (currentStep === 1) {
       if (onboardingPath === "byok") {
-        setCurrentStep(2);
+        setCurrentStep(1);
       } else {
-        setCurrentStep(3);
+        setCurrentStep(2);
       }
+    } else if (currentStep === 1) {
+      setCurrentStep(2);
     } else if (currentStep === 2) {
       setCurrentStep(3);
+    } else if (currentStep === 3) {
+      setCurrentStep(4);
     }
   }, [currentStep, onboardingPath]);
 
@@ -256,13 +271,15 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
       setCurrentStep(0);
       setOnboardingPath(null);
     } else if (currentStep === 2) {
-      setCurrentStep(1);
-    } else if (currentStep === 3) {
       if (onboardingPath === "byok") {
-        setCurrentStep(2);
-      } else {
         setCurrentStep(1);
+      } else {
+        setCurrentStep(0);
       }
+    } else if (currentStep === 3) {
+      setCurrentStep(2);
+    } else if (currentStep === 4) {
+      setCurrentStep(3);
     }
   }, [currentStep, onboardingPath]);
 
@@ -348,7 +365,7 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
       const result = await window.ipc.invoke("vault:select", null);
       if (result.success && result.path) {
         setVaultPath(result.path);
-        toast.success(`Vault set to: ${result.path.split(/[\\/]/).pop()}.`);
+        toast.success(`Vault set to: ${result.path.split(/[\\\\/]/).pop()}.`);
       }
     } catch (err) {
       console.error("Failed to select vault:", err);

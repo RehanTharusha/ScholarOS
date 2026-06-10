@@ -82,6 +82,20 @@ import { SettingsDialog } from "@/components/settings-dialog";
 import { toast } from "@/lib/toast";
 import { useBilling } from "@/hooks/useBilling";
 
+/**
+ * Safe wrapper around window.ipc to prevent "Cannot read properties of
+ * undefined" errors when the IPC bridge is unavailable (e.g. in a browser
+ * without Electron). Returns a proxy that silently no-ops for .invoke()
+ * and .on() so callers don't need individual null-checks.
+ */
+const ipc =
+  typeof window !== "undefined" && (window as any).ipc
+    ? (window as any).ipc
+    : ({
+        invoke: async () => ({} as any),
+        on: () => () => {},
+      } as any);
+
 interface TreeNode {
   path: string;
   name: string;
@@ -210,7 +224,7 @@ export function SidebarContentPanel({
 
   // Load saved vault path on mount
   useEffect(() => {
-    window.ipc
+    ipc
       .invoke("vault:getPath", null)
       .then((result) => {
         if (result.path) {
@@ -223,7 +237,7 @@ export function SidebarContentPanel({
   }, []);
 
   useEffect(() => {
-    const cleanup = window.ipc.on("vault:changed", (event) => {
+    const cleanup = ipc.on("vault:changed", (event) => {
       setVaultPath(event.path);
     });
     return cleanup;
@@ -233,7 +247,7 @@ export function SidebarContentPanel({
   const handleVaultSelect = useCallback(async () => {
     try {
       setVaultLoading(true);
-      const result = await window.ipc.invoke("vault:select", null);
+      const result = await ipc.invoke("vault:select", null);
       if (result.success && result.path) {
         setVaultPath(result.path);
         toast(
@@ -259,7 +273,7 @@ export function SidebarContentPanel({
 
     const refreshConnection = async () => {
       try {
-        const result = await window.ipc.invoke("oauth:getState", null);
+        const result = await ipc.invoke("oauth:getState", null);
         const config = result.config || {};
         const connected = config["scholaros"]?.connected ?? false;
         if (mounted) {
@@ -267,7 +281,7 @@ export function SidebarContentPanel({
         }
         if (connected && mounted) {
           try {
-            const account = await window.ipc.invoke("account:getAccount", null);
+            const account = await ipc.invoke("account:getAccount", null);
             if (mounted) setAppUrl(account.config?.appUrl ?? null);
           } catch {
             /* ignore */
@@ -282,7 +296,7 @@ export function SidebarContentPanel({
     };
 
     refreshConnection();
-    const cleanup = window.ipc.on("oauth:didConnect", () => {
+    const cleanup = ipc.on("oauth:didConnect", () => {
       refreshConnection();
     });
 
@@ -545,11 +559,11 @@ export function SidebarContentPanel({
 
 async function transcribeWithDeepgram(audioBlob: Blob): Promise<string | null> {
   try {
-    const { exists } = await window.ipc.invoke("workspace:exists", {
+    const { exists } = await ipc.invoke("workspace:exists", {
       path: "config/deepgram.json",
     });
     if (!exists) return null;
-    const configResult = await window.ipc.invoke("workspace:readFile", {
+    const configResult = await ipc.invoke("workspace:readFile", {
       path: "config/deepgram.json",
       encoding: "utf8",
     });
@@ -599,14 +613,14 @@ function VoiceNoteButton({
   React.useEffect(() => {
     (async () => {
       try {
-        const { exists } = await window.ipc.invoke("workspace:exists", {
+        const { exists } = await ipc.invoke("workspace:exists", {
           path: "config/deepgram.json",
         });
         if (!exists) {
           setHasDeepgramKey(false);
           return;
         }
-        const result = await window.ipc.invoke("workspace:readFile", {
+        const result = await ipc.invoke("workspace:readFile", {
           path: "config/deepgram.json",
           encoding: "utf8",
         });
@@ -633,7 +647,7 @@ function VoiceNoteButton({
       relativePathRef.current = relativePath;
 
       // Create the note immediately with a "Recording..." placeholder
-      await window.ipc.invoke("workspace:mkdir", {
+      await ipc.invoke("workspace:mkdir", {
         path: `Voice Memos/${dateStr}`,
         recursive: true,
       });
@@ -649,7 +663,7 @@ path: ${relativePath}
 
 *Recording in progress...*
 `;
-      await window.ipc.invoke("workspace:writeFile", {
+      await ipc.invoke("workspace:writeFile", {
         path: notePath,
         data: initialContent,
         opts: { encoding: "utf8" },
@@ -678,7 +692,7 @@ path: ${relativePath}
 
         // Save audio file to voice_memos folder (for backup/reference)
         try {
-          await window.ipc.invoke("workspace:mkdir", {
+          await ipc.invoke("workspace:mkdir", {
             path: "voice_memos",
             recursive: true,
           });
@@ -691,7 +705,7 @@ path: ${relativePath}
             ),
           );
 
-          await window.ipc.invoke("workspace:writeFile", {
+          await ipc.invoke("workspace:writeFile", {
             path: `voice_memos/${audioFilename}`,
             data: base64,
             opts: { encoding: "base64" },
@@ -715,7 +729,7 @@ path: ${currentRelativePath}
 
 *Transcribing...*
 `;
-          await window.ipc.invoke("workspace:writeFile", {
+          await ipc.invoke("workspace:writeFile", {
             path: currentNotePath,
             data: transcribingContent,
             opts: { encoding: "utf8" },
@@ -748,7 +762,7 @@ path: ${currentRelativePath}
 
 *Transcription failed. Please try again.*
 `;
-          await window.ipc.invoke("workspace:writeFile", {
+          await ipc.invoke("workspace:writeFile", {
             path: currentNotePath,
             data: finalContent,
             opts: { encoding: "utf8" },

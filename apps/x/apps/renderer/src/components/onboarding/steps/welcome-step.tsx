@@ -1,23 +1,49 @@
-import { Loader2, FolderOpen, BookOpen } from "lucide-react";
-import { motion } from "motion/react";
-import { Button } from "@/components/ui/button";
-import type { OnboardingState } from "../use-onboarding-state";
+import { Loader2, FolderOpen, MessageSquare, Network, FileSearch } from "lucide-react"
+import { motion } from "motion/react"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import type { OnboardingState } from "../use-onboarding-state"
 
 interface WelcomeStepProps {
-  state: OnboardingState;
+  state: OnboardingState
 }
+
+const features = [
+  {
+    icon: MessageSquare,
+    title: "AI Chat",
+    description: "Ask questions about your notes, papers, and lectures",
+  },
+  {
+    icon: Network,
+    title: "Knowledge Graph",
+    description: "Visualize connections between concepts",
+  },
+  {
+    icon: FileSearch,
+    title: "PDF Analysis",
+    description: "Extract insights from research papers",
+  },
+]
 
 export function WelcomeStep({ state }: WelcomeStepProps) {
   return (
-    <div className="flex flex-col items-center justify-center text-center flex-1">
-      {/* Logo with ambient glow */}
+    <div className="flex flex-col items-center text-center flex-1">
+      {/* Logo with animated glow */}
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="relative mb-8"
+        className="relative mb-6"
       >
-        <div className="absolute inset-0 size-16 rounded-2xl bg-primary/10 blur-xl scale-[2.5]" />
+        <motion.div
+          animate={{
+            opacity: [0.15, 0.3, 0.15],
+            scale: [2.2, 2.5, 2.2],
+          }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute inset-0 size-16 rounded-2xl bg-primary/10 blur-xl"
+        />
         <img
           src="/logo-only.png"
           alt="ScholarOS"
@@ -25,70 +51,59 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
         />
       </motion.div>
 
-      {/* Tagline badge */}
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-3.5 py-1.5 text-xs font-medium text-muted-foreground mb-6"
-      >
-        <span className="size-1.5 rounded-full bg-green-500 animate-pulse" />
-        Your academic life, compiled
-      </motion.div>
-
-      {/* Main heading */}
+      {/* Heading */}
       <motion.h1
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="text-3xl font-bold tracking-tight mb-3"
+        transition={{ delay: 0.15 }}
+        className="text-3xl font-bold tracking-tight mb-2"
       >
         Welcome to ScholarOS
       </motion.h1>
+
+      {/* Subtitle */}
       <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="text-base text-muted-foreground leading-relaxed max-w-sm mb-10"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="text-base text-muted-foreground leading-relaxed max-w-sm mb-8"
       >
-        Drop in a lecture PDF, a paper, or your class notes — the AI reads it,
-        builds a structured wiki, and keeps everything linked and consistent.
+        Your AI-powered academic workspace
       </motion.p>
 
-      {/* Feature highlights */}
+      {/* Feature highlight cards */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
-        className="grid grid-cols-2 gap-3 w-full max-w-sm mb-10 text-left"
+        transition={{ delay: 0.25 }}
+        className="grid grid-cols-3 gap-3 w-full max-w-md mb-8"
       >
-        <div className="flex items-start gap-2.5 rounded-xl border bg-muted/30 p-3">
-          <BookOpen className="size-4 text-primary shrink-0 mt-0.5" />
-          <div>
-            <div className="text-xs font-semibold">Wiki, not RAG</div>
-            <div className="text-xs text-muted-foreground">Knowledge compiled once, kept current</div>
-          </div>
-        </div>
+        {features.map((feature, i) => (
+          <motion.div
+            key={feature.title}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 + i * 0.08 }}
+            className="flex flex-col items-center gap-2.5 rounded-2xl border bg-card p-4 text-center"
+          >
+            <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <feature.icon className="size-5 text-primary" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold mb-0.5">{feature.title}</div>
+              <div className="text-xs text-muted-foreground leading-snug">{feature.description}</div>
+            </div>
+          </motion.div>
+        ))}
       </motion.div>
 
-      {/* Primary actions */}
+      {/* Vault selection button */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="w-full max-w-xs space-y-3"
+        transition={{ delay: 0.45 }}
+        className="w-full max-w-sm space-y-3"
       >
-        <Button
-          onClick={() => {
-            state.setOnboardingPath("byok");
-            state.setCurrentStep(1);
-          }}
-          size="lg"
-          className="w-full h-12 text-base font-medium"
-        >
-          Set up AI model
-        </Button>
-
         <Button
           onClick={state.handleVaultSelect}
           disabled={state.vaultLoading}
@@ -104,27 +119,49 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
           ) : (
             <>
               <FolderOpen className="size-4 mr-2" />
-              {state.vaultPath ? `Vault: ${state.vaultPath.split(/[\\/]/).pop()}` : "Choose vault folder"}
+              {state.vaultPath ? `Vault: ${state.vaultPath.split(/[\\\\/]/).pop()}` : "Choose vault folder"}
             </>
           )}
         </Button>
+
+        <Button
+          onClick={() => {
+            state.setOnboardingPath("byok")
+            state.handleNext()
+          }}
+          size="lg"
+          className="w-full h-12 text-base font-medium"
+        >
+          Set up AI model
+        </Button>
+
+        <Button
+          onClick={state.handleNext}
+          variant="ghost"
+          size="lg"
+          className="w-full h-12 text-base font-medium"
+        >
+          Skip AI setup
+        </Button>
       </motion.div>
 
-      {/* Skip link */}
+      {/* Skip onboarding link */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.55 }}
         className="mt-6"
       >
         <button
-          onClick={() => state.setCurrentStep(1)}
+          onClick={() => {
+            toast.info("You can configure all settings in the Settings menu (gear icon)")
+            state.handleComplete()
+          }}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground/50"
         >
-          Skip setup, get started
+          Skip onboarding
         </button>
       </motion.div>
     </div>
-  );
+  )
 }
-

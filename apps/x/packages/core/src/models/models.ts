@@ -9,9 +9,34 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { LlmModelConfig, LlmProvider } from "@x/shared/dist/models.js";
 import z from "zod";
 import { getGatewayProvider } from "./gateway.js";
+import fs from "node:fs";
+import path from "node:path";
+import { homedir } from "node:os";
 
 export const Provider = LlmProvider;
 export const ModelConfig = LlmModelConfig;
+
+/**
+ * Read the OpenCode API key from ~/.local/share/opencode/auth.json
+ * Auth format: { "opencode-go": { "type": "api", "key": "sk-..." } }
+ * Falls back to trying "opencode" key if "opencode-go" is not found.
+ */
+function readOpenCodeAuthKey(): string | undefined {
+    try {
+        const authPath = path.join(homedir(), ".local", "share", "opencode", "auth.json");
+        if (!fs.existsSync(authPath)) return undefined;
+        const raw = fs.readFileSync(authPath, "utf-8");
+        const auth = JSON.parse(raw);
+        // Try opencode-go first, then opencode, then any key found
+        const entry = auth["opencode-go"] || auth["opencode"] || Object.values(auth)[0];
+        if (entry && typeof entry === "object" && "key" in entry) {
+            return entry.key as string;
+        }
+        return undefined;
+    } catch {
+        return undefined;
+    }
+}
 
 export function createProvider(config: z.infer<typeof Provider>): ProviderV2 {
     const { apiKey, baseURL, headers } = config;
@@ -66,6 +91,15 @@ export function createProvider(config: z.infer<typeof Provider>): ProviderV2 {
             }) as unknown as ProviderV2;
         case "scholaros":
             return getGatewayProvider();
+        case "opencode": {
+            const openCodeApiKey = apiKey || readOpenCodeAuthKey();
+            return createOpenAICompatible({
+                name: "opencode",
+                apiKey: openCodeApiKey,
+                baseURL: baseURL || "https://opencode.ai/zen",
+                headers,
+            });
+        }
         default:
             throw new Error(`Unsupported provider flavor: ${config.flavor}`);
     }

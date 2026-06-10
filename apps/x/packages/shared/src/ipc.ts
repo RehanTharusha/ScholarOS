@@ -381,6 +381,12 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
+  "onboarding:reset": {
+    req: z.null(),
+    res: z.object({
+      success: z.literal(true),
+    }),
+  },
   // Composio integration channels
   "composio:is-configured": {
     req: z.null(),

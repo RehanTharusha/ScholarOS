@@ -325,7 +325,7 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
     }
   }, [nodes.length])
 
-  const handlePointerDown = (event: React.PointerEvent) => {
+  const handlePointerDown = useCallback((event: React.PointerEvent) => {
     if (event.button !== 0) return
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -335,9 +335,9 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
       originX: pan.x,
       originY: pan.y,
     }
-  }
+  }, [pan.x, pan.y])
 
-  const handlePointerMove = (event: React.PointerEvent) => {
+  const handlePointerMove = useCallback((event: React.PointerEvent) => {
     const dragging = draggingRef.current
     if (dragging) {
       const point = getGraphPoint(event)
@@ -358,9 +358,9 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
         y: panning.originY + (event.clientY - panning.startY),
       })
     }
-  }
+  }, [getGraphPoint])
 
-  const handlePointerUp = () => {
+  const handlePointerUp = useCallback(() => {
     const dragging = draggingRef.current
     if (dragging) {
       if (!dragging.moved) {
@@ -369,9 +369,9 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
       draggingRef.current = null
     }
     panningRef.current = null
-  }
+  }, [onSelectNode])
 
-  const handleWheel = (event: React.WheelEvent) => {
+  const handleWheel = useCallback((event: React.WheelEvent) => {
     event.preventDefault()
     const rawDelta = event.deltaY
     const normalizedDelta = event.deltaMode === 1
@@ -400,7 +400,7 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
       x: cursorX - graphX * nextZoom,
       y: cursorY - graphY * nextZoom,
     })
-  }
+  }, [viewport.height, zoom, pan.x, pan.y])
 
   const startDragNode = (event: React.PointerEvent, nodeId: string) => {
     event.stopPropagation()
@@ -426,6 +426,16 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
     displayPositions.set(node.id, getDisplayPosition(node.id, pos, isDragging))
   })
   const activeNodeId = hoveredNodeId ?? draggingRef.current?.id ?? null
+
+  const uniqueNodeColors = useMemo(
+    () => Array.from(new Set(nodes.map((n) => n.color))),
+    [nodes],
+  )
+
+  const activeNode = useMemo(
+    () => (activeNodeId ? nodes.find((n) => n.id === activeNodeId) ?? null : null),
+    [activeNodeId, nodes],
+  )
   const connectedNodes = useMemo(() => {
     if (!activeNodeId) return null
     const set = new Set([activeNodeId])
@@ -513,7 +523,7 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
       >
         <rect width={viewport.width} height={viewport.height} fill="transparent" />
         <defs>
-          {Array.from(new Set(nodes.map((n) => n.color))).map((color) => (
+          {uniqueNodeColors.map((color) => (
             <filter
               key={color}
               id={`glow-${color.replace('#', '')}`}
@@ -558,7 +568,6 @@ export function GraphView({ nodes, edges, error, onSelectNode }: GraphViewProps)
               strokeOpacity = isActiveEdge ? 0.8 : 0.1
               strokeWidth = isActiveEdge ? 2 : 1
             }
-            const activeNode = activeNodeId ? nodes.find((n) => n.id === activeNodeId) : null
             const stroke = isActiveEdge && activeNode ? activeNode.color : '#333'
             const dx = target.x - source.x
             const dy = target.y - source.y

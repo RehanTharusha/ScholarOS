@@ -217,6 +217,7 @@ function ChatInputInner({
       setLockedModel(null);
       return;
     }
+    if (!window.ipc) return;
     let cancelled = false;
     window.ipc
       .invoke("runs:fetch", { runId })
@@ -236,6 +237,7 @@ function ChatInputInner({
 
   // Check ScholarOS sign-in state
   useEffect(() => {
+    if (!window.ipc) return;
     window.ipc
       .invoke("oauth:getState", null)
       .then((result) => {
@@ -246,9 +248,9 @@ function ChatInputInner({
 
   // Update sign-in state when OAuth events fire
   useEffect(() => {
+    if (!window.ipc) return;
     const cleanup = window.ipc.on("oauth:didConnect", () => {
-      window.ipc
-        .invoke("oauth:getState", null)
+      window.ipc?.invoke("oauth:getState", null)
         .then((result) => {
           setIsSignedIn(result.config?.scholaros?.connected ?? false);
         })
@@ -261,6 +263,7 @@ function ChatInputInner({
   // Signed-in: gateway model list. Signed-out: providers configured in models.json.
   const loadModelConfig = useCallback(async () => {
     try {
+      if (!window.ipc) return;
       if (isSignedIn) {
         const listResult = await window.ipc.invoke("models:list", null);
         const scholarosProvider = listResult.providers?.find(
@@ -356,6 +359,7 @@ function ChatInputInner({
   }, [presetMessage, controller.textInput, onPresetMessageConsumed]);
 
   const addFiles = useCallback(async (paths: string[]) => {
+    if (!window.ipc) return;
     const newAttachments: StagedAttachment[] = [];
     for (const filePath of paths) {
       try {

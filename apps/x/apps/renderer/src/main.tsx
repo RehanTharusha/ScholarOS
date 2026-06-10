@@ -9,20 +9,28 @@ import { IngestWindow } from "@/components/ingest-window";
 const isIngestWindow =
   new URLSearchParams(window.location.search).get("mode") === "ingest";
 
+const posthogKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
+const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST;
+
 const options = {
-  api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
+  api_host: posthogHost,
   defaults: "2025-11-30",
 } as const;
 
+const inner = (
+  <ThemeProvider defaultTheme="paper">
+    {isIngestWindow ? <IngestWindow /> : <App />}
+  </ThemeProvider>
+);
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <PostHogProvider
-      apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
-      options={options}
-    >
-      <ThemeProvider defaultTheme="paper">
-        {isIngestWindow ? <IngestWindow /> : <App />}
-      </ThemeProvider>
-    </PostHogProvider>
+    {posthogKey ? (
+      <PostHogProvider apiKey={posthogKey} options={options}>
+        {inner}
+      </PostHogProvider>
+    ) : (
+      inner
+    )}
   </StrictMode>,
 );
