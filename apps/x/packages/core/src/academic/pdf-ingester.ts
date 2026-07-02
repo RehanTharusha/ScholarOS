@@ -193,7 +193,7 @@ async function extractWithOcrmypdf(
     return undefined;
   }
 
-  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-pdf-"));
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "scholaros-pdf-"));
   const outputPdf = path.join(tempDir, "ocr.pdf");
 
   try {
@@ -310,7 +310,7 @@ async function tryExtractPdfPagesViaCanvas(
 async function extractPdfTextWithTesseractJs(
   filepath: string,
 ): Promise<string | undefined> {
-  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "rowboat-ocr-"));
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "scholaros-ocr-"));
   try {
     const cliImages = await tryExtractPdfPagesViaCli(filepath, tempDir);
     if (cliImages.length > 0) {

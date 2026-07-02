@@ -1,5 +1,5 @@
 {
-  "comment": "Development configuration. Copy this to ~/.rowboat/config/dev.json and modify as needed.",
+  "comment": "Development configuration. Copy this to ~/.scholarOS/config/dev.json and modify as needed.",
   "disableTools": false,
   "disableToolsHelp": "Set to true to disable tool calling for development. Useful when testing LLMs that don't support the tool_choice parameter (e.g., some OpenRouter models). When true, the AI assistant will respond with text only, without attempting to call tools.",
   "showOnboarding": false,

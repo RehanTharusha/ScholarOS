@@ -2239,7 +2239,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         ),
     }),
     execute: async ({ note }: { note: string }) => {
-      const inboxPath = path.join(homedir(), ".rowboat", "memory", "inbox.md");
+      const inboxPath = path.join(homedir(), ".scholarOS", "memory", "inbox.md");
       const dir = path.dirname(inboxPath);
       await fs.mkdir(dir, { recursive: true });
 

@@ -19,7 +19,7 @@
 │  ┌──────────────────────────────────────────────┐   │
 │  │           ResearchHandler                      │   │
 │  │  - Task registry & lifecycle                  │   │
-│  │  - Persistence (~/.rowboat/research/*.json)   │   │
+│  │  - Persistence (~/.scholarOS/research/*.json)   │   │
 │  │  - Progress events via Electron IPC send      │   │
 │  └──────────┬───────────────────────────────────┘   │
 │             │ calls                                  │
@@ -192,7 +192,7 @@ class DeepResearcher {
 ```
 class ResearchHandler {
   private activeTasks = new Map<string, ActiveTask>()
-  private researchDir: string  // ~/.rowboat/research/
+  private researchDir: string  // ~/.scholarOS/research/
 
   constructor() {
     // Ensure research directory exists on instantiation
@@ -506,7 +506,7 @@ export { ResearchSynapse } from './research-synapse'
 The agent does NOT respond — the research replaces the agent's turn. If the user sends another message during research, it gets queued (or cancels the current research — TBD based on UX preference).
 
 **Reconnection on app restart:**
-On mount, check for any research sessions with "running" status in `~/.rowboat/research/`. If found, optionally re-run them or mark as "error" with "app was closed" message.
+On mount, check for any research sessions with "running" status in `~/.scholarOS/research/\`. If found, optionally re-run them or mark as "error" with "app was closed" message.
 
 ---
 
@@ -607,7 +607,7 @@ Steps 5, 6, and 7 are independent and can be built in parallel after Step 4.
 
 4. **IPC event streaming** — Following existing `runs:events` / `services:events` pattern. Main process pushes to renderer via `webContents.send()`.
 
-5. **File-based persistence** — JSON files in `~/.rowboat/research/`. Directory auto-created on first use.
+5. **File-based persistence** — JSON files in `~/.scholarOS/research/\`. Directory auto-created on first use.
 
 6. **AbortController for cancellation** — Simple, native JS, no additional dependencies.
 

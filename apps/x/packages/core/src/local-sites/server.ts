@@ -49,8 +49,8 @@ const MIME_TYPES: Record<string, string> = {
 };
 const IFRAME_AUTOSIZE_BOOTSTRAP = String.raw`<script>
 (() => {
-  const SITE_CHANGED_MESSAGE = '__ROWBOAT_SITE_CHANGED_MESSAGE__';
-  const SITE_EVENTS_PATH = '__ROWBOAT_SITE_EVENTS_PATH__';
+  const SITE_CHANGED_MESSAGE = '__SCHOLAROS_SITE_CHANGED_MESSAGE__';
+  const SITE_EVENTS_PATH = '__SCHOLAROS_SITE_EVENTS_PATH__';
   let reloadRequested = false;
   let reloadSource = null;
 
@@ -104,7 +104,7 @@ const IFRAME_AUTOSIZE_BOOTSTRAP = String.raw`<script>
 
   if (window.parent === window || typeof window.parent?.postMessage !== 'function') return;
 
-  const MESSAGE_TYPE = '__ROWBOAT_IFRAME_HEIGHT_MESSAGE__';
+  const MESSAGE_TYPE = '__SCHOLAROS_IFRAME_HEIGHT_MESSAGE__';
   const MIN_HEIGHT = 240;
   let animationFrameId = 0;
   let lastHeight = 0;
@@ -268,11 +268,11 @@ async function ensureLocalSiteScaffold(): Promise<void> {
 
 function injectIframeAutosizeBootstrap(html: string): string {
   const bootstrap = IFRAME_AUTOSIZE_BOOTSTRAP.replace(
-    "__ROWBOAT_IFRAME_HEIGHT_MESSAGE__",
+    "__SCHOLAROS_IFRAME_HEIGHT_MESSAGE__",
     IFRAME_HEIGHT_MESSAGE,
   )
-    .replace("__ROWBOAT_SITE_CHANGED_MESSAGE__", SITE_RELOAD_MESSAGE)
-    .replace("__ROWBOAT_SITE_EVENTS_PATH__", SITE_EVENTS_PATH);
+    .replace("__SCHOLAROS_SITE_CHANGED_MESSAGE__", SITE_RELOAD_MESSAGE)
+    .replace("__SCHOLAROS_SITE_EVENTS_PATH__", SITE_EVENTS_PATH);
   if (/<\/body>/i.test(html)) {
     return html.replace(/<\/body>/i, `${bootstrap}\n</body>`);
   }

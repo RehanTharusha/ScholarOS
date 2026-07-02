@@ -51,7 +51,7 @@ function resolveWorkDir(): string {
   // Check for saved vault path first
   const vaultConfigPath = path.join(
     homedir(),
-    ".rowboat",
+    ".scholarOS",
     "config",
     "vault.json",
   );
@@ -85,9 +85,9 @@ function resolveWorkDir(): string {
   }
 
   // Fallback to environment variable or default
-  const configured = process.env.ROWBOAT_WORKDIR;
+  const configured = process.env.SCHOLAROS_WORKDIR;
   if (!configured) {
-    const defaultPath = path.join(homedir(), ".rowboat");
+    const defaultPath = path.join(homedir(), ".scholarOS");
     console.log(`[Config] Using default vault path: ${defaultPath}`);
     return defaultPath;
   }
@@ -105,17 +105,17 @@ function resolveWorkDir(): string {
 }
 
 /**
- * Global config directory — lives at ~/.rowboat/config/
+ * Global config directory — lives at ~/.scholarOS/config/
  * This is the default location for app-wide settings that persist across vault switches:
  * model config, MCP servers, OAuth tokens, Slack config, security allow-lists, voice config,
  * Composio config, user profile, and the models.dev catalog cache.
  *
  * Switching vaults (WorkDir) only changes where the agent works, NOT the app's own config.
  */
-export const GlobalConfigDir = path.join(homedir(), ".rowboat", "config");
+export const GlobalConfigDir = path.join(homedir(), ".scholarOS", "config");
 
 // Resolve app root relative to compiled file location (dist/...)
-// Allow override via ROWBOAT_WORKDIR env var for standalone pipeline usage.
+// Allow override via SCHOLAROS_WORKDIR env var for standalone pipeline usage.
 // Normalize to an absolute path so workspace boundary checks behave consistently.
 // Export WorkDir as a live binding so it can be refreshed at runtime when vault changes
 export let WorkDir = resolveWorkDir();
@@ -141,7 +141,7 @@ export function refreshWorkDir(): void {
 export function saveVaultPath(vaultPath: string): void {
   const vaultConfigPath = path.join(
     homedir(),
-    ".rowboat",
+    ".scholarOS",
     "config",
     "vault.json",
   );
@@ -167,7 +167,7 @@ export function saveVaultPath(vaultPath: string): void {
 export function getVaultPath(): string | null {
   const vaultConfigPath = path.join(
     homedir(),
-    ".rowboat",
+    ".scholarOS",
     "config",
     "vault.json",
   );
@@ -241,9 +241,9 @@ ensureDefaultConfigs();
 
 /**
  * App-level configuration (stored globally, persists across vault changes)
- * Located at ~/.rowboat/config/app.json
+ * Located at ~/.scholarOS/config/app.json
  */
-const APP_CONFIG_DIR = path.join(homedir(), ".rowboat", "config");
+const APP_CONFIG_DIR = path.join(homedir(), ".scholarOS", "config");
 const APP_CONFIG_FILE = path.join(APP_CONFIG_DIR, "app.json");
 
 interface AppConfig {
@@ -302,7 +302,7 @@ export function resetOnboarding(): void {
  *
  * Configuration priority (highest to lowest):
  * 1. SCHOLAROS_DISABLE_TOOLS environment variable
- * 2. ~/.rowboat/config/dev.json { disableTools: true }
+ * 2. ~/.scholarOS/config/dev.json { disableTools: true }
  * 3. Default: false (tools enabled)
  */
 export function shouldDisableTools(): boolean {
@@ -333,7 +333,7 @@ export function shouldDisableTools(): boolean {
  *
  * Configuration priority (highest to lowest):
  * 1. SCHOLAROS_SHOW_ONBOARDING environment variable ("true")
- * 2. ~/.rowboat/config/dev.json { showOnboarding: true }
+ * 2. ~/.scholarOS/config/dev.json { showOnboarding: true }
  * 3. Default: false (normal behavior)
  */
 export function shouldShowOnboardingOverride(): boolean {

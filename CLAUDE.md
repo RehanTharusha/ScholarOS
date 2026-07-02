@@ -112,9 +112,9 @@ Before designing or implementing any new feature UI in `apps/x/apps/renderer/src
 
 ### LLM configuration (single provider)
 
-- Config file: `~/.rowboat/config/models.json`
+- Config file: `~/.scholarOS/config/models.json`
 - Schema: `{ provider: { flavor, apiKey?, baseURL?, headers? }, model: string }`
-- Models catalog cache: `~/.rowboat/config/models.dev.json` (OpenAI/Anthropic/Google only)
+- Models catalog cache: `~/.scholarOS/config/models.dev.json` (OpenAI/Anthropic/Google only)
 
 ### Add a new shared type
 

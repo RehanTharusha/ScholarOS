@@ -2,10 +2,10 @@ import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const ROWBOAT_DIR = path.join(homedir(), ".rowboat");
+const SCHOLAROS_DIR = path.join(homedir(), ".scholarOS");
 const APP_NAME = "ScholarOS";
 const CLEANUP_SENTINEL = path.join(
-  ROWBOAT_DIR,
+  SCHOLAROS_DIR,
   "config",
   ".cleanup-sentinel",
 );
@@ -24,7 +24,7 @@ function getElectronUserDataPath(): string {
 
 // read vault path to know what to NEVER touch
 function getVaultPath(): string | null {
-  const vaultConfigPath = path.join(ROWBOAT_DIR, "config", "vault.json");
+  const vaultConfigPath = path.join(SCHOLAROS_DIR, "config", "vault.json");
   try {
     if (fs.existsSync(vaultConfigPath)) {
       const cfg = JSON.parse(fs.readFileSync(vaultConfigPath, "utf-8"));
@@ -72,7 +72,7 @@ function cleanSystemTemp(): void {
   const tmp = tmpdir();
   try {
     for (const entry of fs.readdirSync(tmp)) {
-      if (entry.startsWith("rowboat-")) {
+      if (entry.startsWith("scholaros-")) {
         const fullPath = path.join(tmp, entry);
         safeRmdir(fullPath);
       }
@@ -85,16 +85,16 @@ function cleanSystemTemp(): void {
 // holds paths to clean that we know are safe (never vault content)
 const SAFE_CLEAN_PATHS = [
   // Global config (recreated on startup)
-  path.join(ROWBOAT_DIR, "config"),
+  path.join(SCHOLAROS_DIR, "config"),
   // Research cache
-  path.join(ROWBOAT_DIR, "research"),
+  path.join(SCHOLAROS_DIR, "research"),
   // Logs
-  path.join(ROWBOAT_DIR, "logs"),
+  path.join(SCHOLAROS_DIR, "logs"),
   // Agent memory inbox (regenerated from conversations)
-  path.join(ROWBOAT_DIR, "memory", "inbox.md"),
-  // Old .rowboat root junk files
-  path.join(ROWBOAT_DIR, ".last-run"),
-  path.join(ROWBOAT_DIR, ".lock"),
+  path.join(SCHOLAROS_DIR, "memory", "inbox.md"),
+  // Old .scholarOS root junk files
+  path.join(SCHOLAROS_DIR, ".last-run"),
+  path.join(SCHOLAROS_DIR, ".lock"),
 ];
 
 export function cleanupPreviousInstall(): void {

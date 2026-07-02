@@ -25,7 +25,7 @@ export class ResearchHandler {
   private emitProgress: ProgressCallback;
 
   constructor(emitProgress?: ProgressCallback) {
-    this.researchDir = path.join(homedir(), ".rowboat", "research");
+    this.researchDir = path.join(homedir(), ".scholarOS", "research");
     this.emitProgress = emitProgress ?? (() => {});
     try {
       fs.mkdirSync(this.researchDir, { recursive: true });

@@ -39,7 +39,7 @@ const DEFAULT_EMBEDDING_MODEL_BY_PROVIDER: Record<string, string> = {
   "openai-compatible": "text-embedding-3-small",
   openrouter: "text-embedding-3-small",
   aigateway: "text-embedding-3-small",
-  rowboat: "text-embedding-3-small",
+  scholaros: "text-embedding-3-small",
   google: "text-embedding-004",
   ollama: "nomic-embed-text",
 };
@@ -95,7 +95,7 @@ function embeddingModelCandidates(
   providerFlavor: string,
   configuredModels: string[] | undefined,
 ): string[] {
-  const envModel = process.env.ROWBOAT_EMBEDDING_MODEL?.trim();
+  const envModel = process.env.SCHOLAROS_EMBEDDING_MODEL?.trim();
   const providerDefaults = DEFAULT_EMBEDDING_MODEL_BY_PROVIDER[providerFlavor]
     ? [DEFAULT_EMBEDDING_MODEL_BY_PROVIDER[providerFlavor]]
     : [];

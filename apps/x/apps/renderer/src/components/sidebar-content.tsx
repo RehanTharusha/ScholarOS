@@ -218,7 +218,7 @@ export function SidebarContentPanel({
   const showKnowledgeNewChat = activeSection === "knowledge";
   const quickActionState = showChatQuickActions ? "open" : "closed";
   const handleOpenCanvases = onOpenCanvases ?? knowledgeActions.openCanvas;
-  const [isScholarOSConnected, setIsRowboatConnected] = useState(false);
+  const [isScholarOSConnected, setIsScholarOSConnected] = useState(false);
   const [appUrl, setAppUrl] = useState<string | null>(null);
   const { billing } = useBilling(isScholarOSConnected);
   const [vaultPath, setVaultPath] = useState<string | null>(null);
@@ -228,7 +228,7 @@ export function SidebarContentPanel({
   // Check if courses.json exists to set default sidebar view
   useEffect(() => {
     ipc
-      .invoke("workspace:exists", { path: ".scholar/courses.json" })
+      .invoke("workspace:exists", { path: ".scholarOS/courses.json" })
       .then((result: { exists: boolean }) => {
         if (result.exists) {
           setSidebarView("courses");
@@ -292,7 +292,7 @@ export function SidebarContentPanel({
         const config = result.config || {};
         const connected = config["scholaros"]?.connected ?? false;
         if (mounted) {
-          setIsRowboatConnected(connected);
+          setIsScholarOSConnected(connected);
         }
         if (connected && mounted) {
           try {
@@ -305,7 +305,7 @@ export function SidebarContentPanel({
       } catch (error) {
         console.error("Failed to fetch OAuth state:", error);
         if (mounted) {
-          setIsRowboatConnected(false);
+          setIsScholarOSConnected(false);
         }
       }
     };
