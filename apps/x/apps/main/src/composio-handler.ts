@@ -113,7 +113,7 @@ export async function initiateConnection(toolkitSlug: string): Promise<{
         toolkit: { slug: toolkitSlug },
         auth_config: {
           type: "use_composio_managed_auth",
-          name: `rowboat-${toolkitSlug}`,
+          name: `scholaros-${toolkitSlug}`,
         },
       });
       authConfigId = created.auth_config.id;
@@ -124,7 +124,7 @@ export async function initiateConnection(toolkitSlug: string): Promise<{
     const response = await composioClient.createConnectedAccount({
       auth_config: { id: authConfigId },
       connection: {
-        user_id: "rowboat-user",
+        user_id: "scholaros-user",
         callback_url: callbackUrl,
       },
     });

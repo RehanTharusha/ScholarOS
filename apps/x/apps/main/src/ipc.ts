@@ -48,7 +48,7 @@ import { ResearchHandler } from "@x/core/dist/research/research-handler.js";
 import { versionHistory, voice } from "@x/core";
 import { getBillingInfo } from "@x/core/dist/billing/billing.js";
 import { getAccessToken } from "@x/core/dist/auth/tokens.js";
-import { getScholarOSConfig } from "@x/core/dist/config/rowboat.js";
+import { getScholarOSConfig } from "@x/core/dist/config/scholaros.js";
 import {
   WorkDir,
   saveVaultPath,

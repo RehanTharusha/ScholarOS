@@ -23,7 +23,7 @@ import { LlmModelConfig } from "./models.js";
 import { ServiceEvent } from "./service-events.js";
 
 import { UserMessageContent } from "./message.js";
-import { ScholarOSApiConfig } from "./rowboat-account.js";
+import { ScholarOSApiConfig } from "./scholaros-account.js";
 import { ZListToolkitsResponse } from "./composio.js";
 import { BrowserStateSchema } from "./browser-control.js";
 import { ResearchQuery, ResearchProgress, ResearchSession } from "./research.js";

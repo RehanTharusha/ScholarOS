@@ -218,9 +218,9 @@ export function SidebarContentPanel({
   const showKnowledgeNewChat = activeSection === "knowledge";
   const quickActionState = showChatQuickActions ? "open" : "closed";
   const handleOpenCanvases = onOpenCanvases ?? knowledgeActions.openCanvas;
-  const [isRowboatConnected, setIsRowboatConnected] = useState(false);
+  const [isScholarOSConnected, setIsRowboatConnected] = useState(false);
   const [appUrl, setAppUrl] = useState<string | null>(null);
-  const { billing } = useBilling(isRowboatConnected);
+  const { billing } = useBilling(isScholarOSConnected);
   const [vaultPath, setVaultPath] = useState<string | null>(null);
   const [vaultLoading, setVaultLoading] = useState(false);
   const [sidebarView, setSidebarView] = useState<"courses" | "files">("files");
@@ -496,7 +496,7 @@ export function SidebarContentPanel({
         )}
       </SidebarContent>
       {/* Billing / upgrade CTA or Log in CTA */}
-      {isRowboatConnected && billing ? (
+      {isScholarOSConnected && billing ? (
         <div className="px-3 py-2">
           <div className="flex items-center justify-between rounded-lg border border-sidebar-border bg-sidebar-accent/20 px-3 py-2">
             <div className="min-w-0">

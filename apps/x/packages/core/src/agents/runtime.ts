@@ -368,7 +368,7 @@ function formatLlmStreamError(rawError: unknown): string {
 }
 
 export async function loadAgent(id: string): Promise<z.infer<typeof Agent>> {
-  if (id === "copilot" || id === "rowboatx") {
+  if (id === "copilot" || id === "scholaros") {
     return buildCopilotAgent();
   }
 
@@ -1027,7 +1027,7 @@ export async function* streamAgent({
     });
     let instructionsWithDateTime = `Current date and time: ${currentDateTime}\n\n${agent.instructions}`;
     // Inject Agent Notes context for copilot
-    if (state.agentName === "copilot" || state.agentName === "rowboatx") {
+    if (state.agentName === "copilot" || state.agentName === "scholaros") {
       const agentNotesContext = loadAgentNotesContext();
       if (agentNotesContext) {
         instructionsWithDateTime += `\n\n${agentNotesContext}`;

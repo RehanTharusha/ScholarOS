@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { useBilling } from "@/hooks/useBilling";
-import { useScholarOSAccount } from "@/hooks/useRowboatAccount";
+import { useScholarOSAccount } from "@/hooks/useAccount";
 import { toast } from "sonner";
 
 interface AccountSettingsProps {

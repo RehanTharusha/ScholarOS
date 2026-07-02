@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { buildDeepgramListenUrl } from '@/lib/deepgram-listen-url';
-import { useScholarOSAccount } from '@/hooks/useRowboatAccount';
+import { useScholarOSAccount } from '@/hooks/useAccount';
 import posthog from 'posthog-js';
 import * as analytics from '@/lib/analytics';
 

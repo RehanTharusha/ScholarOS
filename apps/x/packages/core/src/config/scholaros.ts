@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ScholarOSApiConfig } from "@x/shared/dist/rowboat-account.js";
+import { ScholarOSApiConfig } from "@x/shared/dist/scholaros-account.js";
 import { API_URL } from "./env.js";
 
 let cached: z.infer<typeof ScholarOSApiConfig> | null = null;
