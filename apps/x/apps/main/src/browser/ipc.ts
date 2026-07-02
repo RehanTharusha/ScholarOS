@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import { ipc } from '@x/shared';
+import { ipc } from '@scholaros/shared';
 import { browserViewManager, type BrowserState } from './view.js';
 
 type IPCChannels = ipc.IPCChannels;

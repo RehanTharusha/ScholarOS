@@ -3,8 +3,8 @@ import z from "zod";
 import {
   AskHumanRequestEvent,
   ToolPermissionRequestEvent,
-} from "@x/shared/src/runs.js";
-import { COMPOSIO_DISPLAY_NAMES } from "@x/shared/src/composio.js";
+} from "@scholaros/shared/src/runs.js";
+import { COMPOSIO_DISPLAY_NAMES } from "@scholaros/shared/src/composio.js";
 
 export interface MessageAttachment {
   path: string;

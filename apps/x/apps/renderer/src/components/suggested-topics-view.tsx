@@ -3,7 +3,7 @@ import { ArrowRight, Lightbulb, Loader2 } from "lucide-react";
 import {
   SuggestedTopicBlockSchema,
   type SuggestedTopicBlock,
-} from "@x/shared/dist/blocks.js";
+} from "@scholaros/shared/dist/blocks.js";
 
 const SUGGESTED_TOPICS_PATH = "suggested-topics.md";
 const LEGACY_SUGGESTED_TOPICS_PATHS = ["config/suggested-topics.md"];

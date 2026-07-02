@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { ChevronDown, FileText } from 'lucide-react'
-import { blocks } from '@x/shared'
+import { blocks } from '@scholaros/shared'
 import { useState, useMemo } from 'react'
 
 interface TranscriptEntry {

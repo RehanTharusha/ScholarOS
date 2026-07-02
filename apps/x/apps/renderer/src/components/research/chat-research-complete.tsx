@@ -5,7 +5,7 @@ import { CheckCircle, Clock, Copy, ExternalLink, FileText, MessageSquare, Quote,
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { ResearchSession, ResearchSource, ResearchFinding } from "@x/shared/src/research.js"
+import type { ResearchSession, ResearchSource, ResearchFinding } from "@scholaros/shared/src/research.js"
 
 function formatDuration(ms: number) {
   const s = Math.floor(ms / 1000)

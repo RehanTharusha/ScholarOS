@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useCallback, useEffect, useState, useRef } from "react";
-import { workspace } from "@x/shared";
-import { RunEvent, ListRunsResponse } from "@x/shared/src/runs.js";
+import { workspace } from "@scholaros/shared";
+import { RunEvent, ListRunsResponse } from "@scholaros/shared/src/runs.js";
 import type { LanguageModelUsage, ToolUIPart } from "ai";
 import "./App.css";
 import z from "zod";
@@ -84,7 +84,7 @@ import { ReviewSession } from "@/components/review-session";
 import {
   ToolPermissionRequestEvent,
   AskHumanRequestEvent,
-} from "@x/shared/src/runs.js";
+} from "@scholaros/shared/src/runs.js";
 import {
   SidebarInset,
   SidebarProvider,
@@ -145,7 +145,7 @@ import {
   parseAttachedFiles,
   toToolState,
 } from "@/lib/chat-conversation";
-import { COMPOSIO_DISPLAY_NAMES as composioDisplayNames } from "@x/shared/src/composio.js";
+import { COMPOSIO_DISPLAY_NAMES as composioDisplayNames } from "@scholaros/shared/src/composio.js";
 import { toast } from "sonner";
 import { useVoiceMode } from "@/hooks/useVoiceMode";
 import { useVoiceTTS } from "@/hooks/useVoiceTTS";

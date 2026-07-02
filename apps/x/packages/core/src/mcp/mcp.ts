@@ -10,7 +10,7 @@ import {
     connectionState,
     ListToolsResponse,
     McpServerList,
-} from "@x/shared/dist/mcp.js";
+} from "@scholaros/shared/dist/mcp.js";
 
 type mcpState = {
     state: z.infer<typeof connectionState>,

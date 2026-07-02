@@ -5,7 +5,7 @@
 
 import { PDFIngester, IngestResult } from "./pdf-ingester.js";
 import { ContradictionDetector } from "./contradiction-detector.js";
-import type { Contradiction as AcademicContradiction } from "@x/shared/dist/academic.js";
+import type { Contradiction as AcademicContradiction } from "@scholaros/shared/dist/academic.js";
 import path from "path";
 import { promises as fs } from "fs";
 

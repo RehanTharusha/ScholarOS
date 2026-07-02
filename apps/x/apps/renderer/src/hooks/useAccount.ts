@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { useCallback, useEffect, useState } from 'react';
-import { ScholarOSApiConfig } from '@x/shared/dist/scholaros-account.js';
+import { ScholarOSApiConfig } from '@scholaros/shared/dist/scholaros-account.js';
 
 
 interface ScholarOSAccountState {

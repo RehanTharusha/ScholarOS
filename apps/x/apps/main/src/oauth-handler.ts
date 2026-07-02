@@ -1,15 +1,15 @@
 import { shell } from "electron";
 import type { Server } from "http";
 import { createAuthServer } from "./auth-server.js";
-import * as oauthClient from "@x/core/dist/auth/oauth-client.js";
-import type { Configuration } from "@x/core/dist/auth/oauth-client.js";
+import * as oauthClient from "@scholaros/core/dist/auth/oauth-client.js";
+import type { Configuration } from "@scholaros/core/dist/auth/oauth-client.js";
 import {
   getProviderConfig,
   getAvailableProviders,
-} from "@x/core/dist/auth/providers.js";
-import container from "@x/core/dist/di/container.js";
-import { IOAuthRepo } from "@x/core/dist/auth/repo.js";
-import { IClientRegistrationRepo } from "@x/core/dist/auth/client-repo.js";
+} from "@scholaros/core/dist/auth/providers.js";
+import container from "@scholaros/core/dist/di/container.js";
+import { IOAuthRepo } from "@scholaros/core/dist/auth/repo.js";
+import { IClientRegistrationRepo } from "@scholaros/core/dist/auth/client-repo.js";
 import { emitOAuthEvent } from "./ipc.js";
 
 const REDIRECT_URI = "http://localhost:8080/oauth/callback";

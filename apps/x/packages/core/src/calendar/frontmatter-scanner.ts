@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { WorkDir } from "../config/config.js";
-import { frontmatter } from "@x/shared";
+import { frontmatter } from "@scholaros/shared";
 import { Task, CreateTask } from "./types.js";
 import { getTaskRepo, ITaskRepo } from "./repo.js";
 

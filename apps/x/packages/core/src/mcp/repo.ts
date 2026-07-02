@@ -1,5 +1,5 @@
 import { GlobalConfigDir } from "../config/config.js";
-import { McpServerConfig, McpServerDefinition } from "@x/shared/dist/mcp.js";
+import { McpServerConfig, McpServerDefinition } from "@scholaros/shared/dist/mcp.js";
 import fs from "fs/promises";
 import path from "path";
 import z from "zod";

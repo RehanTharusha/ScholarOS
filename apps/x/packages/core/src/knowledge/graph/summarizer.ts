@@ -2,7 +2,7 @@ import { generateText } from 'ai';
 import z from 'zod';
 import { getDefaultModelAndProvider, resolveProviderConfig, getKgModel } from '../../models/defaults.js';
 import { createProvider } from '../../models/models.js';
-import { RunEvent } from '@x/shared/dist/runs.js';
+import { RunEvent } from '@scholaros/shared/dist/runs.js';
 
 type RunEventType = z.infer<typeof RunEvent>;
 

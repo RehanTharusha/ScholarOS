@@ -1,5 +1,5 @@
-import type { IBrowserControlService } from '@x/core/dist/application/browser-control/service.js';
-import type { BrowserControlAction, BrowserControlInput, BrowserControlResult } from '@x/shared/dist/browser-control.js';
+import type { IBrowserControlService } from '@scholaros/core/dist/application/browser-control/service.js';
+import type { BrowserControlAction, BrowserControlInput, BrowserControlResult } from '@scholaros/shared/dist/browser-control.js';
 import { browserViewManager } from './view.js';
 import { normalizeNavigationTarget } from './navigation.js';
 

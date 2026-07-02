@@ -1,5 +1,5 @@
 {
-  "name": "@x/core",
+  "name": "@scholaros/core",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -20,7 +20,7 @@
     "@openrouter/ai-sdk-provider": "^1.2.6",
     "@react-pdf/renderer": "^4.3.2",
     "@types/react": "^19.2.7",
-    "@x/shared": "workspace:*",
+    "@scholaros/shared": "workspace:*",
     "ai": "^5.0.133",
     "awilix": "^12.0.5",
     "chokidar": "^4.0.3",

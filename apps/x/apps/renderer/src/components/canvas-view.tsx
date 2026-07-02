@@ -6,7 +6,7 @@ import type {
   CanvasEdge,
   CanvasTextNode,
   NodeSide,
-} from "@x/shared/src/canvas.js";
+} from "@scholaros/shared/src/canvas.js";
 import {
   addEdge,
   addNode,

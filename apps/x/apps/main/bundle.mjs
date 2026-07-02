@@ -2,7 +2,7 @@
  * Bundles the compiled main process into a single JavaScript file.
  *
  * Why we bundle:
- * - pnpm uses symlinks for workspace packages (@x/core, @x/shared)
+ * - pnpm uses symlinks for workspace packages (@scholaros/core, @scholaros/shared)
  * - Electron Forge's dependency walker (flora-colossus) cannot follow these symlinks
  * - Bundling inlines all dependencies into a single file, eliminating node_modules
  *
@@ -42,14 +42,14 @@ console.log("✅ Main process bundled to .package/dist/main.cjs");
 // find it at runtime. This is needed in both dev mode (npm run dev) and
 // packaging (forge generateAssets hooks into bundle.mjs).
 //
-// pdfjs-dist is a dependency of @x/core, not apps/main. We resolve it
+// pdfjs-dist is a dependency of @scholaros/core, not apps/main. We resolve it
 // from the core package's node_modules.
 try {
   const { createRequire } = await import("module");
   const { copyFileSync, mkdirSync } = await import("fs");
   const { join, dirname, resolve } = await import("path");
 
-  // Resolve from @x/core so pnpm's module resolution finds pdfjs-dist
+  // Resolve from @scholaros/core so pnpm's module resolution finds pdfjs-dist
   const corePkg = resolve("../../packages/core/package.json");
   const coreReq = createRequire(corePkg);
   const workerPath = coreReq.resolve("pdfjs-dist/build/pdf.worker.mjs");

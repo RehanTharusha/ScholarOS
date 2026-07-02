@@ -4,7 +4,7 @@ import { mergeAttributes, Node } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { Sparkles } from 'lucide-react'
 import { parse as parseYaml } from 'yaml'
-import { PromptBlockSchema } from '@x/shared/dist/prompt-block.js'
+import { PromptBlockSchema } from '@scholaros/shared/dist/prompt-block.js'
 import { Button } from '@/components/ui/button'
 
 function truncate(text: string, maxLen: number): string {

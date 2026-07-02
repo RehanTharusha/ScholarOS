@@ -8,7 +8,7 @@ import type {
   CanvasLinkNode,
   CanvasGroupNode,
   NodeSide,
-} from "@x/shared/src/canvas.js";
+} from "@scholaros/shared/src/canvas.js";
 
 export type { CanvasData, CanvasNode, CanvasEdge, NodeSide };
 

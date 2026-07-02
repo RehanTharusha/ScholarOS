@@ -12,7 +12,7 @@ import { executeTool, listServers, listTools } from "../../mcp/mcp.js";
 import * as anki from "../../anki/service.js";
 import container from "../../di/container.js";
 import { IMcpConfigRepo } from "../..//mcp/repo.js";
-import { McpServerDefinition } from "@x/shared/dist/mcp.js";
+import { McpServerDefinition } from "@scholaros/shared/dist/mcp.js";
 import * as workspace from "../../workspace/workspace.js";
 import { IAgentsRepo } from "../../agents/repo.js";
 import { WorkDir } from "../../config/config.js";
@@ -25,11 +25,11 @@ import {
 import {
   CURATED_TOOLKITS,
   CURATED_TOOLKIT_SLUGS,
-} from "@x/shared/dist/composio.js";
+} from "@scholaros/shared/dist/composio.js";
 import {
   BrowserControlInputSchema,
   type BrowserControlInput,
-} from "@x/shared/dist/browser-control.js";
+} from "@scholaros/shared/dist/browser-control.js";
 import type { ToolContext } from "./exec-tool.js";
 import { generateText } from "ai";
 import { createProvider } from "../../models/models.js";
@@ -1960,7 +1960,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
           // Scan knowledge files and extract frontmatter properties
           try {
             const { parseFrontmatter } =
-              await import("@x/shared/dist/frontmatter.js");
+              await import("@scholaros/shared/dist/frontmatter.js");
             const entries = await workspace.readdir("", {
               recursive: true,
               allowedExtensions: [".md"],

@@ -1,4 +1,4 @@
-import type { ResearchSession } from "@x/shared/src/research.js"
+import type { ResearchSession } from "@scholaros/shared/src/research.js"
 
 export function generateResearchHtmlReport(session: ResearchSession): string {
   const title = escapeHtml(session.query)

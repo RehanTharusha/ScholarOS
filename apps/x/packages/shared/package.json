@@ -1,5 +1,5 @@
 {
-  "name": "@x/shared",
+  "name": "@scholaros/shared",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",

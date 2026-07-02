@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
-import { workspace } from "@x/shared";
+import { workspace } from "@scholaros/shared";
 import { z } from "zod";
 import {
   RemoveOptions,

@@ -1,4 +1,4 @@
-import { ipc } from '@x/shared';
+import { ipc } from '@scholaros/shared';
 type InvokeChannels = ipc.InvokeChannels;
 type SendChannels = ipc.SendChannels;
 type IPCChannels = ipc.IPCChannels;

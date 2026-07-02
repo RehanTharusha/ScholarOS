@@ -1,5 +1,5 @@
 {
-  "name": "@x/preload",
+  "name": "@scholaros/preload",
   "private": true,
   "type": "module",
   "main": "dist/preload.js",
@@ -7,7 +7,7 @@
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc && esbuild dist/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=dist/preload.bundle.js && node -e \"require('node:fs').renameSync('dist/preload.bundle.js','dist/preload.js')\""
   },
   "dependencies": {
-    "@x/shared": "workspace:*"
+    "@scholaros/shared": "workspace:*"
   },
   "devDependencies": {
     "electron": "^39.2.7",

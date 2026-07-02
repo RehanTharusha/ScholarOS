@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@thednp/dommatrix": "^3.0.4",
-    "@x/core": "workspace:*",
-    "@x/shared": "workspace:*",
+    "@scholaros/core": "workspace:*",
+    "@scholaros/shared": "workspace:*",
     "chokidar": "^4.0.3",
     "electron-squirrel-startup": "^1.0.1",
     "html-to-docx": "^1.8.0",

@@ -12,7 +12,7 @@ import type {
   BrowserPageSnapshot,
   BrowserState,
   BrowserTabState,
-} from "@x/shared/dist/browser-control.js";
+} from "@scholaros/shared/dist/browser-control.js";
 import { normalizeNavigationTarget } from "./navigation.js";
 import {
   buildClickScript,

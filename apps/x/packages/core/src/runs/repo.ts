@@ -11,7 +11,7 @@ import {
   CreateRunOptions,
   ListRunsResponse,
   MessageEvent,
-} from "@x/shared/dist/runs.js";
+} from "@scholaros/shared/dist/runs.js";
 import { getScholarOSPath } from "../config/config.js";
 import { getDefaultModelAndProvider } from "../models/defaults.js";
 
@@ -23,7 +23,7 @@ import { getDefaultModelAndProvider } from "../models/defaults.js";
  * for any non-start event RunEvent matches first; for a strict start event
  * RunEvent still matches; only a legacy start event falls through and parses
  * as LegacyStartEvent. New event types stay maintained in one place
- * (`@x/shared/dist/runs.js`) — the lenient form just adds one fallback variant.
+ * (`@scholaros/shared/dist/runs.js`) — the lenient form just adds one fallback variant.
  */
 const LegacyStartEvent = StartEvent.extend({
   model: z.string().optional(),

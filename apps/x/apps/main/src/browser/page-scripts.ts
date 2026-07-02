@@ -1,4 +1,4 @@
-import type { BrowserPageElement } from '@x/shared/dist/browser-control.js';
+import type { BrowserPageElement } from '@scholaros/shared/dist/browser-control.js';
 
 const INTERACTABLE_SELECTORS = [
   'a[href]',

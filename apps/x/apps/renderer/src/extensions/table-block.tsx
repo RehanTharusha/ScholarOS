@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { X, Table2 } from 'lucide-react'
-import { blocks } from '@x/shared'
+import { blocks } from '@scholaros/shared'
 
 function TableBlockView({ node, deleteNode }: { node: { attrs: Record<string, unknown> }; deleteNode: () => void }) {
   const raw = node.attrs.data as string

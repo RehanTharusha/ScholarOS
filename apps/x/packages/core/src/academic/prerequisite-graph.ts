@@ -1,4 +1,4 @@
-import type { ConceptPrerequisite } from "@x/shared/dist/academic.js";
+import type { ConceptPrerequisite } from "@scholaros/shared/dist/academic.js";
 
 export interface ConceptNode {
   id: string;

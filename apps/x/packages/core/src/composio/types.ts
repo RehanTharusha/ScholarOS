@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ZToolkitMeta as ZSharedToolkitMeta, ZToolkitItem } from "@x/shared/dist/composio.js";
+import { ZToolkitMeta as ZSharedToolkitMeta, ZToolkitItem } from "@scholaros/shared/dist/composio.js";
 
 // Re-export the shared toolkit schemas so existing imports continue to work
 export const ZToolkitMeta = ZSharedToolkitMeta;

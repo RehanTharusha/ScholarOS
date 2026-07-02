@@ -1,5 +1,5 @@
 {
-  "name": "@x/renderer",
+  "name": "@scholaros/renderer",
   "private": true,
   "type": "module",
   "scripts": {
@@ -37,8 +37,8 @@
     "@tiptap/pm": "^3.15.3",
     "@tiptap/react": "^3.15.3",
     "@tiptap/starter-kit": "^3.15.3",
-    "@x/preload": "workspace:*",
-    "@x/shared": "workspace:*",
+    "@scholaros/preload": "workspace:*",
+    "@scholaros/shared": "workspace:*",
     "ai": "^5.0.117",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

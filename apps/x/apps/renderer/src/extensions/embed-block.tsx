@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { X, ExternalLink } from 'lucide-react'
-import { blocks } from '@x/shared'
+import { blocks } from '@scholaros/shared'
 
 function getEmbedUrl(provider: string, url: string): string | null {
   if (provider === 'youtube') {

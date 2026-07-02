@@ -1,5 +1,5 @@
 import z from "zod";
-import { LlmProvider } from "@x/shared/dist/models.js";
+import { LlmProvider } from "@scholaros/shared/dist/models.js";
 import { IModelConfigRepo } from "./repo.js";
 import { isSignedIn } from "../account/account.js";
 import container from "../di/container.js";

@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, shell, app, dialog } from "electron";
-import { ipc } from "@x/shared";
+import { ipc } from "@scholaros/shared";
 import path from "node:path";
 import os from "node:os";
 import {
@@ -7,13 +7,13 @@ import {
   disconnectProvider,
   listProviders,
 } from "./oauth-handler.js";
-import { watcher as watcherCore, workspace } from "@x/core";
-import { refreshWorkDir } from "@x/core/dist/config/config.js";
-import { workspace as workspaceShared } from "@x/shared";
-import * as mcpCore from "@x/core/dist/mcp/mcp.js";
-import * as runsCore from "@x/core/dist/runs/runs.js";
-import { bus } from "@x/core/dist/runs/bus.js";
-import { serviceBus } from "@x/core/dist/services/service_bus.js";
+import { watcher as watcherCore, workspace } from "@scholaros/core";
+import { refreshWorkDir } from "@scholaros/core/dist/config/config.js";
+import { workspace as workspaceShared } from "@scholaros/shared";
+import * as mcpCore from "@scholaros/core/dist/mcp/mcp.js";
+import * as runsCore from "@scholaros/core/dist/runs/runs.js";
+import { bus } from "@scholaros/core/dist/runs/bus.js";
+import { serviceBus } from "@scholaros/core/dist/services/service_bus.js";
 import type { FSWatcher } from "chokidar";
 import fs from "node:fs/promises";
 import { exec } from "node:child_process";
@@ -24,36 +24,36 @@ const mammoth = (mammothModule as any).default || mammothModule;
 
 const execAsync = promisify(exec);
 
-import { RunEvent } from "@x/shared/dist/runs.js";
-import { ServiceEvent } from "@x/shared/dist/service-events.js";
-import container from "@x/core/dist/di/container.js";
-import { KnowledgeGraphService } from "@x/core/dist/knowledge/graph/service.js";
-import type { KnowledgeGraph } from "@x/core/dist/knowledge/graph/graph.js";
-import { listOnboardingModels } from "@x/core/dist/models/models-dev.js";
-import { testModelConnection } from "@x/core/dist/models/models.js";
-import { isSignedIn } from "@x/core/dist/account/account.js";
-import { listGatewayModels } from "@x/core/dist/models/gateway.js";
-import type { IModelConfigRepo } from "@x/core/dist/models/repo.js";
-import type { IOAuthRepo } from "@x/core/dist/auth/repo.js";
-import { ISlackConfigRepo } from "@x/core/dist/slack/repo.js";
+import { RunEvent } from "@scholaros/shared/dist/runs.js";
+import { ServiceEvent } from "@scholaros/shared/dist/service-events.js";
+import container from "@scholaros/core/dist/di/container.js";
+import { KnowledgeGraphService } from "@scholaros/core/dist/knowledge/graph/service.js";
+import type { KnowledgeGraph } from "@scholaros/core/dist/knowledge/graph/graph.js";
+import { listOnboardingModels } from "@scholaros/core/dist/models/models-dev.js";
+import { testModelConnection } from "@scholaros/core/dist/models/models.js";
+import { isSignedIn } from "@scholaros/core/dist/account/account.js";
+import { listGatewayModels } from "@scholaros/core/dist/models/gateway.js";
+import type { IModelConfigRepo } from "@scholaros/core/dist/models/repo.js";
+import type { IOAuthRepo } from "@scholaros/core/dist/auth/repo.js";
+import { ISlackConfigRepo } from "@scholaros/core/dist/slack/repo.js";
 import {
   isOnboardingComplete,
   markOnboardingComplete,
   resetOnboarding,
   shouldShowOnboardingOverride,
-} from "@x/core/dist/config/config.js";
+} from "@scholaros/core/dist/config/config.js";
 import * as composioHandler from "./composio-handler.js";
-import { search } from "@x/core/dist/search/search.js";
-import { ResearchHandler } from "@x/core/dist/research/research-handler.js";
-import { versionHistory, voice } from "@x/core";
-import { getBillingInfo } from "@x/core/dist/billing/billing.js";
-import { getAccessToken } from "@x/core/dist/auth/tokens.js";
-import { getScholarOSConfig } from "@x/core/dist/config/scholaros.js";
+import { search } from "@scholaros/core/dist/search/search.js";
+import { ResearchHandler } from "@scholaros/core/dist/research/research-handler.js";
+import { versionHistory, voice } from "@scholaros/core";
+import { getBillingInfo } from "@scholaros/core/dist/billing/billing.js";
+import { getAccessToken } from "@scholaros/core/dist/auth/tokens.js";
+import { getScholarOSConfig } from "@scholaros/core/dist/config/scholaros.js";
 import {
   WorkDir,
   saveVaultPath,
   getVaultPath,
-} from "@x/core/dist/config/config.js";
+} from "@scholaros/core/dist/config/config.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
 
 async function ensureUniqueWorkspaceDestination(
@@ -437,7 +437,7 @@ const researchHandler = new ResearchHandler((sessionId, progress, status) => {
   emitResearchProgress(sessionId, progress, status);
 });
 
-function emitResearchProgress(sessionId: string, progress: import("@x/shared/dist/research.js").ResearchProgress, status: string): void {
+function emitResearchProgress(sessionId: string, progress: import("@scholaros/shared/dist/research.js").ResearchProgress, status: string): void {
   const windows = BrowserWindow.getAllWindows();
   for (const win of windows) {
     if (!win.isDestroyed() && win.webContents) {
@@ -981,12 +981,12 @@ export function setupIpcHandlers() {
     },
     // Calendar / Tasks handlers
     "calendar:list": async () => {
-      const { getMergedTasks } = await import("@x/core/dist/calendar/frontmatter-scanner.js");
+      const { getMergedTasks } = await import("@scholaros/core/dist/calendar/frontmatter-scanner.js");
       const tasks = await getMergedTasks();
       return { tasks };
     },
     "calendar:create": async (_event, args) => {
-      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const { getTaskRepo } = await import("@scholaros/core/dist/calendar/repo.js");
       const repo = getTaskRepo();
       const task = await repo.create({
         title: args.title,
@@ -999,19 +999,19 @@ export function setupIpcHandlers() {
       return { task };
     },
     "calendar:complete": async (_event, args) => {
-      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const { getTaskRepo } = await import("@scholaros/core/dist/calendar/repo.js");
       const repo = getTaskRepo();
       const task = await repo.complete(args.id);
       return { task };
     },
     "calendar:delete": async (_event, args) => {
-      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const { getTaskRepo } = await import("@scholaros/core/dist/calendar/repo.js");
       const repo = getTaskRepo();
       await repo.delete(args.id);
       return { success: true as const };
     },
     "calendar:upcoming": async (_event, args) => {
-      const { getTaskRepo } = await import("@x/core/dist/calendar/repo.js");
+      const { getTaskRepo } = await import("@scholaros/core/dist/calendar/repo.js");
       const repo = getTaskRepo();
       const tasks = await repo.getUpcoming(args.days || 14);
       return { tasks };
@@ -1038,7 +1038,7 @@ export function setupIpcHandlers() {
       return service.getGraph().getStats();
     },
     "knowledge-graph:getWarmProfile": async () => {
-      const { buildWarmProfile } = await import("@x/core/dist/knowledge/graph/warm-profile.js");
+      const { buildWarmProfile } = await import("@scholaros/core/dist/knowledge/graph/warm-profile.js");
       const service = getKnowledgeGraphService();
       if (!service) return { profile: null };
       const profile = buildWarmProfile(service.getGraph());

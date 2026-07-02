@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Contradiction } from "@x/shared/dist/academic.js";
+import type { Contradiction } from "@scholaros/shared/dist/academic.js";
 
 interface LlmAgent {
   generate(prompt: string): Promise<{ text: string }>;

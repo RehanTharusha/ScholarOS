@@ -1,4 +1,4 @@
-import type { BrowserControlInput, BrowserControlResult } from '@x/shared/dist/browser-control.js';
+import type { BrowserControlInput, BrowserControlResult } from '@scholaros/shared/dist/browser-control.js';
 
 export interface IBrowserControlService {
   execute(

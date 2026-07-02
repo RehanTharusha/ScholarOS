@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { DeepResearcher } from "./deep-researcher.js";
 import type { DeepResearcherOptions } from "./deep-researcher.js";
 import type { AcademicCategoryId } from "./academic-categories.js";
-import type { ResearchProgress, ResearchSource, ResearchFinding, ResearchSession } from "@x/shared/dist/research.js";
+import type { ResearchProgress, ResearchSource, ResearchFinding, ResearchSession } from "@scholaros/shared/dist/research.js";
 
 interface ActiveTask {
   promise: Promise<void>;

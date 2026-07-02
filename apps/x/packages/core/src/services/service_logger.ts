@@ -3,7 +3,7 @@ import fsp from "fs/promises";
 import path from "path";
 import { getScholarOSPath } from "../config/config.js";
 import { IdGen } from "../application/lib/id-gen.js";
-import type { ServiceEventType } from "@x/shared/dist/service-events.js";
+import type { ServiceEventType } from "@scholaros/shared/dist/service-events.js";
 import { serviceBus } from "./service_bus.js";
 
 type ServiceNameType = ServiceEventType["service"];

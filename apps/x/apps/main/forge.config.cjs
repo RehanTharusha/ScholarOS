@@ -185,7 +185,7 @@ module.exports = {
       
       const { createRequire } = require("module");
       const pdfWorkerCandidates = [
-        // Primary: pdfjs-dist (dependency of @x/core, resolved from core)
+        // Primary: pdfjs-dist (dependency of @scholaros/core, resolved from core)
         (() => {
           try {
             const coreReq = createRequire(

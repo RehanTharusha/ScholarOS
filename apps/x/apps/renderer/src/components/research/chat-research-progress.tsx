@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import type { ResearchProgress } from "@x/shared/src/research.js"
+import type { ResearchProgress } from "@scholaros/shared/src/research.js"
 import { X } from "lucide-react"
 
 const phaseLabels: Record<string, string> = {

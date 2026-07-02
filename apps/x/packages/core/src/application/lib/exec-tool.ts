@@ -1,4 +1,4 @@
-import { ToolAttachment } from "@x/shared/dist/agent.js";
+import { ToolAttachment } from "@scholaros/shared/dist/agent.js";
 import { z } from "zod";
 import { BuiltinTools } from "./builtin-tools.js";
 import { executeTool } from "../../mcp/mcp.js";

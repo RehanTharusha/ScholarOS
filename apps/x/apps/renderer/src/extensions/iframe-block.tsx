@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from '@tiptap/react'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { Globe, X } from 'lucide-react'
-import { blocks } from '@x/shared'
+import { blocks } from '@scholaros/shared'
 import { useEffect, useRef, useState } from 'react'
 
 const IFRAME_HEIGHT_MESSAGE = 'scholaros:iframe-height'

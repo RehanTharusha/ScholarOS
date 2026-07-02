@@ -1,13 +1,13 @@
 import { shell, BrowserWindow } from "electron";
 import { createAuthServer } from "./auth-server.js";
-import * as composioClient from "@x/core/dist/composio/client.js";
-import { composioAccountsRepo } from "@x/core/dist/composio/repo.js";
-import { invalidateCopilotInstructionsCache } from "@x/core/dist/application/assistant/instructions.js";
-import { CURATED_TOOLKIT_SLUGS } from "@x/shared/dist/composio.js";
+import * as composioClient from "@scholaros/core/dist/composio/client.js";
+import { composioAccountsRepo } from "@scholaros/core/dist/composio/repo.js";
+import { invalidateCopilotInstructionsCache } from "@scholaros/core/dist/application/assistant/instructions.js";
+import { CURATED_TOOLKIT_SLUGS } from "@scholaros/shared/dist/composio.js";
 import type {
   LocalConnectedAccount,
   Toolkit,
-} from "@x/core/dist/composio/types.js";
+} from "@scholaros/core/dist/composio/types.js";
 
 const REDIRECT_URI = "http://localhost:8081/oauth/callback";
 

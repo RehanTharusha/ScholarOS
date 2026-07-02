@@ -27,12 +27,12 @@ import { updateElectronApp, UpdateSourceType } from "update-electron-app";
 import {
   init as initLocalSites,
   shutdown as shutdownLocalSites,
-} from "@x/core/dist/local-sites/server.js";
+} from "@scholaros/core/dist/local-sites/server.js";
 
-import { initConfigs } from "@x/core/dist/config/initConfigs.js";
+import { initConfigs } from "@scholaros/core/dist/config/initConfigs.js";
 import started from "electron-squirrel-startup";
 import { execSync, execFileSync } from "node:child_process";
-import { registerBrowserControlService } from "@x/core/dist/di/container.js";
+import { registerBrowserControlService } from "@scholaros/core/dist/di/container.js";
 import { browserViewManager, BROWSER_PARTITION } from "./browser/view.js";
 import { setupBrowserEventForwarding } from "./browser/ipc.js";
 import { ElectronBrowserControlService } from "./browser/control-service.js";

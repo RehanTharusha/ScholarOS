@@ -5,7 +5,7 @@ import { searchDuckDuckGo } from "./search-provider.js";
 import type { SearchResult } from "./search-provider.js";
 import { getCategoryReportPrompt } from "./academic-categories.js";
 import type { AcademicCategoryId } from "./academic-categories.js";
-import type { ResearchProgress, ResearchSource, ResearchFinding } from "@x/shared/dist/research.js";
+import type { ResearchProgress, ResearchSource, ResearchFinding } from "@scholaros/shared/dist/research.js";
 
 const RESEARCH_PLAN_PROMPT = `You are a research strategist. Before searching, analyze this question and create a research plan.
 

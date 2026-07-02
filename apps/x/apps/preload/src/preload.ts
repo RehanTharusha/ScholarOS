@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron';
-import { ipc as ipcShared } from '@x/shared';
+import { ipc as ipcShared } from '@scholaros/shared';
 
 type InvokeChannels = ipcShared.InvokeChannels;
 type IPCChannels = ipcShared.IPCChannels;

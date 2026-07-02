@@ -2,7 +2,7 @@ import { jsonSchema, ModelMessage } from "ai";
 import fs from "fs";
 import path from "path";
 import { getScholarOSPath } from "../config/config.js";
-import { Agent, ToolAttachment } from "@x/shared/dist/agent.js";
+import { Agent, ToolAttachment } from "@scholaros/shared/dist/agent.js";
 import {
   AssistantContentPart,
   AssistantMessage,
@@ -11,7 +11,7 @@ import {
   ProviderOptions,
   ToolCallPart,
   ToolMessage,
-} from "@x/shared/dist/message.js";
+} from "@scholaros/shared/dist/message.js";
 import {
   LanguageModel,
   stepCountIs,
@@ -21,13 +21,13 @@ import {
   ToolSet,
 } from "ai";
 import { z } from "zod";
-import { LlmStepStreamEvent } from "@x/shared/dist/llm-step-events.js";
+import { LlmStepStreamEvent } from "@scholaros/shared/dist/llm-step-events.js";
 import { execTool } from "../application/lib/exec-tool.js";
 import {
   AskHumanRequestEvent,
   RunEvent,
   ToolPermissionRequestEvent,
-} from "@x/shared/dist/runs.js";
+} from "@scholaros/shared/dist/runs.js";
 import { BuiltinTools } from "../application/lib/builtin-tools.js";
 import { buildCopilotAgent } from "../application/assistant/agent.js";
 import {
@@ -48,7 +48,7 @@ import {
 import { IRunsRepo } from "../runs/repo.js";
 import { IRunsLock } from "../runs/lock.js";
 import { IAbortRegistry } from "../runs/abort-registry.js";
-import { PrefixLogger } from "@x/shared";
+import { PrefixLogger } from "@scholaros/shared";
 import { parse } from "yaml";
 import { getRaw as getNoteCreationRaw } from "../knowledge/note_creation.js";
 import { getRaw as getLabelingAgentRaw } from "../knowledge/note_tagging_agent.js";

@@ -1,4 +1,4 @@
-import type { PDFAnnotation } from "@x/shared/dist/academic.js";
+import type { PDFAnnotation } from "@scholaros/shared/dist/academic.js";
 
 export interface QuoteBlock {
   markdown: string;
