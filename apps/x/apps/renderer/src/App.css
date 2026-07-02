@@ -435,14 +435,9 @@
   pointer-events: none;
 }
 
-.graph-view > svg {
+.graph-view > canvas {
   position: relative;
   z-index: 1;
-  cursor: grab;
-}
-
-.graph-view:active > svg {
-  cursor: grabbing;
 }
 
 .graph-view text {

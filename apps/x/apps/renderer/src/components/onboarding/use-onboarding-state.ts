@@ -1,15 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
-export interface ProviderState {
-  isConnected: boolean;
-  isLoading: boolean;
-  isConnecting: boolean;
+export interface Course {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
 }
 
-export type Step = 0 | 1 | 2 | 3 | 4;
+const COURSE_COLORS = [
+  "#3B82F6", // blue
+  "#22C55E", // green
+  "#8B5CF6", // purple
+  "#F97316", // orange
+  "#EC4899", // pink
+  "#14B8A6", // teal
+];
 
-export type OnboardingPath = "byok" | null;
+export type Step = 0 | 1 | 2 | 3;
 
 export type LlmProviderFlavor =
   | "openai"
@@ -27,9 +35,54 @@ export interface LlmModelOption {
   release_date?: string;
 }
 
-export function useOnboardingState(open: boolean, onComplete: () => void, devMode = false) {
+export function useOnboardingState(open: boolean, onComplete: () => void) {
   const [currentStep, setCurrentStep] = useState<Step>(0);
-  const [onboardingPath, setOnboardingPath] = useState<OnboardingPath>(null);
+
+  // Course state
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [courseInput, setCourseInput] = useState("");
+
+  const addCourse = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      if (courses.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
+        toast.error("Course already added");
+        return;
+      }
+      const color = COURSE_COLORS[courses.length % COURSE_COLORS.length];
+      const course: Course = {
+        id: crypto.randomUUID(),
+        name: trimmed,
+        color,
+        createdAt: new Date().toISOString(),
+      };
+      setCourses((prev) => [...prev, course]);
+      setCourseInput("");
+    },
+    [courses],
+  );
+
+  const removeCourse = useCallback((id: string) => {
+    setCourses((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  const saveCourses = useCallback(async (): Promise<boolean> => {
+    try {
+      await window.ipc.invoke("workspace:mkdir", {
+        path: ".scholar",
+        recursive: true,
+      });
+      await window.ipc.invoke("workspace:writeFile", {
+        path: ".scholar/courses.json",
+        data: JSON.stringify({ courses }, null, 2),
+      });
+      return true;
+    } catch (error) {
+      console.error("Failed to save courses:", error);
+      return false;
+    }
+  }, [courses]);
 
   // LLM setup state
   const [llmProvider, setLlmProvider] = useState<LlmProviderFlavor>("openai");
@@ -41,103 +94,34 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
   const [providerConfigs, setProviderConfigs] = useState<
     Record<
       LlmProviderFlavor,
-      {
-        apiKey: string;
-        baseURL: string;
-        model: string;
-        knowledgeGraphModel: string;
-        meetingNotesModel: string;
-        trackBlockModel: string;
-      }
+      { apiKey: string; baseURL: string; model: string }
     >
   >({
-    openai: {
-      apiKey: "",
-      baseURL: "",
-      model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
-    },
-    anthropic: {
-      apiKey: "",
-      baseURL: "",
-      model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
-    },
-    google: {
-      apiKey: "",
-      baseURL: "",
-      model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
-    },
-    opencode: {
-      apiKey: "",
-      baseURL: "",
-      model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
-    },
-    openrouter: {
-      apiKey: "",
-      baseURL: "",
-      model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
-    },
-    aigateway: {
-      apiKey: "",
-      baseURL: "",
-      model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
-    },
-    ollama: {
-      apiKey: "",
-      baseURL: "http://localhost:11434",
-      model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
-    },
+    openai: { apiKey: "", baseURL: "", model: "" },
+    anthropic: { apiKey: "", baseURL: "", model: "" },
+    google: { apiKey: "", baseURL: "", model: "" },
+    opencode: { apiKey: "", baseURL: "", model: "" },
+    openrouter: { apiKey: "", baseURL: "", model: "" },
+    aigateway: { apiKey: "", baseURL: "", model: "" },
+    ollama: { apiKey: "", baseURL: "http://localhost:11434", model: "" },
     "openai-compatible": {
       apiKey: "",
       baseURL: "http://localhost:1234/v1",
       model: "",
-      knowledgeGraphModel: "",
-      meetingNotesModel: "",
-      trackBlockModel: "",
     },
   });
   const [testState, setTestState] = useState<{
     status: "idle" | "testing" | "success" | "error";
     error?: string;
-  }>({
-    status: "idle",
-  });
+  }>({ status: "idle" });
   const [showMoreProviders, setShowMoreProviders] = useState(false);
-
-  // Vault path state
-  const [vaultPath, setVaultPath] = useState<string | null>(null);
+  const [skipLlm, setSkipLlm] = useState(false);
+  const [hasScholarOSAccount, setHasScholarOSAccount] = useState(false);
 
   const updateProviderConfig = useCallback(
     (
       provider: LlmProviderFlavor,
-      updates: Partial<{
-        apiKey: string;
-        baseURL: string;
-        model: string;
-        knowledgeGraphModel: string;
-        meetingNotesModel: string;
-        trackBlockModel: string;
-      }>,
+      updates: Partial<{ apiKey: string; baseURL: string; model: string }>,
     ) => {
       setProviderConfigs((prev) => ({
         ...prev,
@@ -163,8 +147,6 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     llmProvider === "google" ||
     llmProvider === "openrouter" ||
     llmProvider === "aigateway";
-  const requiresBaseURL =
-    llmProvider === "ollama" || llmProvider === "openai-compatible";
   const showBaseURL =
     llmProvider === "ollama" ||
     llmProvider === "openai-compatible" ||
@@ -173,21 +155,11 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     llmProvider === "ollama" || llmProvider === "openai-compatible";
   const canTest =
     activeConfig.model.trim().length > 0 &&
-    (!requiresApiKey || activeConfig.apiKey.trim().length > 0) &&
-    (!requiresBaseURL || activeConfig.baseURL.trim().length > 0);
+    (!requiresApiKey || activeConfig.apiKey.trim().length > 0);
 
-  // Load vault path and LLM models catalog on open
+  // Load models catalog on open
   useEffect(() => {
     if (!open) return;
-
-    async function loadVaultPath() {
-      try {
-        const result = await window.ipc.invoke("vault:getPath", null);
-        setVaultPath(result.path || null);
-      } catch (error) {
-        console.error("Failed to load vault path:", error);
-      }
-    }
 
     async function loadModels() {
       try {
@@ -208,11 +180,27 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
       }
     }
 
-    loadVaultPath();
     loadModels();
+    // Check for existing ScholarOS account (OpenRouter key)
+    checkExistingConfig();
   }, [open]);
 
-  // Preferred default models for each provider
+  const checkExistingConfig = useCallback(async () => {
+    try {
+      const result = await window.ipc.invoke("models:getConfig", null);
+      if (
+        result?.provider?.flavor === "openrouter" &&
+        result?.provider?.apiKey
+      ) {
+        setHasScholarOSAccount(true);
+        setLlmProvider("openrouter");
+      }
+    } catch {
+      // No existing config
+    }
+  }, []);
+
+  // Preferred default models
   const preferredDefaults: Partial<Record<LlmProviderFlavor, string>> = {
     openai: "gpt-5.2",
     anthropic: "claude-opus-4-6-20260202",
@@ -244,44 +232,14 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     });
   }, [modelsCatalog]);
 
-  // Step flow (5 steps, 0-4):
-  // 0: Welcome + Vault Selection
-  // 1: AI Provider Setup (if BYOK)
-  // 2: Appearance
-  // 3: Feature Tour
-  // 4: Completion
+  // Navigation (linear 0→1→2→3)
   const handleNext = useCallback(() => {
-    if (currentStep === 0) {
-      if (onboardingPath === "byok") {
-        setCurrentStep(1);
-      } else {
-        setCurrentStep(2);
-      }
-    } else if (currentStep === 1) {
-      setCurrentStep(2);
-    } else if (currentStep === 2) {
-      setCurrentStep(3);
-    } else if (currentStep === 3) {
-      setCurrentStep(4);
-    }
-  }, [currentStep, onboardingPath]);
+    setCurrentStep((prev) => Math.min(prev + 1, 3) as Step);
+  }, []);
 
   const handleBack = useCallback(() => {
-    if (currentStep === 1) {
-      setCurrentStep(0);
-      setOnboardingPath(null);
-    } else if (currentStep === 2) {
-      if (onboardingPath === "byok") {
-        setCurrentStep(1);
-      } else {
-        setCurrentStep(0);
-      }
-    } else if (currentStep === 3) {
-      setCurrentStep(2);
-    } else if (currentStep === 4) {
-      setCurrentStep(3);
-    }
-  }, [currentStep, onboardingPath]);
+    setCurrentStep((prev) => Math.max(prev - 1, 0) as Step);
+  }, []);
 
   const handleComplete = useCallback(() => {
     onComplete();
@@ -294,11 +252,6 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
       const apiKey = activeConfig.apiKey.trim() || undefined;
       const baseURL = activeConfig.baseURL.trim() || undefined;
       const model = activeConfig.model.trim();
-      const knowledgeGraphModel =
-        activeConfig.knowledgeGraphModel.trim() || undefined;
-      const meetingNotesModel =
-        activeConfig.meetingNotesModel.trim() || undefined;
-      const trackBlockModel = activeConfig.trackBlockModel.trim() || undefined;
       const providerConfig = {
         provider: {
           flavor: llmProvider,
@@ -306,9 +259,6 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
           baseURL,
         },
         model,
-        knowledgeGraphModel,
-        meetingNotesModel,
-        trackBlockModel,
       };
       const result = await window.ipc.invoke("models:test", providerConfig);
       if (result.success) {
@@ -329,61 +279,23 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     activeConfig.apiKey,
     activeConfig.baseURL,
     activeConfig.model,
-    activeConfig.knowledgeGraphModel,
-    activeConfig.meetingNotesModel,
-    activeConfig.trackBlockModel,
     canTest,
     llmProvider,
     handleNext,
   ]);
 
-  // Connect accounts state
-  const [providers] = useState<string[]>([]);
-  const [providersLoading] = useState(false);
-  const [providerStates] = useState<Record<string, ProviderState>>({});
-
-  const handleConnect = useCallback((_provider: string) => {
-    // no-op placeholder
-  }, []);
-
-  const [useComposioForGoogle] = useState(false);
-  const [gmailConnected] = useState(false);
-  const [gmailLoading] = useState(false);
-  const [gmailConnecting] = useState(false);
-
-  const handleConnectGmail = useCallback(() => {
-    // no-op placeholder
-  }, []);
-
-  // Vault selection state
-  const [vaultLoading, setVaultLoading] = useState(false);
-
-  // Handle vault selection (open existing folder as vault)
-  const handleVaultSelect = useCallback(async () => {
-    try {
-      setVaultLoading(true);
-      const result = await window.ipc.invoke("vault:select", null);
-      if (result.success && result.path) {
-        setVaultPath(result.path);
-        toast.success(`Vault set to: ${result.path.split(/[\\\\/]/).pop()}.`);
-      }
-    } catch (err) {
-      console.error("Failed to select vault:", err);
-      toast.error("Failed to select vault");
-    } finally {
-      setVaultLoading(false);
-    }
-  }, []);
-
   return {
-    // Dev mode
-    devMode,
-
     // Step state
     currentStep,
     setCurrentStep,
-    onboardingPath,
-    setOnboardingPath,
+
+    // Course state
+    courses,
+    courseInput,
+    setCourseInput,
+    addCourse,
+    removeCourse,
+    saveCourses,
 
     // LLM state
     llmProvider,
@@ -397,12 +309,14 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     setTestState,
     showApiKey,
     requiresApiKey,
-    requiresBaseURL,
     showBaseURL,
     isLocalProvider,
     canTest,
     showMoreProviders,
     setShowMoreProviders,
+    skipLlm,
+    setSkipLlm,
+    hasScholarOSAccount,
     updateProviderConfig,
     handleTestAndSaveLlmConfig,
 
@@ -410,22 +324,6 @@ export function useOnboardingState(open: boolean, onComplete: () => void, devMod
     handleNext,
     handleBack,
     handleComplete,
-
-    // Connect accounts
-    providers,
-    providersLoading,
-    providerStates,
-    handleConnect,
-    useComposioForGoogle,
-    gmailConnected,
-    gmailLoading,
-    gmailConnecting,
-    handleConnectGmail,
-
-    // Vault
-    vaultPath,
-    vaultLoading,
-    handleVaultSelect,
   };
 }
 

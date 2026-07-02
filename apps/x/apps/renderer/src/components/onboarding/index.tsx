@@ -10,35 +10,30 @@ import {
 import { useOnboardingState } from "./use-onboarding-state"
 import { StepIndicator } from "./step-indicator"
 import { WelcomeStep } from "./steps/welcome-step"
+import { CoursesStep } from "./steps/courses-step"
 import { LlmSetupStep } from "./steps/llm-setup-step"
-import { AppearanceStep } from "./steps/appearance-step"
-import { FeatureTourStep } from "./steps/feature-tour-step"
 import { CompletionStep } from "./steps/completion-step"
 
 interface OnboardingModalProps {
   open: boolean
   onComplete: () => void
-  onNavigateToIngest?: () => void
-  devMode?: boolean
 }
 
-export function OnboardingModal({ open, onComplete, onNavigateToIngest, devMode = false }: OnboardingModalProps) {
-  const state = useOnboardingState(open, onComplete, devMode)
+export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
+  const state = useOnboardingState(open, onComplete)
 
   const stepContent = React.useMemo(() => {
     switch (state.currentStep) {
       case 0:
         return <WelcomeStep state={state} />
       case 1:
-        return <LlmSetupStep state={state} />
+        return <CoursesStep state={state} />
       case 2:
-        return <AppearanceStep state={state} />
+        return <LlmSetupStep state={state} />
       case 3:
-        return <FeatureTourStep state={state} />
-      case 4:
-        return <CompletionStep state={state} onNavigateToIngest={onNavigateToIngest} />
+        return <CompletionStep state={state} />
     }
-  }, [state.currentStep, state, onNavigateToIngest])
+  }, [state.currentStep, state])
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -49,10 +44,7 @@ export function OnboardingModal({ open, onComplete, onNavigateToIngest, devMode 
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <div className="flex flex-col h-full max-h-[85vh] overflow-y-auto p-8 md:p-10">
-          <StepIndicator
-            currentStep={state.currentStep}
-            path={state.onboardingPath}
-          />
+          <StepIndicator currentStep={state.currentStep} />
           <AnimatePresence mode="wait">
             <motion.div
               key={state.currentStep}

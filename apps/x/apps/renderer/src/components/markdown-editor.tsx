@@ -372,6 +372,8 @@ interface MarkdownEditorProps {
   onFrontmatterChange?: (raw: string | null) => void;
   onExport?: (format: "md" | "pdf" | "docx") => void;
   notePath?: string;
+  citationOptions?: { value: string; label: string; description: string }[];
+  onCitationClick?: () => void;
 }
 
 type WikiLinkMatch = {
@@ -475,6 +477,8 @@ export const MarkdownEditor = memo(forwardRef<
     onFrontmatterChange,
     onExport,
     notePath,
+    citationOptions,
+    onCitationClick,
   },
   ref,
 ) {
@@ -1129,8 +1133,8 @@ export const MarkdownEditor = memo(forwardRef<
 
   // @ mention autocomplete options
   const atMentionOptions = useMemo(
-    () => [] as { value: string; label: string; description: string }[],
-    [],
+    () => citationOptions ?? [],
+    [citationOptions],
   );
 
   const filteredAtOptions = useMemo(() => {
@@ -1166,8 +1170,17 @@ export const MarkdownEditor = memo(forwardRef<
 
   // @ mention selection handler
   const handleSelectAtMention = useCallback(
-    (_value: string) => {
-      if (!editor || !activeAtMention) return;
+    (value: string) => {
+      if (!editor || editor.isDestroyed || !activeAtMention) return;
+
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(
+          { from: activeAtMention.range.from, to: activeAtMention.range.to },
+          `[@${value}]`,
+        )
+        .run();
 
       setActiveAtMention(null);
       setAtAnchorPosition(null);
@@ -1207,6 +1220,7 @@ export const MarkdownEditor = memo(forwardRef<
         onSelectionHighlight={setSelectionHighlight}
         onImageUpload={handleImageUploadWithPlaceholder}
         onExport={onExport}
+        onCitationClick={onCitationClick}
       />
       {frontmatter !== undefined && onFrontmatterChange && (
         <FrontmatterProperties

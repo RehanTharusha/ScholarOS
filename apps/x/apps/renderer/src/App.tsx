@@ -79,6 +79,8 @@ import { ComposioConnectCard } from "@/components/ai-elements/composio-connect-c
 import { PermissionRequest } from "@/components/ai-elements/permission-request";
 import { AskHumanRequest } from "@/components/ai-elements/ask-human-request";
 import { Suggestions } from "@/components/ai-elements/suggestions";
+import { StudyDashboard } from "@/components/study-dashboard";
+import { ReviewSession } from "@/components/review-session";
 import {
   ToolPermissionRequestEvent,
   AskHumanRequestEvent,
@@ -1255,10 +1257,12 @@ function App() {
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingDevMode, setOnboardingDevMode] = useState(false);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Review state
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   // Keep selectedPathRef in sync for async guards
   useEffect(() => {
@@ -4862,7 +4866,6 @@ function App() {
       try {
         const result = await window.ipc.invoke("onboarding:getStatus", null);
         setShowOnboarding(result.showOnboarding);
-        setOnboardingDevMode(result.devOverride || false);
       } catch (err) {
         console.error("Failed to check onboarding status:", err);
       }
@@ -6438,11 +6441,7 @@ function App() {
                                   className={tabConversationContentClassName}
                                 >
                                   {!tabHasConversation ? (
-                                    <ConversationEmptyState className="h-auto">
-                                      <div className="text-2xl font-semibold tracking-tight text-foreground/80 sm:text-3xl md:text-4xl">
-                                        What are we working on?
-                                      </div>
-                                    </ConversationEmptyState>
+                                    <StudyDashboard onStartReview={() => setIsReviewOpen(true)} />
                                   ) : (
                                     <>
                                       {tabState.conversation.map((item) => {
@@ -6802,13 +6801,12 @@ function App() {
         />
       </SidebarSectionProvider>
       <Toaster />
+      {isReviewOpen && (
+        <ReviewSession onClose={() => setIsReviewOpen(false)} />
+      )}
       <OnboardingModal
         open={showOnboarding}
         onComplete={handleOnboardingComplete}
-        onNavigateToIngest={() => {
-          void navigateToView({ type: "file", path: INGEST_TAB_PATH })
-        }}
-        devMode={onboardingDevMode}
       />
     </TooltipProvider>
   );

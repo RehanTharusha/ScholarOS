@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, ArrowLeft } from "lucide-react"
+import { Loader2, CheckCircle2, ArrowLeft, ShieldCheck } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,10 +45,11 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
     llmProvider, setLlmProvider, modelsCatalog, modelsLoading, modelsError,
     activeConfig, testState, setTestState, showApiKey,
     showBaseURL, isLocalProvider, canTest, showMoreProviders, setShowMoreProviders,
-    updateProviderConfig, handleTestAndSaveLlmConfig, handleBack,
+    updateProviderConfig, handleTestAndSaveLlmConfig, handleBack, handleNext,
+    hasScholarOSAccount, skipLlm, setSkipLlm,
   } = state
 
-  const isMoreProvider = moreProviders.some(p => p.id === llmProvider)
+  const isMoreProvider = moreProviders.some((p) => p.id === llmProvider)
   const modelsForProvider = modelsCatalog[llmProvider] || []
   const showModelInput = isLocalProvider || modelsForProvider.length === 0
 
@@ -68,7 +69,7 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
           "rounded-xl border-2 p-4 text-left transition-all",
           isSelected
             ? "border-primary bg-primary/5 shadow-sm"
-            : "border-transparent bg-muted/50 hover:bg-muted"
+            : "border-transparent bg-muted/50 hover:bg-muted",
         )}
       >
         <div className="flex items-center gap-3">
@@ -84,14 +85,64 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
     )
   }
 
+  // Show ScholarOS account banner when detected
+  if (hasScholarOSAccount && !skipLlm) {
+    return (
+      <div className="flex flex-col flex-1">
+        <h2 className="text-3xl font-bold tracking-tight text-center mb-2">
+          Connect your AI assistant
+        </h2>
+        <p className="text-base text-muted-foreground text-center mb-8">
+          ScholarOS uses AI to help you study.
+        </p>
+
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-2xl border-2 border-green-500/30 bg-green-500/5 p-8 text-center max-w-sm w-full"
+          >
+            <div className="size-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="size-6 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Using ScholarOS Account</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Your AI assistant is already connected via your ScholarOS account.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
+              <ShieldCheck className="size-4" />
+              OpenRouter configured
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="flex items-center justify-between border-t mt-6 pt-4">
+          <Button variant="ghost" onClick={handleBack} className="gap-1">
+            <ArrowLeft className="size-4" />
+            Back
+          </Button>
+
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={() => { setHasScholarOSAccount(false); setSkipLlm(false) }}>
+              Use different provider
+            </Button>
+            <Button onClick={handleNext} className="min-w-[120px]">
+              Continue
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col flex-1">
       {/* Title */}
       <h2 className="text-3xl font-bold tracking-tight text-center mb-2">
-        Connect your AI
+        Connect your AI assistant
       </h2>
       <p className="text-base text-muted-foreground text-center mb-6">
-        Choose a provider to power ScholarOS
+        ScholarOS uses AI to help you study. Choose a provider.
       </p>
 
       {/* Provider selection */}
@@ -119,7 +170,7 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
 
       {/* Model configuration */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold">Model Configuration</h3>
+        <h3 className="text-sm font-semibold">Configuration</h3>
 
         <div className="space-y-4">
           <div className="space-y-2 min-w-0">
@@ -193,6 +244,17 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
               />
             </div>
           )}
+
+          {/* Skip option */}
+          <button
+            onClick={() => {
+              setSkipLlm(true)
+              handleNext()
+            }}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground/50"
+          >
+            Skip for now (use demo mode)
+          </button>
         </div>
       </div>
 
@@ -204,15 +266,6 @@ export function LlmSetupStep({ state }: LlmSetupStepProps) {
         </Button>
 
         <div className="flex items-center gap-3">
-          {state.devMode && (
-            <Button
-              variant="outline"
-              onClick={state.handleNext}
-              className="min-w-[100px]"
-            >
-              Skip
-            </Button>
-          )}
           {testState.status === "success" && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}

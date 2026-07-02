@@ -1658,3 +1658,19 @@
   color: var(--border);
   font-size: 0.625rem;
 }
+
+/* Writing mode — hide editor's built-in word count bar */
+.writing-mode .word-count-bar {
+  display: none;
+}
+
+.writing-mode .tiptap-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.writing-mode .editor-content-wrapper {
+  flex: 1;
+  min-height: 0;
+}

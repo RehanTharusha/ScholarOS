@@ -77,6 +77,52 @@ Save the current view configuration as a named base.
 - ` + "`open-note`" + ` validates that the file exists before navigating.
 - Filter categories and values come from frontmatter in knowledge files.
 - **Never send ` + "`columns`" + ` or ` + "`sort`" + ` with ` + "`update-base-view`" + ` unless the user specifically asks to change them.** Only pass the parameters you intend to change — omitted parameters are left untouched.
+
+### open-dashboard
+Open the study dashboard showing due cards, mastery levels, and upcoming reviews.
+
+**When to use:** When the user asks what to study, what's due, or wants to see their study dashboard.
+
+**Parameters:** none
+
+### start-review
+Start a review session for due flashcards.
+
+**When to use:** When the user wants to review their cards or start a study session.
+
+**Parameters:**
+- ` + "`course`" + ` (optional): Course name to filter reviews by (e.g., "Biology 101")
+
+### open-writing-mode
+Open the Academic Writing Mode with outline panel, inline citations, and export.
+
+**When to use:** When the user wants to write a paper, essay, or work on an academic document.
+
+**Parameters:**
+- ` + "`notePath`" + ` (optional): Path to an existing note to open in writing mode
+- ` + "`course`" + ` (optional): Course name for context
+
+### open-citation-import
+Open the citation import dialog for Zotero JSON or BibTeX.
+
+**When to use:** When the user wants to import citations from Zotero or BibTeX.
+
+**Parameters:** none
+
+### switch-sidebar
+Switch the sidebar between courses view and files view.
+
+**When to use:** When the user wants to see their courses or browse files.
+
+**Parameters:**
+- ` + "`sidebarView`" + `: ` + "`\"courses\"`" + ` or ` + "`\"files\"`" + `
+
+### get-study-stats
+Read review data and return study statistics (due cards, total cards, courses, sessions).
+
+**When to use:** When the user asks about their progress, streak, or study stats.
+
+**Parameters:** none
 `;
 
 export default skill;

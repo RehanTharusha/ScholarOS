@@ -18,7 +18,12 @@ import { skill as docxSkill } from "./docx/skill.js";
 import { skill as xlsxSkill } from "./xlsx/skill.js";
 import { skill as webArtifactsBuilderSkill } from "./web-artifacts-builder/skill.js";
 import { skill as ankiFlashcardsSkill } from "./anki-flashcards/skill.js";
+import { skill as autoFlashcardsSkill } from "./auto-flashcards/skill.js";
 import { skill as deepResearchSkill } from "./deep-research/skill.js";
+import { skill as studyWorkflowSkill } from "./study-workflow/skill.js";
+import { skill as writingModeSkill } from "./writing-mode/skill.js";
+import { skill as citationManagementSkill } from "./citation-management/skill.js";
+import { skill as courseManagementSkill } from "./course-management/skill.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_PREFIX = "src/application/assistant/skills";
@@ -159,11 +164,46 @@ const definitions: SkillDefinition[] = [
     content: ankiFlashcardsSkill,
   },
   {
+    id: "auto-flashcards",
+    title: "Auto-Flashcards",
+    summary:
+      "Automatically generate flashcards from course notes and store them in ScholarOS's built-in spaced repetition system. Reads markdown files, creates Q&A cards, and saves to .scholar/review/cards.json.",
+    content: autoFlashcardsSkill,
+  },
+  {
     id: "deep-research",
     title: "Deep Research",
     summary:
       "Perform iterative multi-round academic research with web search, source extraction, and report synthesis. Use for literature reviews, comparisons, methodology research, fact-checking, concept exploration, and problem-solving.",
     content: deepResearchSkill,
+  },
+  {
+    id: "study-workflow",
+    title: "Study Workflow",
+    summary:
+      "Guide users through the built-in spaced repetition review system. Use for studying, reviewing flashcards, exam prep, checking progress, or starting review sessions.",
+    content: studyWorkflowSkill,
+  },
+  {
+    id: "writing-mode",
+    title: "Academic Writing Mode",
+    summary:
+      "Help users write papers, essays, and assignments with the built-in Academic Writing Mode featuring outline panel, inline citations, word count targets, and export to Word/LaTeX.",
+    content: writingModeSkill,
+  },
+  {
+    id: "citation-management",
+    title: "Citation Management",
+    summary:
+      "Manage academic citations and references - import from Zotero or BibTeX, insert citations in writing mode, and generate formatted bibliographies.",
+    content: citationManagementSkill,
+  },
+  {
+    id: "course-management",
+    title: "Course Management",
+    summary:
+      "Organize academic content by courses, add new courses, switch between course/file views, and manage course folder structures.",
+    content: courseManagementSkill,
   },
 ];
 

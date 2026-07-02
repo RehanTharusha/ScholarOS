@@ -1,4 +1,4 @@
-import { Loader2, FolderOpen, MessageSquare, Network, FileSearch } from "lucide-react"
+import { MessageSquare, Network, FileSearch } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -68,7 +68,7 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
         transition={{ delay: 0.2 }}
         className="text-base text-muted-foreground leading-relaxed max-w-sm mb-8"
       >
-        Your AI-powered academic workspace
+        Let's get you set up for studying.
       </motion.p>
 
       {/* Feature highlight cards */}
@@ -97,7 +97,7 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
         ))}
       </motion.div>
 
-      {/* Vault selection button */}
+      {/* CTA */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -105,43 +105,11 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
         className="w-full max-w-sm space-y-3"
       >
         <Button
-          onClick={state.handleVaultSelect}
-          disabled={state.vaultLoading}
-          variant="outline"
-          size="lg"
-          className="w-full h-12 text-base font-medium"
-        >
-          {state.vaultLoading ? (
-            <>
-              <Loader2 className="size-4 animate-spin mr-2" />
-              Selecting…
-            </>
-          ) : (
-            <>
-              <FolderOpen className="size-4 mr-2" />
-              {state.vaultPath ? `Vault: ${state.vaultPath.split(/[\\\\/]/).pop()}` : "Choose vault folder"}
-            </>
-          )}
-        </Button>
-
-        <Button
-          onClick={() => {
-            state.setOnboardingPath("byok")
-            state.handleNext()
-          }}
-          size="lg"
-          className="w-full h-12 text-base font-medium"
-        >
-          Set up AI model
-        </Button>
-
-        <Button
           onClick={state.handleNext}
-          variant="ghost"
           size="lg"
           className="w-full h-12 text-base font-medium"
         >
-          Skip AI setup
+          Get Started
         </Button>
       </motion.div>
 
@@ -154,7 +122,7 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
       >
         <button
           onClick={() => {
-            toast.info("You can configure all settings in the Settings menu (gear icon)")
+            toast.info("You can configure everything in Settings later")
             state.handleComplete()
           }}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground/50"

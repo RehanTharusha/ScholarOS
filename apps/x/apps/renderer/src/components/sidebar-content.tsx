@@ -4,6 +4,7 @@ import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { isKnowledgeRelPath } from "@/lib/wiki-links";
 import {
+  BookOpen,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -79,6 +80,7 @@ import {
   useSidebarSection,
 } from "@/contexts/sidebar-context";
 import { SettingsDialog } from "@/components/settings-dialog";
+import { CourseSidebar } from "@/components/course-sidebar";
 import { toast } from "@/lib/toast";
 import { useBilling } from "@/hooks/useBilling";
 
@@ -221,6 +223,19 @@ export function SidebarContentPanel({
   const { billing } = useBilling(isRowboatConnected);
   const [vaultPath, setVaultPath] = useState<string | null>(null);
   const [vaultLoading, setVaultLoading] = useState(false);
+  const [sidebarView, setSidebarView] = useState<"courses" | "files">("files");
+
+  // Check if courses.json exists to set default sidebar view
+  useEffect(() => {
+    ipc
+      .invoke("workspace:exists", { path: ".scholar/courses.json" })
+      .then((result: { exists: boolean }) => {
+        if (result.exists) {
+          setSidebarView("courses");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Load saved vault path on mount
   useEffect(() => {
@@ -467,6 +482,8 @@ export function SidebarContentPanel({
             actions={knowledgeActions}
             onOpenSearch={onOpenSearch}
             onVoiceNoteCreated={onVoiceNoteCreated}
+            sidebarView={sidebarView}
+            setSidebarView={setSidebarView}
           />
         )}
         {activeSection === "tasks" && (
@@ -832,6 +849,8 @@ function KnowledgeSection({
   actions,
   onOpenSearch,
   onVoiceNoteCreated,
+  sidebarView,
+  setSidebarView,
 }: {
   tree: TreeNode[];
   selectedPath: string | null;
@@ -841,6 +860,8 @@ function KnowledgeSection({
   actions: KnowledgeActions;
   onOpenSearch?: () => void;
   onVoiceNoteCreated?: (path: string) => void;
+  sidebarView: "courses" | "files";
+  setSidebarView: (view: "courses" | "files") => void;
 }) {
   const isExpanded = expandedPaths.size > 0;
   const treeContainerRef = React.useRef<HTMLDivElement | null>(null);
@@ -927,23 +948,66 @@ function KnowledgeSection({
               </TooltipContent>
             </Tooltip>
           </div>
-          <SidebarGroupContent className="flex-1 overflow-y-auto">
-            <div ref={treeContainerRef}>
-              <SidebarMenu>
-                {tree.map((item, index) => (
-                  <Tree
-                    key={index}
-                    item={item}
-                    selectedPath={selectedPath}
-                    expandedPaths={expandedPaths}
-                    onSelect={onSelectFile}
-                    onToggleFolder={onToggleFolder}
-                    actions={actions}
-                  />
-                ))}
-              </SidebarMenu>
+          {/* View toggle: Courses / Files */}
+          <div className="flex items-center px-3 py-1 border-b border-sidebar-border bg-sidebar">
+            <div className="flex w-full rounded-md bg-sidebar-accent/50 p-0.5">
+              <button
+                type="button"
+                onClick={() => setSidebarView("courses")}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
+                  sidebarView === "courses"
+                    ? "bg-sidebar-accent text-sidebar-foreground shadow-sm"
+                    : "text-sidebar-foreground/50 hover:text-sidebar-foreground",
+                )}
+              >
+                <BookOpen className="size-3.5" />
+                Courses
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarView("files")}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
+                  sidebarView === "files"
+                    ? "bg-sidebar-accent text-sidebar-foreground shadow-sm"
+                    : "text-sidebar-foreground/50 hover:text-sidebar-foreground",
+                )}
+              >
+                <Folder className="size-3.5" />
+                Files
+              </button>
             </div>
-          </SidebarGroupContent>
+          </div>
+          {sidebarView === "courses" ? (
+            <CourseSidebar
+              tree={tree}
+              selectedPath={selectedPath}
+              expandedPaths={expandedPaths}
+              onSelectFile={onSelectFile}
+              onToggleFolder={onToggleFolder}
+              actions={actions}
+              onSwitchToFiles={() => setSidebarView("files")}
+            />
+          ) : (
+            <SidebarGroupContent className="flex-1 overflow-y-auto">
+              <div ref={treeContainerRef}>
+                <SidebarMenu>
+                  {tree.map((item, index) => (
+                    <Tree
+                      key={index}
+                      item={item}
+                      selectedPath={selectedPath}
+                      expandedPaths={expandedPaths}
+                      onSelect={onSelectFile}
+                      onToggleFolder={onToggleFolder}
+                      actions={actions}
+                    />
+                  ))}
+                </SidebarMenu>
+              </div>
+            </SidebarGroupContent>
+          )}
         </SidebarGroup>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">

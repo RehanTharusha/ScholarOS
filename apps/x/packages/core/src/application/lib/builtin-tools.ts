@@ -1829,6 +1829,12 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
           "update-base-view",
           "get-base-state",
           "create-base",
+          "open-dashboard",
+          "start-review",
+          "open-writing-mode",
+          "open-citation-import",
+          "switch-sidebar",
+          "get-study-stats",
         ])
         .describe("The navigation action to perform"),
       // open-note
@@ -1899,6 +1905,24 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         .string()
         .optional()
         .describe("Name for the saved base view (for create-base)"),
+      // open-writing-mode
+      notePath: z
+        .string()
+        .optional()
+        .describe(
+          "Path to the note to open in writing mode (for open-writing-mode)",
+        ),
+      course: z
+        .string()
+        .optional()
+        .describe(
+          "Course name for context (for open-writing-mode, start-review)",
+        ),
+      // switch-sidebar
+      sidebarView: z
+        .enum(["courses", "files"])
+        .optional()
+        .describe("Which sidebar view to show (for switch-sidebar)"),
     }),
     execute: async (input: { action: string; [key: string]: unknown }) => {
       switch (input.action) {
@@ -2019,6 +2043,90 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
                   ? error.message
                   : "Failed to create base",
             };
+          }
+        }
+
+        case "open-dashboard": {
+          return { success: true, action: "open-dashboard" };
+        }
+
+        case "start-review": {
+          const courseFilter = input.course as string | undefined;
+          return {
+            success: true,
+            action: "start-review",
+            course: courseFilter,
+          };
+        }
+
+        case "open-writing-mode": {
+          const noteFilePath = input.notePath as string | undefined;
+          const courseName = input.course as string | undefined;
+          return {
+            success: true,
+            action: "open-writing-mode",
+            notePath: noteFilePath,
+            course: courseName,
+          };
+        }
+
+        case "open-citation-import": {
+          return { success: true, action: "open-citation-import" };
+        }
+
+        case "switch-sidebar": {
+          const view = input.sidebarView as string;
+          return { success: true, action: "switch-sidebar", view };
+        }
+
+        case "get-study-stats": {
+          try {
+            const { default: fs } = await import("node:fs/promises");
+            const { join } = await import("node:path");
+            const { root } = await workspace.getRoot();
+            const reviewPath = join(root, ".scholar", "review", "cards.json");
+            try {
+              const raw = await fs.readFile(reviewPath, "utf-8");
+              const data = JSON.parse(raw);
+              const cards = data.cards ?? [];
+              const sessions = data.sessions ?? [];
+              const now = new Date();
+              const due = cards.filter(
+                (c: { nextReview: string }) =>
+                  new Date(c.nextReview) <= now,
+              ).length;
+              const total = cards.length;
+              const courses = [
+                ...new Set(cards.map((c: { course: string }) => c.course)),
+              ];
+              const totalSessions = sessions.length;
+              const totalReviewed = sessions.reduce(
+                (s: number, r: { cardsReviewed: number }) =>
+                  s + r.cardsReviewed,
+                0,
+              );
+              return {
+                success: true,
+                action: "get-study-stats",
+                due,
+                total,
+                courses,
+                totalSessions,
+                totalReviewed,
+              };
+            } catch {
+              return {
+                success: true,
+                action: "get-study-stats",
+                due: 0,
+                total: 0,
+                courses: [],
+                totalSessions: 0,
+                totalReviewed: 0,
+              };
+            }
+          } catch {
+            return { success: false, error: "Failed to read study stats" };
           }
         }
 

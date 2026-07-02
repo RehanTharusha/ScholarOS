@@ -42,6 +42,7 @@ interface EditorToolbarProps {
   onSelectionHighlight?: (range: { from: number; to: number } | null) => void
   onImageUpload?: (file: File) => Promise<void> | void
   onExport?: (format: 'md' | 'pdf' | 'docx') => void
+  onCitationClick?: () => void
 }
 
 export function EditorToolbar({
@@ -49,6 +50,7 @@ export function EditorToolbar({
   onSelectionHighlight,
   onImageUpload,
   onExport,
+  onCitationClick,
 }: EditorToolbarProps) {
   const [linkUrl, setLinkUrl] = useState('')
   const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false)
@@ -341,6 +343,18 @@ export function EditorToolbar({
           </div>
         </PopoverContent>
       </Popover>
+
+      {/* Citation button */}
+      {onCitationClick && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onCitationClick}
+          title="Add Citation"
+        >
+          <QuoteIcon className="size-4" />
+        </Button>
+      )}
 
       {/* Image upload */}
       {onImageUpload && (
