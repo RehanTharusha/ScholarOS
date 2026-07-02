@@ -266,7 +266,7 @@ workspace-readFile("courses/Biology 101/lectures/Week1.md")
 **Search strategy for course materials:**
 1. Start by searching broadly: \`workspace-grep({ pattern: "topic name", path: "courses/" })\`
 2. Identify which course folder it belongs to from the search results
-3. Read the specific file: \`workspace-readFile("courses/<course-name>/concepts/<topic>.md"\)
+3. Read the specific file: \`workspace-readFile("courses/<course-name>/concepts/<topic>.md")
 4. If the topic spans multiple courses, the search will reveal all occurrences
 
 ## Local-First and Private

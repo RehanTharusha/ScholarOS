@@ -20,6 +20,7 @@ import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import z from "zod";
 import mammothModule from "mammoth";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mammoth = (mammothModule as any).default || mammothModule;
 
 const execAsync = promisify(exec);
@@ -1076,6 +1077,7 @@ export function setupIpcHandlers() {
     "research:start": async (_event, args) => {
       const sessionId = await researchHandler.startResearch(
         args.query,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         args.category as any,
         { rounds: args.rounds, model: args.model, provider: args.provider }
       );

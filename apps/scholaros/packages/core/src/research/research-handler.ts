@@ -3,9 +3,8 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { homedir } from "node:os";
 import { DeepResearcher } from "./deep-researcher.js";
-import type { DeepResearcherOptions } from "./deep-researcher.js";
 import type { AcademicCategoryId } from "./academic-categories.js";
-import type { ResearchProgress, ResearchSource, ResearchFinding, ResearchSession } from "@scholaros/shared/dist/research.js";
+import type { ResearchProgress, ResearchSession } from "@scholaros/shared/dist/research.js";
 
 interface ActiveTask {
   promise: Promise<void>;
@@ -100,7 +99,7 @@ export class ResearchHandler {
             urls: result.stats.urls,
             model: result.stats.model,
             searchProvider: result.stats.searchProvider,
-            category: result.stats.category as any,
+            category: result.stats.category as AcademicCategoryId,
           },
           startedAt: Date.now() - (result.stats.duration * 1000),
           completedAt: Date.now(),

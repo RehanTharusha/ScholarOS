@@ -45,15 +45,15 @@ importers:
 
   apps/main:
     dependencies:
+      '@scholaros/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@scholaros/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@thednp/dommatrix':
         specifier: ^3.0.4
         version: 3.0.4
-      '@x/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@x/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
@@ -121,7 +121,7 @@ importers:
 
   apps/preload:
     dependencies:
-      '@x/shared':
+      '@scholaros/shared':
         specifier: workspace:*
         version: link:../../packages/shared
     devDependencies:
@@ -188,6 +188,12 @@ importers:
       '@radix-ui/react-use-controllable-state':
         specifier: ^1.2.2
         version: 1.2.2(@types/react@19.2.14)(react@19.2.6)
+      '@scholaros/preload':
+        specifier: workspace:*
+        version: link:../preload
+      '@scholaros/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.3.0(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.22.3)(yaml@2.9.0))
@@ -218,12 +224,6 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.15.3
         version: 3.23.2
-      '@x/preload':
-        specifier: workspace:*
-        version: link:../preload
-      '@x/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       ai:
         specifier: ^5.0.117
         version: 5.0.188(zod@4.4.3)
@@ -387,12 +387,12 @@ importers:
       '@react-pdf/renderer':
         specifier: ^4.3.2
         version: 4.5.1(react@19.2.6)
+      '@scholaros/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@types/react':
         specifier: ^19.2.7
         version: 19.2.14
-      '@x/shared':
-        specifier: workspace:*
-        version: link:../shared
       ai:
         specifier: ^5.0.133
         version: 5.0.188(zod@4.4.3)

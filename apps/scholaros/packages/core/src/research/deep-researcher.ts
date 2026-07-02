@@ -180,8 +180,10 @@ export class DeepResearcher {
   }
 
   private async _llm(systemPrompt: string, userPrompt: string, maxTokens?: number): Promise<string> {
+    void maxTokens;
     // Resolve model + provider
     let model: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let providerConfig: any;
 
     if (this.modelName && this.providerName) {
@@ -293,7 +295,7 @@ export class DeepResearcher {
     this._progress("extracting", roundNum, { message: "Extracting content from sources...", sourcesFound: this.totalUrls });
     const topUrls = allResults.slice(0, 6);
     const extractPromises = topUrls.map(result =>
-      this._extractFromUrl(result, roundNum)
+      this._extractFromUrl(result)
     );
     const findings = await Promise.allSettled(extractPromises);
     let newFindingsCount = 0;
@@ -314,7 +316,7 @@ export class DeepResearcher {
     }
   }
 
-  private async _extractFromUrl(result: SearchResult, _roundNum: number): Promise<ResearchFinding | null> {
+  private async _extractFromUrl(result: SearchResult): Promise<ResearchFinding | null> {
     try {
       const response = await fetch(result.url, {
         signal: this.abortSignal,
@@ -364,7 +366,7 @@ export class DeepResearcher {
     }
   }
 
-  private async _synthesize(roundNum: number): Promise<void> {
+  private async _synthesize(): Promise<void> {
     // Sliding window: only last 3 findings
     const recentFindings = this.allFindings.slice(-3);
     const findingsText = recentFindings
@@ -459,7 +461,7 @@ export class DeepResearcher {
 
       // SYNTHESIZE
       this._progress("synthesizing", round, { message: "Synthesizing findings..." });
-      await this._synthesize(round);
+      await this._synthesize();
 
       // DECIDE (only after round 2)
       if (round >= 2) {

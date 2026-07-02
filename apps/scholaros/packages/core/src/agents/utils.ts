@@ -29,12 +29,13 @@ export async function extractAgentResponse(runId: string): Promise<string | null
  * Wait for a run to complete by listening for run-processing-end event
  */
 export async function waitForRunCompletion(runId: string): Promise<void> {
-    return new Promise(async (resolve) => {
-        const unsubscribe = await bus.subscribe('*', async (event) => {
+    return new Promise<void>((resolve) => {
+        let unsubscribe: (() => void) | undefined;
+        bus.subscribe('*', async (event) => {
             if (event.type === 'run-processing-end' && event.runId === runId) {
-                unsubscribe();
+                unsubscribe?.();
                 resolve();
             }
-        });
+        }).then(unsub => { unsubscribe = unsub; });
     });
 }

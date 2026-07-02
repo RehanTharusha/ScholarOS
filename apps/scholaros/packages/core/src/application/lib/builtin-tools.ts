@@ -46,9 +46,12 @@ import PapaParse from "papaparse";
 import mammothModule from "mammoth";
 import { getPdfWorkerPath } from "./pdf-worker-resolver.js";
 import { classifyFiles as classifyFilesFn, suggestCourseFromFilename } from "../../academic/file-classifier.js";
+import type { AcademicCategoryId } from "../../research/academic-categories.js";
 
 // Use the imported modules directly
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Papa = (PapaParse as any).default || PapaParse;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mammoth = (mammothModule as any).default || mammothModule;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -2809,7 +2812,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       try {
         const { ResearchHandler } = await import("../../research/research-handler.js");
         const handler = new ResearchHandler(() => {});
-        const sessionId = await handler.startResearch(input.query, input.category as any, { rounds: input.rounds });
+        const sessionId = await handler.startResearch(input.query, input.category as AcademicCategoryId, { rounds: input.rounds });
         return {
           sessionId,
           message: `Started deep research on "${input.query}". Track progress in the Deep Research panel.`,
