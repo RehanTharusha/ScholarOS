@@ -50,8 +50,16 @@ const CLUSTER_STRENGTH = 0.003
 const CLUSTER_RADIUS_MIN = 120
 const CLUSTER_RADIUS_MAX = 240
 const CLUSTER_RADIUS_STEP = 45
-const EDGE_COLOR = '#4a4a4a'
-const LABEL_COLOR = '#9ca3af'
+const NODE_STROKE_COLOR = '#ffffff'
+const ACTIVE_NODE_STROKE_COLOR = '#ffffff'
+
+function edgeColor(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#4a4a4a'
+}
+
+function labelColor(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim() || '#9ca3af'
+}
 const LABEL_MIN_ZOOM = 0.55
 const HIT_RADIUS = 28
 const GLOW_RADIUS_MULT = 2.2
@@ -60,9 +68,10 @@ const GLOW_OPACITY = 0.35
 function masteryColor(node: GraphNode, masteryByTopic?: Map<string, number>): string {
   const mastery = masteryByTopic?.get(node.label)
   if (mastery === undefined) return node.color
-  if (mastery >= 75) return '#16A34A'
-  if (mastery >= 50) return '#D97706'
-  return '#DC2626'
+  const root = document.documentElement
+  if (mastery >= 75) return getComputedStyle(root).getPropertyValue('--color-emerald-600').trim() || '#16A34A'
+  if (mastery >= 50) return getComputedStyle(root).getPropertyValue('--color-amber-600').trim() || '#D97706'
+  return getComputedStyle(root).getPropertyValue('--color-red-600').trim() || '#DC2626'
 }
 
 function computeGroupCenters(nodes: GraphNode[]): Map<string, { x: number; y: number }> {
@@ -465,7 +474,7 @@ export function GraphView({
 
       let strokeOpacity = 0.35
       let strokeWidth = 1
-      let strokeColor = EDGE_COLOR
+      let strokeColor = edgeColor()
 
       if (selGroup) {
         const isGroupEdge = sourceGroup === selGroup && targetGroup === selGroup
@@ -479,7 +488,7 @@ export function GraphView({
         const isActiveEdge = edge.source === hoveredId || edge.target === hoveredId
         if (isActiveEdge) {
           const activeNode = nodes.find((n) => n.id === hoveredId)
-          strokeColor = activeNode ? activeNode.color : EDGE_COLOR
+          strokeColor = activeNode ? activeNode.color : edgeColor()
           strokeOpacity = 0.8
           strokeWidth = 2
         } else {
@@ -571,7 +580,7 @@ export function GraphView({
         ctx.font = `${Math.round(11 / Math.max(zoom, 0.5))}px ui-sans-serif, system-ui, sans-serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
-        ctx.fillStyle = LABEL_COLOR
+        ctx.fillStyle = labelColor()
         ctx.fillText(node.label, pos.x, pos.y + r + 6)
       }
     }

@@ -2,6 +2,7 @@ import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, ChevronLeft } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   initializeIfNeeded,
@@ -216,7 +217,7 @@ export function ReviewSession({ onClose, course }: ReviewSessionProps) {
               <p className="text-xs text-muted-foreground">Reviewed</p>
             </div>
             <div className="rounded-2xl border border-border/60 p-4">
-              <p className="text-2xl font-bold text-[#16A34A] tabular-nums">
+              <p className="text-2xl font-bold text-emerald-600 tabular-nums">
                 {summary.correctCount}
               </p>
               <p className="text-xs text-muted-foreground">Correct</p>
@@ -224,7 +225,7 @@ export function ReviewSession({ onClose, course }: ReviewSessionProps) {
             <div className="rounded-2xl border border-border/60 p-4">
               <p className={cn(
                 "text-2xl font-bold tabular-nums",
-                accuracy >= 80 ? "text-[#16A34A]" : accuracy >= 60 ? "text-[#D97706]" : "text-[#DC2626]",
+                accuracy >= 80 ? "text-emerald-600" : accuracy >= 60 ? "text-amber-600" : "text-red-600",
               )}>
                 {accuracy}%
               </p>
@@ -232,12 +233,9 @@ export function ReviewSession({ onClose, course }: ReviewSessionProps) {
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="mt-6 rounded-xl bg-[#8B5CF6] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#7C3AED] transition-colors"
-          >
+          <Button onClick={onClose} className="mt-6">
             Back to Dashboard
-          </button>
+          </Button>
         </motion.div>
       </div>
     );
@@ -300,12 +298,9 @@ export function ReviewSession({ onClose, course }: ReviewSessionProps) {
 
               {!isAnswerRevealed ? (
                 <div className="mt-8 flex justify-center">
-                  <button
-                    onClick={revealAnswer}
-                    className="rounded-xl bg-[#8B5CF6] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#7C3AED] transition-colors"
-                  >
+                  <Button onClick={revealAnswer}>
                     Show Answer
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <>
@@ -353,7 +348,7 @@ export function ReviewSession({ onClose, course }: ReviewSessionProps) {
       <div className="px-6 pb-6">
         <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-[#8B5CF6] transition-all duration-300"
+            className="h-full rounded-full bg-primary transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>

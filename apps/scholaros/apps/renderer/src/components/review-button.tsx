@@ -29,7 +29,7 @@ export function ReviewButton({ onClick }: { onClick: () => void }) {
     >
       Start Review
       {dueCount > 0 && (
-        <span className="text-[#8B5CF6]">
+        <span className="text-primary">
           ({dueCount} due)
         </span>
       )}

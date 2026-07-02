@@ -43,22 +43,22 @@ function getGreeting(): { greeting: string; emoji: string } {
 
 function statusDot(status: ReviewItem["status"]) {
   switch (status) {
-    case "overdue": return "bg-[#DC2626]";
-    case "due-soon": return "bg-[#D97706]";
-    case "on-track": return "bg-[#16A34A]";
+    case "overdue": return "bg-red-600";
+    case "due-soon": return "bg-amber-600";
+    case "on-track": return "bg-emerald-600";
   }
 }
 
 function masteryBarColor(pct: number) {
-  if (pct >= 75) return "bg-[#16A34A]";
-  if (pct >= 50) return "bg-[#D97706]";
-  return "bg-[#DC2626]";
+  if (pct >= 75) return "bg-emerald-600";
+  if (pct >= 50) return "bg-amber-600";
+  return "bg-red-600";
 }
 
 function masteryTextColor(pct: number) {
-  if (pct >= 75) return "text-[#16A34A]";
-  if (pct >= 50) return "text-[#D97706]";
-  return "text-[#DC2626]";
+  if (pct >= 75) return "text-emerald-600";
+  if (pct >= 50) return "text-amber-600";
+  return "text-red-600";
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ function WeeklyActivity({ hours }: { hours: number[] }) {
           <div key={i} className="flex flex-1 flex-col items-center gap-1">
             <div className="w-full flex-1 flex flex-col justify-end">
               <div
-                className="w-full rounded-sm bg-[#8B5CF6]/75 transition-all"
+                className="w-full rounded-sm bg-primary/75 transition-all"
                 style={{ height: `${Math.round((h / max) * 100)}%` }}
               />
             </div>
