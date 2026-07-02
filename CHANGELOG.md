@@ -11,7 +11,7 @@ All notable features and capabilities of ScholarOS.
 - **Knowledge Graph** — fully functional knowledge graph with CRUD operations, merging, and summarization
 - **Deep Research** — deep research capabilities with canvas integration and bug fixes
 - **Revision Guide** — updated to Paper design system with KaTeX math rendering and Mermaid diagram support
-- **.scholar folder** — internal workspace folder setup for better organization
+- **.scholarOS folder** — internal workspace folder setup for better organization
 
 ### Fixes & Improvements
 

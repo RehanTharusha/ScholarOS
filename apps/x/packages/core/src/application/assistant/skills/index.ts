@@ -167,7 +167,7 @@ const definitions: SkillDefinition[] = [
     id: "auto-flashcards",
     title: "Auto-Flashcards",
     summary:
-      "Automatically generate flashcards from course notes and store them in ScholarOS's built-in spaced repetition system. Reads markdown files, creates Q&A cards, and saves to .scholar/review/cards.json.",
+      "Automatically generate flashcards from course notes and store them in ScholarOS's built-in spaced repetition system. Reads markdown files, creates Q&A cards, and saves to .scholarOS/review/cards.json.",
     content: autoFlashcardsSkill,
   },
   {

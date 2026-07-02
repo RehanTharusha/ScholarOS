@@ -77,7 +77,7 @@ export function HelpPopover({ children, tooltip }: HelpPopoverProps) {
         </div>
         <div className="px-4 py-3 border-t flex justify-center gap-3 text-xs text-muted-foreground">
           <a
-            href="https://www.rowboatlabs.com/terms-of-service"
+            href="https://scholaros.app/terms"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground transition-colors"
@@ -86,7 +86,7 @@ export function HelpPopover({ children, tooltip }: HelpPopoverProps) {
           </a>
           <span>·</span>
           <a
-            href="https://www.rowboatlabs.com/privacy-policy"
+            href="https://scholaros.app/privacy"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground transition-colors"
