@@ -1,10 +1,10 @@
-# ScholarOS / Rowboat Design System
+# ScholarOS Design System
 
-This document is the visual and interaction contract for the ScholarOS Electron app and the Rowboat surfaces it reuses. If a new feature screen, modal, sidebar, panel, or dashboard is being added, this file is the first design reference.
+This document is the visual and interaction contract for the ScholarOS Electron app and the ScholarOS surfaces it reuses. If a new feature screen, modal, sidebar, panel, or dashboard is being added, this file is the first design reference.
 
 The goal is not to make every screen identical. The goal is to keep every screen recognizably part of the same product: the same spacing rhythm, the same panel language, the same typography hierarchy, the same control density, and the same visual restraint.
 
-If a feature cannot be designed using the rules below, the default response is to reuse an existing Rowboat pattern, not invent a new one.
+If a feature cannot be designed using the rules below, the default response is to reuse an existing ScholarOS pattern, not invent a new one.
 
 ## Design Principles
 
@@ -100,7 +100,7 @@ Do not introduce a second headline style for the same level of hierarchy. Avoid 
 
 ### App Shell
 
-The page should live inside the existing Rowboat shell. New study-mode screens should follow this structure:
+The page should live inside the existing ScholarOS shell. New study-mode screens should follow this structure:
 
 1. Page shell.
 2. Header with eyebrow, title, description, and right-side actions.
@@ -454,6 +454,6 @@ When in doubt, choose the least surprising implementation that preserves clarity
 
 The default answer to a new visual idea should be:
 
-- Can the same outcome be achieved with the existing Rowboat primitives?
+- Can the same outcome be achieved with the existing ScholarOS primitives?
 - If yes, use those primitives.
 - If no, add the smallest reusable abstraction possible and update this document.

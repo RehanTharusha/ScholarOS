@@ -216,7 +216,7 @@ async function ensureUserEmail(): Promise<string | null> {
       if (account && account.status === "ACTIVE") {
         const result = await executeAction("GMAIL_GET_PROFILE", {
           connected_account_id: account.id,
-          user_id: "rowboat-user",
+          user_id: "scholaros-user",
           version: "latest",
           arguments: { user_id: "me" },
         });

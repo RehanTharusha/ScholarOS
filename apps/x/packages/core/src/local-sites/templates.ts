@@ -409,7 +409,7 @@ h1 {
 
 const reposConfig = [
   {
-    slug: 'rowboatlabs/rowboat',
+    slug: 'scholaroslabs/scholaros',
     label: 'ScholarOS',
     description: 'AI coworker with memory',
   },
@@ -428,7 +428,7 @@ const fallbackStories = [
 ];
 
 const fallbackRepos = [
-  { ...reposConfig[0], stars: 1280, forks: 144, issues: 28, url: 'https://github.com/rowboatlabs/rowboat' },
+  { ...reposConfig[0], stars: 1280, forks: 144, issues: 28, url: 'https://github.com/RehanTharusha/ScholarOS' },
   { ...reposConfig[1], stars: 71600, forks: 11300, issues: 52, url: 'https://github.com/openai/openai-cookbook' },
 ];
 

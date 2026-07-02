@@ -70,7 +70,7 @@ if (process.stderr) {
   });
 }
 
-// Clean up old rowboat/scholarOS cache/config on Squirrel install/update
+// Clean up old ScholarOS cache/config on Squirrel install/update
 // (Windows). Never touches the user's vault.
 if (started) {
   const isInstallOrUpdate = process.argv.some(

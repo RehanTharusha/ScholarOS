@@ -1498,9 +1498,9 @@ function ToolsLibrarySettings({
   );
 }
 
-// --- Rowboat Model Settings (when signed in via Rowboat) ---
+// --- ScholarOS Model Settings (when signed in via ScholarOS) ---
 
-function RowboatModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
+function ScholarOSModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
   const [gatewayModels, setGatewayModels] = useState<LlmModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedKgModel, setSelectedKgModel] = useState("");
@@ -1803,7 +1803,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
                 <ConnectedAccountsSettings dialogOpen={open} />
               ) : activeTab === "models" ? (
                 scholarosConnected ? (
-                  <RowboatModelSettings dialogOpen={open} />
+                  <ScholarOSModelSettings dialogOpen={open} />
                 ) : (
                   <ModelSettings dialogOpen={open} />
                 )

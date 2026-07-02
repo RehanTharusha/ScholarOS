@@ -2542,7 +2542,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
 
   "composio-execute-tool": {
     description:
-      'Execute a Composio tool by its slug. You MUST pass the arguments field with all required parameters from the search results inputSchema. Example: composio-execute-tool({ toolSlug: "GITHUB_ISSUES_LIST_FOR_REPO", toolkitSlug: "github", arguments: { owner: "rowboatlabs", repo: "rowboat", state: "open", per_page: 100 } })',
+      'Execute a Composio tool by its slug. You MUST pass the arguments field with all required parameters from the search results inputSchema. Example: composio-execute-tool({ toolSlug: "GITHUB_ISSUES_LIST_FOR_REPO", toolkitSlug: "github", arguments: { owner: "scholaroslabs", repo: "scholaros", state: "open", per_page: 100 } })',
     inputSchema: z.object({
       toolSlug: z
         .string()
@@ -2583,7 +2583,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       try {
         return await executeComposioAction(toolSlug, {
           connected_account_id: account.id,
-          user_id: "rowboat-user",
+          user_id: "scholaros-user",
           version: "latest",
           arguments: toolArgs,
         });

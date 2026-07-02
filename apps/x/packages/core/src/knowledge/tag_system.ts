@@ -51,7 +51,7 @@ const DEFAULT_TAG_DEFINITIONS: TagDefinition[] = [
     noteEffect: "create",
     description: "Paying customers",
     example:
-      "We're seeing great results with Rowboat. Can we discuss expanding to more teams?",
+      "We're seeing great results with ScholarOS. Can we discuss expanding to more teams?",
   },
   {
     tag: "prospect",
@@ -132,7 +132,7 @@ const DEFAULT_TAG_DEFINITIONS: TagDefinition[] = [
     noteEffect: "create",
     description:
       "Peers, YC batchmates, or open source contributors with direct interaction",
-    example: "Love what you're building with Rowboat. Here's a bug I found...",
+    example: "Love what you're building with ScholarOS. Here's a bug I found...",
   },
   {
     tag: "government",
@@ -279,7 +279,7 @@ const DEFAULT_TAG_DEFINITIONS: TagDefinition[] = [
     noteEffect: "create",
     description:
       "Deploy failures, build errors, webhook issues, API migrations, and production alerts",
-    example: "Vercel deploy failed for rowboat-app. Build log attached.",
+    example: "Vercel deploy failed for scholaros-app. Build log attached.",
   },
   {
     tag: "meeting",
@@ -289,7 +289,7 @@ const DEFAULT_TAG_DEFINITIONS: TagDefinition[] = [
     description:
       "Calendar invites and scheduling for real meetings with named people — investors, customers, partners, candidates, team members. The key signal is a specific person you have a relationship with.",
     example:
-      "Invitation: Zoom: Rowboat Labs <> Dalton Caldwell @ Sat 7 Mar 2026",
+      "Invitation: Zoom: ScholarOS <> Dalton Caldwell @ Sat 7 Mar 2026",
   },
   {
     tag: "event",
