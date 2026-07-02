@@ -10,20 +10,20 @@ cd apps/x && pnpm install          # Install dependencies
 cd apps/x && npm run deps          # Build workspace packages (shared → core → preload)
 cd apps/x && npm run dev           # Development mode (builds deps, runs app)
 cd apps/x && npm run lint          # Lint check
-cd apps/x/apps/main && npm run package   # Production build (.app)
-cd apps/x/apps/main && npm run make      # Create DMG distributable
+cd apps/scholaros/apps/main && npm run package   # Production build (.app)
+cd apps/scholaros/apps/main && npm run make      # Create DMG distributable
 ```
 
 ## Project Structure
 
-The entire codebase is the **Electron desktop app** in `apps/x/`. No other apps exist.
+The entire codebase is the **Electron desktop app** in `apps/scholaros/`. No other apps exist.
 
 ## Electron App Architecture (`apps/x`)
 
 The Electron app is a **nested pnpm workspace** with its own package management.
 
 ```
-apps/x/
+apps/scholaros/
 ├── package.json           # Workspace root, dev scripts
 ├── pnpm-workspace.yaml    # Defines workspace packages
 ├── pnpm-lock.yaml         # Lockfile
@@ -38,8 +38,8 @@ apps/x/
 │   └── preload/           # Electron preload scripts
 │       └── src/
 └── packages/
-    ├── shared/            # @x/shared - Types, utilities, validators
-    └── core/              # @x/core - Business logic, AI, OAuth, MCP
+    ├── shared/            # @scholaros/shared - Types, utilities, validators
+    └── core/              # @scholaros/core - Business logic, AI, OAuth, MCP
 ```
 
 ### Build Order (Dependencies)
@@ -81,15 +81,15 @@ pnpm uses symlinks for workspace packages. Electron Forge's dependency walker ca
 
 | Purpose                  | File                                  |
 | ------------------------ | ------------------------------------- |
-| Electron main entry      | `apps/x/apps/main/src/main.ts`        |
-| React app entry          | `apps/x/apps/renderer/src/main.tsx`   |
-| Forge config (packaging) | `apps/x/apps/main/forge.config.cjs`   |
-| Main process bundler     | `apps/x/apps/main/bundle.mjs`         |
-| Vite config              | `apps/x/apps/renderer/vite.config.ts` |
-| Shared types             | `apps/x/packages/shared/src/`         |
-| Core business logic      | `apps/x/packages/core/src/`           |
-| Workspace config         | `apps/x/pnpm-workspace.yaml`          |
-| Root scripts             | `apps/x/package.json`                 |
+| Electron main entry      | `apps/scholaros/apps/main/src/main.ts`        |
+| React app entry          | `apps/scholaros/apps/renderer/src/main.tsx`   |
+| Forge config (packaging) | `apps/scholaros/apps/main/forge.config.cjs`   |
+| Main process bundler     | `apps/scholaros/apps/main/bundle.mjs`         |
+| Vite config              | `apps/scholaros/apps/renderer/vite.config.ts` |
+| Shared types             | `apps/scholaros/packages/shared/src/`         |
+| Core business logic      | `apps/scholaros/packages/core/src/`           |
+| Workspace config         | `apps/scholaros/pnpm-workspace.yaml`          |
+| Root scripts             | `apps/scholaros/package.json`                 |
 
 ## Feature Deep-Dives
 
@@ -97,11 +97,11 @@ Long-form docs for specific features. Read the relevant file before making chang
 
 | Feature                                                                                                       | Doc                |
 | ------------------------------------------------------------------------------------------------------------- | ------------------ |
-| Track Blocks — auto-updating note content (scheduled / event-driven / manual), Copilot skill, prompts catalog | `apps/x/TRACKS.md` |
+| Track Blocks — auto-updating note content (scheduled / event-driven / manual), Copilot skill, prompts catalog | `apps/scholaros/TRACKS.md` |
 
 ## Design Contract
 
-Before designing or implementing any new feature UI in `apps/x/apps/renderer/src/`, read [design.md](design.md). Treat it as the source of truth for layout, spacing, component choice, colors, empty states, and interaction patterns.
+Before designing or implementing any new feature UI in `apps/scholaros/apps/renderer/src/`, read [design.md](design.md). Treat it as the source of truth for layout, spacing, component choice, colors, empty states, and interaction patterns.
 
 - Start from the shared shell and primitives described there instead of inventing a new visual language.
 - If a new feature needs a reusable visual pattern that is not already documented, add it to [design.md](design.md) before or alongside the implementation.
@@ -118,22 +118,22 @@ Before designing or implementing any new feature UI in `apps/x/apps/renderer/src
 
 ### Add a new shared type
 
-1. Edit `apps/x/packages/shared/src/`
+1. Edit `apps/scholaros/packages/shared/src/`
 2. Run `cd apps/x && npm run deps` to rebuild
 
 ### Modify main process
 
-1. Edit `apps/x/apps/main/src/`
+1. Edit `apps/scholaros/apps/main/src/`
 2. Restart dev server (main doesn't hot-reload)
 
 ### Modify renderer (React UI)
 
-1. Edit `apps/x/apps/renderer/src/`
+1. Edit `apps/scholaros/apps/renderer/src/`
 2. Changes hot-reload automatically in dev mode
 
 ### Add a new dependency to main
 
-1. `cd apps/x/apps/main && pnpm add <package>`
+1. `cd apps/scholaros/apps/main && pnpm add <package>`
 2. Import in source - esbuild will bundle it
 
 ### Verify compilation
@@ -150,10 +150,10 @@ The app requires Electron's preload (`window.electronAPI`), so it **cannot** be 
 
 ```powershell
 # 1. Start the renderer (Vite) in a separate window
-Start-Process pwsh -ArgumentList "-NoExit","-Command","cd 'apps/x/apps/renderer'; npx vite"
+Start-Process pwsh -ArgumentList "-NoExit","-Command","cd 'apps/scholaros/apps/renderer'; npx vite"
 
 # 2. Wait for Vite to be ready, then start Electron with remote debugging
-Start-Process pwsh -ArgumentList "-NoExit","-Command","cd 'apps/x/apps/main'; npx electron --remote-debugging-port=9222 ."
+Start-Process pwsh -ArgumentList "-NoExit","-Command","cd 'apps/scholaros/apps/main'; npx electron --remote-debugging-port=9222 ."
 ```
 
 ### Connecting via Playwright

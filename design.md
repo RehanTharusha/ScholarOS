@@ -37,15 +37,15 @@ If a feature cannot be designed using the rules below, the default response is t
 
 The following files define the current implementation-level design language:
 
-- [apps/x/apps/renderer/src/components/academic/academic-shell.tsx](apps/x/apps/renderer/src/components/academic/academic-shell.tsx)
-- [apps/x/apps/renderer/src/components/ui/button.tsx](apps/x/apps/renderer/src/components/ui/button.tsx)
-- [apps/x/apps/renderer/src/components/ui/badge.tsx](apps/x/apps/renderer/src/components/ui/badge.tsx)
-- [apps/x/apps/renderer/src/components/ui/input.tsx](apps/x/apps/renderer/src/components/ui/input.tsx)
-- [apps/x/apps/renderer/src/components/ui/textarea.tsx](apps/x/apps/renderer/src/components/ui/textarea.tsx)
-- [apps/x/apps/renderer/src/components/ui/select.tsx](apps/x/apps/renderer/src/components/ui/select.tsx)
-- [apps/x/apps/renderer/src/components/tab-bar.tsx](apps/x/apps/renderer/src/components/tab-bar.tsx)
-- [apps/x/apps/renderer/src/components/sidebar-content.tsx](apps/x/apps/renderer/src/components/sidebar-content.tsx)
-- [apps/x/apps/renderer/src/App.css](apps/x/apps/renderer/src/App.css)
+- [apps/scholaros/apps/renderer/src/components/academic/academic-shell.tsx](apps/scholaros/apps/renderer/src/components/academic/academic-shell.tsx)
+- [apps/scholaros/apps/renderer/src/components/ui/button.tsx](apps/scholaros/apps/renderer/src/components/ui/button.tsx)
+- [apps/scholaros/apps/renderer/src/components/ui/badge.tsx](apps/scholaros/apps/renderer/src/components/ui/badge.tsx)
+- [apps/scholaros/apps/renderer/src/components/ui/input.tsx](apps/scholaros/apps/renderer/src/components/ui/input.tsx)
+- [apps/scholaros/apps/renderer/src/components/ui/textarea.tsx](apps/scholaros/apps/renderer/src/components/ui/textarea.tsx)
+- [apps/scholaros/apps/renderer/src/components/ui/select.tsx](apps/scholaros/apps/renderer/src/components/ui/select.tsx)
+- [apps/scholaros/apps/renderer/src/components/tab-bar.tsx](apps/scholaros/apps/renderer/src/components/tab-bar.tsx)
+- [apps/scholaros/apps/renderer/src/components/sidebar-content.tsx](apps/scholaros/apps/renderer/src/components/sidebar-content.tsx)
+- [apps/scholaros/apps/renderer/src/App.css](apps/scholaros/apps/renderer/src/App.css)
 
 If a choice here conflicts with another document, treat the component implementation and this file as higher priority than informal examples elsewhere.
 
