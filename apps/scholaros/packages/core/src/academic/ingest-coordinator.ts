@@ -1,6 +1,10 @@
 /**
- * Ingest coordinator - orchestrates PDF ingestion workflow
- * Handles extraction → parsing → preview → confirmation → commit to wiki
+ * Ingest coordinator — orchestrates document ingestion workflow
+ * Handles extraction → analysis (two-step CoT) → generation → commit
+ *
+ * Adapted from nashsu/llm_wiki two-step CoT pattern (GPL v3):
+ *   Step 1 (Analysis LLM): extract entities, concepts, connections, contradictions
+ *   Step 2 (Generation LLM): generate wiki pages with ---FILE: <path>--- blocks
  */
 
 import { PDFIngester, IngestResult } from "./pdf-ingester.js";
@@ -8,15 +12,16 @@ import { ContradictionDetector } from "./contradiction-detector.js";
 import type { Contradiction as AcademicContradiction } from "@scholaros/shared/dist/academic.js";
 import path from "path";
 import { promises as fs } from "fs";
+import { ReviewStore } from "../knowledge/review-store.js";
+import { IngestCache } from "../knowledge/ingest-cache.js";
+import { IngestQueue } from "../knowledge/ingest-queue.js";
+import { parseFileBlocks } from "../knowledge/file-block-parser.js";
+import { parseReviewBlocks } from "../knowledge/review-parser.js";
 
-/**
- * Sanitize a string for use as a filesystem folder or file name.
- * Removes or replaces characters that are not safe for filenames.
- */
 function sanitize(name: string): string {
   return name
-    .replace(/[/\\?%*:|"<>]/g, "-") // Replace unsafe characters with hyphens
-    .replace(/\s+/g, " ") // Normalize whitespace
+    .replace(/[/\\?%*:|"<>]/g, "-")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -58,7 +63,7 @@ export interface Contradiction {
   source1: string;
   claim2: string;
   source2: string;
-  confidence: number; // 0-1
+  confidence: number;
 }
 
 export interface CommitOptions {
@@ -67,9 +72,12 @@ export interface CommitOptions {
   autoResolution?: "merged" | "superseded" | "both-valid";
 }
 
-/**
- * Main ingest coordinator
- */
+export interface TwoStepCoTResult {
+  pagesCreated: string[];
+  reviewsCreated: number;
+  skipped: boolean;
+}
+
 export class IngestCoordinator {
   private pdfIngester: PDFIngester;
   private contradictionDetector: ContradictionDetector;
@@ -78,33 +86,29 @@ export class IngestCoordinator {
   constructor(
     private vaultPath: string,
     private llmAgent: LlmAgent,
-    private knowledgeGraph: unknown, // Reference to knowledge graph for wiki integration
+    private knowledgeGraph: unknown,
+    private reviewStore?: ReviewStore,
+    private cache?: IngestCache,
+    private queue?: IngestQueue,
   ) {
     this.pdfIngester = new PDFIngester(vaultPath, llmAgent);
     this.contradictionDetector = new ContradictionDetector(llmAgent);
   }
 
-  /**
-   * Step 1: Upload & Extract
-   */
   async extractPDFs(filepaths: string[]): Promise<IngestResult[]> {
     return this.pdfIngester.ingestBatch(filepaths, {
-      courseId: "", // Will be set in orchestrate
+      courseId: "",
       autoTag: false,
       checkContradictions: false,
     });
   }
 
-  /**
-   * Step 2: Generate preview with suggestions
-   */
   async generatePreview(
     extractResults: IngestResult[],
     options: IngestWorkflowOptions,
   ): Promise<IngestPreview> {
     const suggestedConcepts: SuggestedConcept[] = [];
 
-    // Use LLM to suggest concepts from all extracted PDFs
     for (const result of extractResults.filter((r) => r.success)) {
       const chunks = result.metadata.chunks ?? [];
       const chunkPreview =
@@ -157,7 +161,6 @@ Format as JSON array.
       }
     }
 
-    // Check for contradictions if enabled
     let potentialContradictions: Contradiction[] | undefined;
     if (options.checkContradictions && extractResults.length > 1) {
       const detected = await this.contradictionDetector.detect(
@@ -175,7 +178,7 @@ Format as JSON array.
       results: extractResults,
       suggestedConcepts: [
         ...new Map(suggestedConcepts.map((c) => [c.title, c])).values(),
-      ], // Dedupe by title
+      ],
       potentialContradictions,
       summary: {
         total: extractResults.length,
@@ -188,16 +191,10 @@ Format as JSON array.
     return preview;
   }
 
-  /**
-   * Step 3: User reviews preview (UI step - coordinator just stores state)
-   */
   getCurrentPreview(): IngestPreview | undefined {
     return this.currentWorkflow;
   }
 
-  /**
-   * Step 4: Commit changes to wiki
-   */
   async commit(
     courseId: string,
     courseName: string,
@@ -211,7 +208,6 @@ Format as JSON array.
     let created = 0;
     const errors: string[] = [];
 
-    // Create concept pages
     if (
       options.createConceptPages &&
       this.currentWorkflow.suggestedConcepts.length > 0
@@ -244,7 +240,6 @@ Format as JSON array.
       }
     }
 
-    // Handle contradictions
     if (
       options.markContradictions &&
       this.currentWorkflow.potentialContradictions
@@ -252,18 +247,320 @@ Format as JSON array.
       for (const contradiction of this.currentWorkflow
         .potentialContradictions) {
         try {
-          void contradiction;
-          // TODO: create contradiction note or flag in affected concept pages
+          if (this.reviewStore) {
+            this.reviewStore.addItem({
+              type: "contradiction",
+              title: `${contradiction.claim1?.substring(0, 60)}… vs ${contradiction.claim2?.substring(0, 60)}…`,
+              description: `Confidence: ${(contradiction.confidence * 100).toFixed(0)}%\n\n${contradiction.claim1}\n— ${contradiction.source1}\n\nvs\n\n${contradiction.claim2}\n— ${contradiction.source2}`,
+              sourcePath: contradiction.source1,
+              affectedPages: [contradiction.source1, contradiction.source2].filter(Boolean),
+              searchQueries: [contradiction.claim1, contradiction.claim2].filter(Boolean),
+              options: [
+                { label: "Both Valid", action: "both-valid" },
+                { label: "Superseded", action: "superseded" },
+                { label: "Merged", action: "merged" },
+              ],
+            })
+          }
         } catch (e) {
           errors.push(`Failed to mark contradiction: ${e}`);
         }
       }
     }
 
-    // Clear workflow
     this.currentWorkflow = undefined;
-
     return { created, errors };
+  }
+
+  /**
+   * Two-step CoT pipeline (LLM Wiki pattern):
+   *   1. Analysis LLM — extract concepts, connections, contradictions
+   *   2. Generation LLM — produce wiki pages as ---FILE:--- blocks
+   *
+   * Supports PDF, markdown, and plain text sources.
+   * Skips unchanged files via SHA256 cache.
+   * Emits progress events through the ingest queue.
+   */
+  async processWithTwoStepCoT(
+    filepath: string,
+    options: IngestWorkflowOptions & { queueItemId?: string },
+  ): Promise<TwoStepCoTResult> {
+    const emitProgress = async (progress: number, stage: string) => {
+      if (this.queue && options.queueItemId) {
+        await this.queue.updateProgress(options.queueItemId, progress, stage);
+      }
+    };
+
+    await emitProgress(5, "extracting");
+
+    if (this.cache) {
+      await this.cache.load();
+      const unchanged = await this.cache.isUnchanged(filepath);
+      if (unchanged) {
+        return { pagesCreated: [], reviewsCreated: 0, skipped: true };
+      }
+    }
+
+    const ext = path.extname(filepath).toLowerCase();
+    let extractedText: string;
+    let fileName: string;
+
+    if (ext === ".pdf") {
+      const result = await this.pdfIngester.ingestPDF(filepath, {
+        courseId: options.courseId,
+        autoTag: options.autoTag,
+        checkContradictions: false,
+      });
+      if (!result.success) {
+        throw new Error(`Failed to extract PDF: ${result.errors?.join(", ")}`);
+      }
+      extractedText = result.metadata.extractedText;
+      fileName = result.metadata.filename;
+    } else if (ext === ".md" || ext === ".txt") {
+      extractedText = await fs.readFile(filepath, "utf-8");
+      fileName = path.basename(filepath);
+    } else {
+      extractedText = (await fs.readFile(filepath, "utf-8").catch(() => "")) || `[Binary file: ${path.basename(filepath)}]`;
+      fileName = path.basename(filepath);
+    }
+
+    await emitProgress(25, "analyzing");
+
+    const courseContext = options.courseCode
+      ? `Course code: ${options.courseCode}\nSemester: ${options.semester || "N/A"}\nCourse ID: ${options.courseId}`
+      : "";
+
+    const contentPreview = extractedText.substring(0, 8000);
+
+    const analysisResponse = await this.llmAgent.generate(
+      this.buildAnalysisPrompt(fileName, courseContext, contentPreview),
+    );
+
+    let analysis: {
+      concepts: Array<{
+        title: string;
+        description: string;
+        difficulty: string;
+        prerequisites: string[];
+        relatedConcepts: string[];
+      }>;
+      connections: Array<{
+        source: string;
+        target: string;
+        type: string;
+      }>;
+      contradictions: Array<{
+        claim1: string;
+        claim2: string;
+        explanation: string;
+      }>;
+      tags: string[];
+      suggestedCourse: string;
+    };
+
+    try {
+      analysis = JSON.parse(analysisResponse.text);
+    } catch {
+      analysis = {
+        concepts: [],
+        connections: [],
+        contradictions: [],
+        tags: [],
+        suggestedCourse: "",
+      };
+    }
+
+    await emitProgress(50, "generating");
+
+    const courseName =
+      options.courseCode || analysis.suggestedCourse || "General";
+
+    const semester = options.semester || "unknown";
+
+    const generationResponse = await this.llmAgent.generate(
+      this.buildGenerationPrompt(
+        fileName,
+        courseName,
+        semester,
+        courseContext,
+        analysis,
+      ),
+    );
+
+    await emitProgress(75, "writing");
+
+    const fileBlocks = parseFileBlocks(generationResponse.text);
+    const pagesCreated: string[] = [];
+
+    for (const block of fileBlocks) {
+      const absPath = path.join(this.vaultPath, block.path);
+      await fs.mkdir(path.dirname(absPath), { recursive: true });
+      await fs.writeFile(absPath, block.content, "utf-8");
+      pagesCreated.push(block.path);
+    }
+
+    await emitProgress(85, "extracting reviews");
+
+    let reviewsCreated = 0;
+    if (this.reviewStore) {
+      const reviewItems = parseReviewBlocks(generationResponse.text, filepath);
+      if (reviewItems.length > 0) {
+        this.reviewStore.addItems(reviewItems);
+        reviewsCreated = reviewItems.length;
+      }
+
+      for (const c of analysis.contradictions) {
+        this.reviewStore.addItem({
+          type: "contradiction",
+          title:
+            c.explanation || "Contradiction detected in source material",
+          description: `${c.claim1}\n\nvs\n\n${c.claim2}`,
+          sourcePath: filepath,
+          affectedPages: pagesCreated,
+          options: [
+            { label: "Keep Both", action: "keep-both" },
+            { label: "Superseded", action: "superseded" },
+            { label: "Needs Investigation", action: "investigate" },
+          ],
+        });
+      }
+      reviewsCreated += analysis.contradictions.length;
+    }
+
+    await emitProgress(100, "completed");
+
+    if (this.cache) {
+      await this.cache.markChanged(filepath);
+    }
+
+    return { pagesCreated, reviewsCreated, skipped: false };
+  }
+
+  private buildAnalysisPrompt(
+    fileName: string,
+    courseContext: string,
+    contentPreview: string,
+  ): string {
+    return `You are analyzing academic material for a student's knowledge wiki.
+
+Source material: ${fileName}
+${courseContext}
+
+Content:
+${contentPreview}
+
+Analyze this material and extract:
+1. KEY CONCEPTS — the main academic concepts/topics (3-8). For each include:
+   - Title
+   - Brief description (1-2 sentences)
+   - Difficulty level (beginner | intermediate | advanced)
+   - Prerequisite concepts
+   - Related topics
+
+2. CONNECTIONS — how the concepts relate to each other:
+   - Source concept
+   - Target concept
+   - Relationship type (depends-on | extends | contradicts | example-of | part-of)
+
+3. CONTRADICTIONS — any claims that contradict each other or well-known facts
+
+4. COURSE CONTEXT — which course/module this material belongs to, suggested tags
+
+Return as structured JSON:
+{
+  "concepts": [{ "title": "string", "description": "string", "difficulty": "beginner|intermediate|advanced", "prerequisites": ["string"], "relatedConcepts": ["string"] }],
+  "connections": [{ "source": "string", "target": "string", "type": "string" }],
+  "contradictions": [{ "claim1": "string", "claim2": "string", "explanation": "string" }],
+  "tags": ["string"],
+  "suggestedCourse": "string"
+}`;
+  }
+
+  private buildGenerationPrompt(
+    fileName: string,
+    courseName: string,
+    semester: string,
+    courseContext: string,
+    analysis: {
+      concepts: Array<{
+        title: string;
+        description: string;
+        difficulty: string;
+        prerequisites: string[];
+        relatedConcepts: string[];
+      }>;
+      connections: Array<{
+        source: string;
+        target: string;
+        type: string;
+      }>;
+      contradictions: Array<{
+        claim1: string;
+        claim2: string;
+        explanation: string;
+      }>;
+      tags: string[];
+      suggestedCourse: string;
+    },
+  ): string {
+    return `You are generating wiki pages for a student's academic knowledge base.
+
+Course: ${courseName}
+${courseContext}
+Source file: ${fileName}
+
+Based on this analysis of the source material:
+
+Concepts:
+${JSON.stringify(analysis.concepts, null, 2)}
+
+Connections:
+${JSON.stringify(analysis.connections, null, 2)}
+
+Contradictions:
+${JSON.stringify(analysis.contradictions, null, 2)}
+
+Tags: ${analysis.tags.join(", ")}
+
+Generate markdown wiki pages for each concept. Use this format for each page:
+
+---FILE: courses/${sanitize(courseName)}/concepts/{concept-title}.md---
+---
+title: "{Concept Title}"
+type: "concept"
+course: "${courseName}"
+semester: "${semester}"
+difficulty: "{difficulty}"
+tags: []
+prerequisites: []
+created: "${new Date().toISOString()}"
+---
+
+{description}
+
+## Key Points
+
+- [Key point 1]
+- [Key point 2]
+
+## Connections
+
+- Related to: [[{related concept}]]
+
+## Resources
+
+- Source: [[raw/${fileName}]]
+
+---END FILE---
+
+For any contradictions found, include review blocks:
+
+---REVIEW: contradiction | {title} ---
+{explanation}
+OPTIONS: Keep Both | Superseded | Needs Investigation
+---END REVIEW---
+
+Use wiki links [[concept-name]] for cross-references. Generate complete, detailed pages with the academic frontmatter shown above.`;
   }
 
   private fromAcademicContradiction(
@@ -278,9 +575,6 @@ Format as JSON array.
     };
   }
 
-  /**
-   * Format a concept page with frontmatter
-   */
   private formatConceptPage(
     concept: SuggestedConcept,
     courseId: string,

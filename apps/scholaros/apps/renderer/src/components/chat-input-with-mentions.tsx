@@ -84,6 +84,9 @@ const providerDisplayNames: Record<string, string> = {
   aigateway: "AI Gateway",
   "openai-compatible": "OpenAI-Compatible",
   scholaros: "ScholarOS",
+  opencode: "OpenCode",
+  "opencode-zen": "OpenCode Zen",
+  "opencode-go": "OpenCode Go",
 };
 
 type ProviderName =
@@ -94,7 +97,10 @@ type ProviderName =
   | "aigateway"
   | "ollama"
   | "openai-compatible"
-  | "scholaros";
+  | "scholaros"
+  | "opencode"
+  | "opencode-zen"
+  | "opencode-go";
 
 interface ConfiguredModel {
   provider: ProviderName;

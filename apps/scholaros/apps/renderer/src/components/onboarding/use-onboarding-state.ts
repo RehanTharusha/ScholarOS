@@ -24,6 +24,8 @@ export type LlmProviderFlavor =
   | "anthropic"
   | "google"
   | "opencode"
+  | "opencode-zen"
+  | "opencode-go"
   | "openrouter"
   | "aigateway"
   | "ollama"
@@ -101,6 +103,8 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
     anthropic: { apiKey: "", baseURL: "", model: "" },
     google: { apiKey: "", baseURL: "", model: "" },
     opencode: { apiKey: "", baseURL: "", model: "" },
+    "opencode-zen": { apiKey: "", baseURL: "https://opencode.ai/zen/v1", model: "" },
+    "opencode-go": { apiKey: "", baseURL: "https://opencode.ai/zen/go/v1", model: "" },
     openrouter: { apiKey: "", baseURL: "", model: "" },
     aigateway: { apiKey: "", baseURL: "", model: "" },
     ollama: { apiKey: "", baseURL: "http://localhost:11434", model: "" },
@@ -138,6 +142,8 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
     llmProvider === "anthropic" ||
     llmProvider === "google" ||
     llmProvider === "opencode" ||
+    llmProvider === "opencode-zen" ||
+    llmProvider === "opencode-go" ||
     llmProvider === "openrouter" ||
     llmProvider === "aigateway" ||
     llmProvider === "openai-compatible";
@@ -184,6 +190,46 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
     // Check for existing ScholarOS account (OpenRouter key)
     checkExistingConfig();
   }, [open]);
+
+  // Fetch OpenCode models when provider/apiKey changes
+  const currentOpenCodeApiKey = providerConfigs[llmProvider]?.apiKey ?? "";
+  useEffect(() => {
+    if (!open) return;
+    if (llmProvider !== "opencode-zen" && llmProvider !== "opencode-go") return;
+    if (!currentOpenCodeApiKey.trim()) return;
+
+    let cancelled = false;
+
+    async function fetchModels() {
+      try {
+        setModelsLoading(true);
+        const result = await window.ipc.invoke("models:list-opencode", {
+          flavor: llmProvider,
+          apiKey: currentOpenCodeApiKey.trim(),
+        });
+        if (cancelled) return;
+        if (result?.providers?.length) {
+          setModelsCatalog((prev) => {
+            const next = { ...prev };
+            for (const p of result.providers) {
+              next[p.id] = p.models || [];
+            }
+            return next;
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to fetch OpenCode models:", err);
+          setModelsError("Failed to load OpenCode models");
+        }
+      } finally {
+        if (!cancelled) setModelsLoading(false);
+      }
+    }
+
+    fetchModels();
+    return () => { cancelled = true; };
+  }, [open, llmProvider, currentOpenCodeApiKey]);
 
   const checkExistingConfig = useCallback(async () => {
     try {

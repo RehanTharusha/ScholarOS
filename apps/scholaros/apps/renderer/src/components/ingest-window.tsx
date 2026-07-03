@@ -27,6 +27,30 @@ type StagedFile = {
   size?: number;
 };
 
+type QueueItemStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+type QueueItem = {
+  id: string;
+  sourcePath: string;
+  fileName: string;
+  status: QueueItemStatus;
+  progress: number;
+  stage: string;
+  error?: string;
+};
+
+type ProgressEvent = {
+  itemId: string;
+  progress: number;
+  stage: string;
+  fileName: string;
+};
+
 interface IngestWindowProps {
   onProcessIngest?: () => void;
   isProcessing?: boolean;
@@ -38,6 +62,43 @@ function formatFileSize(bytes?: number): string {
   const units = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  queued: "Queued",
+  extracting: "Extracting text…",
+  analyzing: "Analyzing content…",
+  generating: "Generating wiki pages…",
+  writing: "Writing pages…",
+  "extracting reviews": "Extracting review items…",
+  embedding: "Embedding for search…",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
+const STAGE_COLORS: Record<string, string> = {
+  extracting: "bg-blue-500",
+  analyzing: "bg-violet-500",
+  generating: "bg-amber-500",
+  writing: "bg-emerald-500",
+  completed: "bg-green-500",
+  failed: "bg-red-500",
+};
+
+function StageBadge({ stage }: { stage: string }) {
+  const label = STAGE_LABELS[stage] || stage;
+  const color = STAGE_COLORS[stage] || "bg-muted-foreground";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-white",
+        color,
+      )}
+    >
+      {label}
+    </span>
+  );
 }
 
 export function IngestWindow({
@@ -52,10 +113,27 @@ export function IngestWindow({
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
 
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [isPipelineProcessing, setIsPipelineProcessing] = useState(false);
+
   useEffect(() => {
     window.ipc.invoke("workspace:getRoot", null).then(({ root }) => {
       setWorkspaceRoot(root || null);
     });
+  }, []);
+
+  useEffect(() => {
+    const cleanup = window.ipc.on("ingest:progress", (event: unknown) => {
+      const ev = event as ProgressEvent;
+      setQueueItems((prev) =>
+        prev.map((item) =>
+          item.id === ev.itemId
+            ? { ...item, progress: ev.progress, stage: ev.stage }
+            : item,
+        ),
+      );
+    });
+    return cleanup;
   }, []);
 
   const stageFiles = useCallback(async (files: FileList | File[]) => {
@@ -136,7 +214,73 @@ export function IngestWindow({
     fileInputRef.current?.click();
   }, []);
 
+  const handlePipelineProcess = useCallback(async () => {
+    if (stagedFiles.length === 0) return;
+
+    setIsPipelineProcessing(true);
+    setErrors([]);
+
+    try {
+      const result = await window.ipc.invoke("ingest:enqueue", {
+        files: stagedFiles.map((f) => f.targetPath),
+        courseId: "default",
+        courseCode: undefined,
+        semester: undefined,
+      });
+
+      setQueueItems((prev) => {
+        const existingIds = new Set(prev.map((i) => i.id));
+        const newItems = result.items.filter((i) => !existingIds.has(i.id));
+        return [
+          ...prev.map((p) => {
+            const updated = result.items.find((r) => r.id === p.id);
+            return updated || p;
+          }),
+          ...newItems.map((i) => ({
+            id: i.id,
+            sourcePath: i.sourcePath,
+            fileName: i.fileName,
+            status: i.status as QueueItemStatus,
+            progress: i.progress,
+            stage: i.stage,
+            error: i.error,
+          })),
+        ];
+      });
+
+      toast.success(`Queued ${result.items.length} file(s) for processing.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setErrors([message]);
+      toast.error("Failed to queue files for processing.");
+    } finally {
+      setIsPipelineProcessing(false);
+    }
+  }, [stagedFiles]);
+
+  const handleRemoveFile = useCallback(
+    (file: StagedFile) => {
+      setStagedFiles((prev) => prev.filter((f) => f.sourcePath !== file.sourcePath));
+      toast.info(`Removed ${file.name}`);
+    },
+    [],
+  );
+
+  const handleCancelItem = useCallback(async (itemId: string) => {
+    try {
+      await window.ipc.invoke("ingest:cancel", { itemId });
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const hasStagedFiles = stagedFiles.length > 0;
+  const hasQueueItems = queueItems.length > 0;
+  const activeItems = queueItems.filter(
+    (i) => i.status !== "completed" && i.status !== "cancelled",
+  );
+  const completedCount = queueItems.filter((i) => i.status === "completed").length;
+  const failedCount = queueItems.filter((i) => i.status === "failed").length;
 
   return (
     <AcademicPageShell>
@@ -258,6 +402,9 @@ export function IngestWindow({
             >
               {/* File List */}
               <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <p className="mb-3 text-sm font-semibold text-foreground">
+                  Staged Files
+                </p>
                 <div className="space-y-2">
                   {stagedFiles.map((file, index) => (
                     <motion.div
@@ -280,12 +427,7 @@ export function IngestWindow({
                       ) : null}
                       <button
                         className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => {
-                          setStagedFiles((prev) =>
-                            prev.filter((f) => f.sourcePath !== file.sourcePath),
-                          );
-                          toast.info(`Removed ${file.name}`);
-                        }}
+                        onClick={() => handleRemoveFile(file)}
                       >
                         <X className="size-3.5" />
                       </button>
@@ -296,26 +438,48 @@ export function IngestWindow({
 
               {/* Action Area */}
               <div className="flex flex-col items-center gap-3">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1, duration: 0.2 }}
-                >
-                  <Button
-                    size="lg"
-                    onClick={onProcessIngest}
-                    disabled={isProcessing || !onProcessIngest}
-                    className="gap-2 px-8"
+                <div className="flex gap-3">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1, duration: 0.2 }}
                   >
-                    {isProcessing ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="size-4" />
-                    )}
-                    Process Files
-                  </Button>
-                </motion.div>
-                {!isProcessing && (
+                    <Button
+                      size="lg"
+                      onClick={onProcessIngest}
+                      disabled={isProcessing || !onProcessIngest}
+                      className="gap-2 px-8"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-4" />
+                      )}
+                      Process Files
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.15, duration: 0.2 }}
+                  >
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={handlePipelineProcess}
+                      disabled={isPipelineProcessing}
+                      className="gap-2 px-8"
+                    >
+                      {isPipelineProcessing ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Brain className="size-4" />
+                      )}
+                      Wiki Pipeline
+                    </Button>
+                  </motion.div>
+                </div>
+                {!isProcessing && !isPipelineProcessing && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -331,7 +495,7 @@ export function IngestWindow({
           ) : null}
         </AnimatePresence>
 
-        {/* Processing State */}
+        {/* Processing State (agent path) */}
         <AnimatePresence>
           {isProcessing && (
             <motion.div
@@ -357,6 +521,90 @@ export function IngestWindow({
                     Processing: {currentProcessingFile}
                   </p>
                 )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Pipeline Progress */}
+        <AnimatePresence>
+          {hasQueueItems && (
+            <motion.div
+              key="pipeline-progress"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">
+                  Pipeline Progress
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {completedCount} done
+                  {failedCount > 0 ? ` · ${failedCount} failed` : ""}
+                  {activeItems.length > 0
+                    ? ` · ${activeItems.length} active`
+                    : ""}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <div className="space-y-3">
+                  {queueItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col gap-1.5 rounded-xl border border-border bg-muted/20 px-4 py-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {item.fileName}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StageBadge stage={item.stage} />
+                          {item.status === "queued" && (
+                            <button
+                              className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => handleCancelItem(item.id)}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{
+                              width: `${item.progress}%`,
+                            }}
+                            transition={{ duration: 0.3 }}
+                            className={cn(
+                              "h-full rounded-full",
+                              item.status === "failed"
+                                ? "bg-destructive"
+                                : item.status === "completed"
+                                  ? "bg-green-500"
+                                  : "bg-primary",
+                            )}
+                          />
+                        </div>
+                        <span className="w-8 text-right text-[10px] text-muted-foreground">
+                          {item.progress}%
+                        </span>
+                      </div>
+                      {item.error && (
+                        <p className="text-xs text-destructive">
+                          {item.error}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}

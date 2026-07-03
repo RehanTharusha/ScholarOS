@@ -30,8 +30,9 @@ import { ServiceEvent } from "@scholaros/shared/dist/service-events.js";
 import container from "@scholaros/core/dist/di/container.js";
 import { KnowledgeGraphService } from "@scholaros/core/dist/knowledge/graph/service.js";
 import type { KnowledgeGraph } from "@scholaros/core/dist/knowledge/graph/graph.js";
+import { ReviewStore } from "@scholaros/core/dist/knowledge/review-store.js";
 import { listOnboardingModels } from "@scholaros/core/dist/models/models-dev.js";
-import { testModelConnection } from "@scholaros/core/dist/models/models.js";
+import { testModelConnection, listOpenCodeModels } from "@scholaros/core/dist/models/models.js";
 import { isSignedIn } from "@scholaros/core/dist/account/account.js";
 import { listGatewayModels } from "@scholaros/core/dist/models/gateway.js";
 import type { IModelConfigRepo } from "@scholaros/core/dist/models/repo.js";
@@ -46,6 +47,8 @@ import {
 import * as composioHandler from "./composio-handler.js";
 import { search } from "@scholaros/core/dist/search/search.js";
 import { ResearchHandler } from "@scholaros/core/dist/research/research-handler.js";
+import { IngestQueue } from "@scholaros/core/dist/knowledge/ingest-queue.js";
+import { IngestCache } from "@scholaros/core/dist/knowledge/ingest-cache.js";
 import { versionHistory, voice } from "@scholaros/core";
 import { getBillingInfo } from "@scholaros/core/dist/billing/billing.js";
 import { getAccessToken } from "@scholaros/core/dist/auth/tokens.js";
@@ -489,6 +492,70 @@ export function getKnowledgeGraphService(): KnowledgeGraphService | null {
   return kgService;
 }
 
+// Review Store lifecycle
+let reviewStore: ReviewStore | null = null;
+
+export async function initReviewStore(): Promise<void> {
+  if (reviewStore) return;
+  try {
+    reviewStore = new ReviewStore();
+    await reviewStore.load();
+    console.log('[ReviewStore] Loaded');
+  } catch (err) {
+    console.error('[ReviewStore] Failed to load:', err);
+  }
+}
+
+export function getReviewStore(): ReviewStore | null {
+  return reviewStore;
+}
+
+// Ingest Queue lifecycle
+let ingestQueue: IngestQueue | null = null;
+let ingestCache: IngestCache | null = null;
+
+export async function initIngestSystem(): Promise<void> {
+  if (ingestQueue) return;
+  try {
+    ingestQueue = new IngestQueue();
+    await ingestQueue.load();
+
+    ingestCache = new IngestCache();
+    await ingestCache.load();
+
+    // Forward queue events to renderer windows
+    ingestQueue.on("progress", (event) => {
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed() && win.webContents) {
+          win.webContents.send("ingest:progress", event);
+        }
+      }
+    });
+
+    ingestQueue.on("status", (event) => {
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed() && win.webContents) {
+          win.webContents.send("ingest:progress", { ...event, stage: event.status });
+        }
+      }
+    });
+
+    console.log('[Ingest] System initialized');
+  } catch (err) {
+    console.error('[Ingest] Failed to initialize:', err);
+  }
+}
+
+export function getIngestQueue(): IngestQueue | null {
+  return ingestQueue;
+}
+
+export function getIngestCache(): IngestCache | null {
+  return ingestCache;
+}
+
 // ============================================================================
 // Handler Implementations
 // ============================================================================
@@ -587,6 +654,61 @@ export function setupIpcHandlers() {
 
       return { ok: true as const, stagedFiles, errors };
     },
+    "ingest:enqueue": async (_event, args) => {
+      const queue = getIngestQueue();
+      if (!queue) throw new Error("Ingest system not initialized");
+
+      const { root: workspaceRoot } = await workspace.getRoot();
+      const rawDirectory = path.join(workspaceRoot, "raw");
+      await fs.mkdir(rawDirectory, { recursive: true });
+
+      const items: Array<{
+        id: string;
+        sourcePath: string;
+        fileName: string;
+        status: "queued" | "processing" | "completed" | "failed" | "cancelled";
+        retryCount: number;
+        maxRetries: number;
+        progress: number;
+        stage: string;
+        error?: string;
+        createdAt: number;
+        updatedAt: number;
+      }> = [];
+
+      for (const sourcePath of args.files) {
+        const sourceStat = await fs.stat(sourcePath).catch(() => null);
+        if (!sourceStat?.isFile()) continue;
+
+        const originalName = path.basename(sourcePath);
+        const destinationPath = await ensureUniqueWorkspaceDestination(
+          path.join(rawDirectory, originalName),
+        );
+
+        if (path.resolve(sourcePath) !== path.resolve(destinationPath)) {
+          await fs.copyFile(sourcePath, destinationPath).catch(() => {});
+        }
+
+        const itemId = await queue.enqueue(destinationPath, originalName);
+        const qItem = queue.get(itemId);
+        if (qItem) {
+          items.push(qItem);
+        }
+      }
+
+      return { items };
+    },
+    "ingest:cancel": async (_event, args) => {
+      const queue = getIngestQueue();
+      if (!queue) return { success: false };
+      const success = await queue.cancel(args.itemId);
+      return { success };
+    },
+    "ingest:queueStatus": async () => {
+      const queue = getIngestQueue();
+      if (!queue) return { items: [] };
+      return { items: queue.getItems() };
+    },
     "mcp:listTools": async (_event, args) => {
       return mcpCore.listTools(args.serverName, args.cursor);
     },
@@ -658,6 +780,9 @@ export function setupIpcHandlers() {
       const repo = container.resolve<IModelConfigRepo>("modelConfigRepo");
       await repo.setConfig(args);
       return { success: true };
+    },
+    "models:list-opencode": async (_event, args) => {
+      return await listOpenCodeModels(args.flavor, args.apiKey);
     },
     "oauth:connect": async (_event, args) => {
       const credentials =
@@ -1050,6 +1175,20 @@ export function setupIpcHandlers() {
       if (!service) return { runsProcessed: 0, factsExtracted: 0 };
       return service.manualProcess();
     },
+    "knowledge-graph:buildWiki": async (_event, args) => {
+      const { buildWikiGraph } = await import("@scholaros/core/dist/knowledge/wiki-link-graph.js");
+      return buildWikiGraph(args.projectPath);
+    },
+    "knowledge-graph:getInsights": async () => {
+      const { buildWikiGraph } = await import("@scholaros/core/dist/knowledge/wiki-link-graph.js");
+      const { findSurprisingConnections, detectKnowledgeGaps } = await import("@scholaros/core/dist/knowledge/graph-insights.js");
+      const graph = await buildWikiGraph();
+      const insights = {
+        surprisingConnections: findSurprisingConnections(graph.nodes, graph.edges, graph.communities),
+        knowledgeGaps: detectKnowledgeGaps(graph.nodes, graph.edges, graph.communities),
+      };
+      return insights;
+    },
     "knowledge-graph:suggestTopics": async () => {
       const service = getKnowledgeGraphService();
       if (!service) return { topics: [] };
@@ -1072,6 +1211,31 @@ export function setupIpcHandlers() {
         });
 
       return { topics };
+    },
+    // Review System handlers
+    "review:getItems": async (_event, args) => {
+      const store = getReviewStore();
+      if (!store) return { items: [] };
+      const items = store.getItems(args.type);
+      return { items };
+    },
+    "review:resolve": async (_event, args) => {
+      const store = getReviewStore();
+      if (!store) return { success: false };
+      store.resolveItem(args.id, args.action);
+      return { success: true };
+    },
+    "review:dismiss": async (_event, args) => {
+      const store = getReviewStore();
+      if (!store) return { success: false };
+      store.dismissItem(args.id);
+      return { success: true };
+    },
+    "review:clearResolved": async () => {
+      const store = getReviewStore();
+      if (!store) return { success: false };
+      store.clearResolved();
+      return { success: true };
     },
     // Deep Research handlers
     "research:start": async (_event, args) => {

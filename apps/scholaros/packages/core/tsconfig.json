@@ -6,7 +6,8 @@
     "rootDir": "src",
     "types": ["node"],
     "jsx": "react-jsx",
-    "allowJs": true
+    "allowJs": true,
+    "esModuleInterop": true
   },
   "include": ["src"]
 }

@@ -45,8 +45,11 @@ export async function resolveProviderConfig(
   if (name === "scholaros") {
     return { flavor: "scholaros" };
   }
-  if (name === "opencode") {
-    return { flavor: "opencode" };
+  if (name === "opencode" || name === "opencode-zen") {
+    return { flavor: "opencode-zen" };
+  }
+  if (name === "opencode-go") {
+    return { flavor: "opencode-go" };
   }
   const repo = container.resolve<IModelConfigRepo>("modelConfigRepo");
   const cfg = await repo.getConfig();

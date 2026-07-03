@@ -66,6 +66,11 @@ import {
 } from "@/components/ai-elements/prompt-input";
 
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  Reasoning,
+  ReasoningTrigger,
+  ReasoningContent,
+} from "@/components/ai-elements/reasoning";
 import { useSmoothedText } from "./hooks/useSmoothedText";
 import {
   Tool,
@@ -202,7 +207,6 @@ function SmoothStreamingMessage({
 }
 
 const DEFAULT_SIDEBAR_WIDTH = 256;
-const wikiLinkRegex = /\[\[([^[\]]+)\]\]/g;
 const graphPalette = [
   { hue: 210, sat: 72, light: 52 },
   { hue: 28, sat: 78, light: 52 },
@@ -811,6 +815,9 @@ function App() {
   const [conversation, setConversation] = useState<ConversationItem[]>([]);
   const [currentAssistantMessage, setCurrentAssistantMessage] =
     useState<string>("");
+  const [currentReasoningMessage, setCurrentReasoningMessage] =
+    useState<string>("");
+  const reasoningBufferRef = useRef("");
   const [, setModelUsage] = useState<LanguageModelUsage | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const runIdRef = useRef<string | null>(null);
@@ -820,7 +827,7 @@ function App() {
     new Set(),
   );
   const processingRunIdsRef = useRef<Set<string>>(new Set());
-  const streamingBuffersRef = useRef<Map<string, { assistant: string }>>(
+  const streamingBuffersRef = useRef<Map<string, { assistant: string; reasoning: string }>>(
     new Map(),
   );
   const [isStopping, setIsStopping] = useState(false);
@@ -1195,6 +1202,7 @@ function App() {
         runId,
         conversation,
         currentAssistantMessage,
+        currentReasoningMessage,
         currentToolDraftActive,
         pendingAskHumanRequests: new Map(pendingAskHumanRequests),
         allPermissionRequests: new Map(allPermissionRequests),
@@ -1208,6 +1216,7 @@ function App() {
     runId,
     conversation,
     currentAssistantMessage,
+    currentReasoningMessage,
     currentToolDraftActive,
     pendingAskHumanRequests,
     allPermissionRequests,
@@ -2009,6 +2018,11 @@ function App() {
                   .map((part) => part.text || "")
                   .join("");
 
+                const reasoningText = contentParts
+                  .filter((part) => part.type === "reasoning")
+                  .map((part) => ("text" in part ? part.text : "") || "")
+                  .join("");
+
                 const attachmentParts = contentParts.filter(
                   (part) => part.type === "attachment" && part.path,
                 );
@@ -2047,11 +2061,12 @@ function App() {
                   }
                 }
               }
-              if (textContent || msgAttachments) {
+              if (textContent || reasoningText || msgAttachments) {
                 items.push({
                   id: event.messageId,
                   role: msg.role,
                   content: textContent,
+                  reasoning: reasoningText || undefined,
                   attachments: msgAttachments,
                   timestamp: event.ts
                     ? new Date(event.ts).getTime()
@@ -2173,7 +2188,7 @@ function App() {
   const getStreamingBuffer = useCallback((id: string) => {
     const existing = streamingBuffersRef.current.get(id);
     if (existing) return existing;
-    const next = { assistant: "" };
+    const next = { assistant: "", reasoning: "" };
     streamingBuffersRef.current.set(id, next);
     return next;
   }, []);
@@ -2211,6 +2226,8 @@ function App() {
           // Reset voice buffer for new response
           voiceTextBufferRef.current = "";
           spokenIndexRef.current = 0;
+          reasoningBufferRef.current = "";
+          setCurrentReasoningMessage("");
           break;
 
         case "run-processing-end":
@@ -2238,6 +2255,8 @@ function App() {
           if (!isActiveRun) return;
           setIsProcessing(true);
           setCurrentAssistantMessage("");
+          setCurrentReasoningMessage("");
+          reasoningBufferRef.current = "";
           setCurrentToolDraftActive(false);
           setModelUsage(null);
           break;
@@ -2255,6 +2274,10 @@ function App() {
             if (!isActiveRun) {
               if (llmEvent.type === "text-delta" && llmEvent.delta) {
                 appendStreamingBuffer(event.runId, llmEvent.delta);
+              }
+              if (llmEvent.type === "reasoning-delta" && llmEvent.delta) {
+                const buf = getStreamingBuffer(event.runId);
+                buf.reasoning = (buf.reasoning || "") + llmEvent.delta;
               }
               return;
             }
@@ -2300,6 +2323,16 @@ function App() {
                   timestamp: Date.now(),
                 },
               ]);
+            } else if (
+              llmEvent.type === "reasoning-start"
+            ) {
+              reasoningBufferRef.current = "";
+              setCurrentReasoningMessage("");
+            } else if (
+              llmEvent.type === "reasoning-delta" && llmEvent.delta
+            ) {
+              reasoningBufferRef.current += llmEvent.delta;
+              setCurrentReasoningMessage((prev) => prev + llmEvent.delta);
             } else if (llmEvent.type === "finish-step") {
               const nextUsage = normalizeUsage(llmEvent.usage);
               if (nextUsage) {
@@ -2331,6 +2364,8 @@ function App() {
               return;
             }
             if (msg.role === "assistant") {
+              const msgReasoning = reasoningBufferRef.current;
+              reasoningBufferRef.current = "";
               setCurrentAssistantMessage((currentMsg) => {
                 if (currentMsg) {
                   const cleanedContent = currentMsg.replace(/<\/?voice>/g, "");
@@ -2348,6 +2383,7 @@ function App() {
                         id: event.messageId,
                         role: "assistant",
                         content: cleanedContent,
+                        reasoning: msgReasoning || undefined,
                         timestamp: Date.now(),
                       },
                     ];
@@ -2356,6 +2392,7 @@ function App() {
                 return "";
               });
               setCurrentToolDraftActive(false);
+              setCurrentReasoningMessage("");
               clearStreamingBuffer(event.runId);
             }
           }
@@ -2510,6 +2547,8 @@ function App() {
           setPendingPermissionRequests(new Map());
           setPendingAskHumanRequests(new Map());
           // Flush any streaming content as a message
+          const stoppedReasoning = reasoningBufferRef.current;
+          reasoningBufferRef.current = "";
           setCurrentAssistantMessage((currentMsg) => {
             if (currentMsg) {
               setConversation((prev) => [
@@ -2518,12 +2557,14 @@ function App() {
                   id: `assistant-stopped-${Date.now()}`,
                   role: "assistant",
                   content: currentMsg,
+                  reasoning: stoppedReasoning || undefined,
                   timestamp: Date.now(),
                 },
               ]);
             }
             return "";
           });
+          setCurrentReasoningMessage("");
           break;
 
         case "error":
@@ -3215,6 +3256,7 @@ function App() {
     loadRunRequestIdRef.current += 1;
     setConversation(existingResearchItems);
     setCurrentAssistantMessage("");
+    setCurrentReasoningMessage("");
     setCurrentToolDraftActive(false);
     setRunId(null);
     setMessage("");
@@ -3248,6 +3290,7 @@ function App() {
         loadRunRequestIdRef.current += 1;
         setConversation([]);
         setCurrentAssistantMessage("");
+        setCurrentReasoningMessage("");
         setCurrentToolDraftActive(false);
         setRunId(null);
         setMessage("");
@@ -3274,6 +3317,7 @@ function App() {
       setRunId(resolvedRunId);
       setConversation(cached.conversation);
       setCurrentAssistantMessage(cached.currentAssistantMessage);
+      setCurrentReasoningMessage(cached.currentReasoningMessage);
       setCurrentToolDraftActive(cached.currentToolDraftActive);
 
       const pendingPermissions = new Map<
@@ -5251,9 +5295,6 @@ function App() {
     [knowledgeFiles, recentWikiFiles, openWikiLink, ensureWikiFile],
   );
 
-  // Cache graph file contents to avoid re-reading all files on every open
-  const graphContentCacheRef = useRef<Map<string, string>>(new Map());
-
   useEffect(() => {
     if (!isGraphOpen) return;
     let cancelled = false;
@@ -5262,137 +5303,76 @@ function App() {
       setGraphStatus("loading");
       setGraphError(null);
 
-      if (knowledgeFilePaths.length === 0) {
-        setGraphData({ nodes: [], edges: [] });
-        setGraphStatus("ready");
-        return;
-      }
+      try {
+        const result = await window.ipc.invoke("knowledge-graph:buildWiki", {
+          projectPath: undefined,
+        });
 
-      const graphFilePaths = knowledgeFilePaths;
-      const cache = graphContentCacheRef.current;
+        if (cancelled) return;
 
-      // Only read files not already in cache, or re-read all if cache is stale
-      const stalePaths = graphFilePaths.filter((p) => !cache.has(p));
-      if (stalePaths.length > 0) {
-        const fresh = await Promise.all(
-          stalePaths.map(async (path) => {
-            try {
-              const result = await window.ipc.invoke("workspace:readFile", {
-                path,
-              });
-              return { path, data: result.data as string };
-            } catch (err) {
-              console.error("Failed to read file for graph:", path, err);
-              return { path, data: "" };
-            }
-          }),
-        );
-        for (const { path, data } of fresh) {
-          cache.set(path, data);
-        }
-      }
-      // Remove stale entries for files no longer in the graph
-      const currentSet = new Set(graphFilePaths);
-      for (const key of cache.keys()) {
-        if (!currentSet.has(key)) cache.delete(key);
-      }
-
-      const nodeSet = new Set(graphFilePaths);
-      const edges: GraphEdge[] = [];
-      const edgeKeys = new Set<string>();
-
-      const contents = graphFilePaths.map((path) => ({
-        path,
-        data: cache.get(path) ?? "",
-      }));
-
-      for (const { path, data } of contents) {
-        for (const match of data.matchAll(wikiLinkRegex)) {
-          const rawTarget = match[1]?.trim() ?? "";
-          const targetPath = toKnowledgePath(rawTarget);
-          if (!targetPath || targetPath === path) continue;
-          if (!nodeSet.has(targetPath)) continue;
-          const edgeKey =
-            path < targetPath
-              ? `${path}|${targetPath}`
-              : `${targetPath}|${path}`;
-          if (edgeKeys.has(edgeKey)) continue;
-          edgeKeys.add(edgeKey);
-          edges.push({ source: path, target: targetPath });
-        }
-      }
-
-      const degreeMap = new Map<string, number>();
-      edges.forEach((edge) => {
-        degreeMap.set(edge.source, (degreeMap.get(edge.source) ?? 0) + 1);
-        degreeMap.set(edge.target, (degreeMap.get(edge.target) ?? 0) + 1);
-      });
-
-      const groupIndexMap = new Map<string, number>();
-      const getGroupIndex = (group: string) => {
-        const existing = groupIndexMap.get(group);
-        if (existing !== undefined) return existing;
-        const nextIndex = groupIndexMap.size;
-        groupIndexMap.set(group, nextIndex);
-        return nextIndex;
-      };
-      const getNodeGroup = (path: string) => {
-        const normalized = stripKnowledgePrefix(path);
-        const parts = normalized.split("/").filter(Boolean);
-        if (parts.length <= 1) {
-          return { group: "root", depth: 0 };
-        }
-        return {
-          group: parts[0],
-          depth: Math.max(0, parts.length - 2),
+        const groupIndexMap = new Map<string, number>();
+        const getGroupIndex = (community: number) => {
+          const key = `community-${community}`;
+          const existing = groupIndexMap.get(key);
+          if (existing !== undefined) return existing;
+          const nextIndex = groupIndexMap.size;
+          groupIndexMap.set(key, nextIndex);
+          return nextIndex;
         };
-      };
-      const getNodeColors = (groupIndex: number, depth: number) => {
-        const base = graphPalette[groupIndex % graphPalette.length];
-        const light = clampNumber(base.light + depth * 6, 36, 72);
-        const strokeLight = clampNumber(light - 12, 28, 60);
-        return {
-          fill: `hsl(${base.hue} ${base.sat}% ${light}%)`,
-          stroke: `hsl(${base.hue} ${Math.min(80, base.sat + 8)}% ${strokeLight}%)`,
-        };
-      };
 
-      const nodes = graphFilePaths.map((path) => {
-        const degree = degreeMap.get(path) ?? 0;
-        const radius = 6 + Math.min(18, degree * 2);
-        const { group, depth } = getNodeGroup(path);
-        const groupIndex = getGroupIndex(group);
-        const colors = getNodeColors(groupIndex, depth);
-        return {
-          id: path,
-          label: wikiLabel(path) || path,
-          degree,
-          radius,
-          group,
-          color: colors.fill,
-          stroke: colors.stroke,
+        const getNodeColors = (groupIndex: number) => {
+          const base = graphPalette[groupIndex % graphPalette.length];
+          return {
+            fill: `hsl(${base.hue} ${base.sat}% ${base.light}%)`,
+            stroke: `hsl(${base.hue} ${Math.min(80, base.sat + 8)}% ${Math.max(28, base.light - 12)}%)`,
+          };
         };
-      });
 
-      if (!cancelled) {
+        const nodeMap = new Map(result.nodes.map((n) => [n.id, n]));
+
+        const nodes: GraphNode[] = result.nodes.map((n) => {
+          const degree = n.linkCount;
+          const radius = 6 + Math.min(18, degree * 2);
+          const groupIndex = getGroupIndex(n.community);
+          const colors = getNodeColors(groupIndex);
+          return {
+            id: n.path || n.id,
+            label: n.label || n.id,
+            degree,
+            radius,
+            group: n.type || `community-${n.community}`,
+            color: colors.fill,
+            stroke: colors.stroke,
+          };
+        });
+
+        const edges: GraphEdge[] = result.edges.map((e) => {
+          const sourceNode = nodeMap.get(e.source);
+          const targetNode = nodeMap.get(e.target);
+          return {
+            source: sourceNode?.path || e.source,
+            target: targetNode?.path || e.target,
+          };
+        });
+
         setGraphData({ nodes, edges });
         setGraphStatus("ready");
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Failed to build wiki graph:", err);
+        setGraphStatus("error");
+        setGraphError(
+          err instanceof Error ? err.message : "Failed to build wiki graph",
+        );
       }
     };
 
-    buildGraph().catch((err) => {
-      if (cancelled) return;
-      console.error("Failed to build graph:", err);
-      setGraphStatus("error");
-      setGraphError(
-        err instanceof Error ? err.message : "Failed to build graph",
-      );
-    });
+    buildGraph();
 
     return () => {
       cancelled = true;
     };
-  }, [isGraphOpen, knowledgeFilePaths]);
+  }, [isGraphOpen]);
 
   const renderConversationItem = (item: ConversationItem, tabId: string) => {
     if (isChatMessage(item)) {
@@ -5444,6 +5424,12 @@ function App() {
       }
       return (
         <Message key={item.id} from={item.role} data-message-id={item.id}>
+          {item.reasoning && (
+            <Reasoning isStreaming={false} defaultOpen={false}>
+              <ReasoningTrigger />
+              <ReasoningContent>{item.reasoning}</ReasoningContent>
+            </Reasoning>
+          )}
           <MessageContent>
             <MessageResponse components={streamdownComponents}>
               {item.content}
@@ -5575,6 +5561,7 @@ function App() {
       runId,
       conversation,
       currentAssistantMessage,
+      currentReasoningMessage,
       currentToolDraftActive,
       pendingAskHumanRequests,
       allPermissionRequests,
@@ -5585,6 +5572,7 @@ function App() {
       runId,
       conversation,
       currentAssistantMessage,
+      currentReasoningMessage,
       currentToolDraftActive,
       pendingAskHumanRequests,
       allPermissionRequests,
@@ -5611,7 +5599,8 @@ function App() {
   );
   const hasConversation =
     activeChatTabState.conversation.length > 0 ||
-    activeChatTabState.currentAssistantMessage ||
+    activeChatTabState.currentAssistantMessage !== "" ||
+    activeChatTabState.currentReasoningMessage !== "" ||
     activeChatTabState.currentToolDraftActive;
   const isRightPaneContext = Boolean(
     selectedPath ||
@@ -6411,7 +6400,8 @@ function App() {
                           const tabState = getChatTabStateForRender(tab.id);
                           const tabHasConversation =
                             tabState.conversation.length > 0 ||
-                            tabState.currentAssistantMessage;
+                            tabState.currentAssistantMessage !== "" ||
+                            tabState.currentReasoningMessage !== "";
                           const tabConversationContentClassName =
                             tabHasConversation
                               ? "mx-auto w-full max-w-4xl pb-28"
@@ -6552,6 +6542,15 @@ function App() {
                                         />
                                       ))}
 
+                                      {tabState.currentReasoningMessage && (
+                                        <Reasoning isStreaming>
+                                          <ReasoningTrigger />
+                                          <ReasoningContent>
+                                            {tabState.currentReasoningMessage}
+                                          </ReasoningContent>
+                                        </Reasoning>
+                                      )}
+
                                       {tabState.currentToolDraftActive && (
                                         <Message from="assistant">
                                           <MessageContent>
@@ -6579,6 +6578,7 @@ function App() {
 
                                       {isActive &&
                                         isProcessing &&
+                                        !tabState.currentReasoningMessage &&
                                         !tabState.currentAssistantMessage &&
                                         !tabState.currentToolDraftActive && (
                                           <Message from="assistant">

@@ -20,6 +20,7 @@ import {
   stopWorkspaceWatcher,
   initKnowledgeGraphService,
   shutdownKnowledgeGraphService,
+  initReviewStore,
 } from "./ipc.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname } from "node:path";
@@ -316,6 +317,11 @@ app.whenReady().then(async () => {
     // start knowledge graph service
     initKnowledgeGraphService().catch((error) => {
       console.error("[KnowledgeGraph] Failed to start:", error);
+    });
+
+    // start review store
+    initReviewStore().catch((error) => {
+      console.error("[ReviewStore] Failed to start:", error);
     });
 
     app.on("activate", () => {

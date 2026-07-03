@@ -42,7 +42,7 @@ type Step = 0 | 1 | 2 | 3 | 4
 
 type OnboardingPath = 'scholaros' | 'byok' | null
 
-type LlmProviderFlavor = "openai" | "anthropic" | "google" | "opencode" | "openrouter" | "aigateway" | "ollama" | "openai-compatible"
+type LlmProviderFlavor = "openai" | "anthropic" | "google" | "opencode" | "opencode-zen" | "opencode-go" | "openrouter" | "aigateway" | "ollama" | "openai-compatible"
 
 interface LlmModelOption {
   id: string
@@ -64,6 +64,8 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     anthropic: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     google: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     opencode: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
+    "opencode-zen": { apiKey: "", baseURL: "https://opencode.ai/zen/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
+    "opencode-go": { apiKey: "", baseURL: "https://opencode.ai/zen/go/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     openrouter: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     aigateway: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
     ollama: { apiKey: "", baseURL: "http://localhost:11434", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
@@ -112,7 +114,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   )
 
   const activeConfig = providerConfigs[llmProvider]
-  const showApiKey = llmProvider === "openai" || llmProvider === "anthropic" || llmProvider === "google" || llmProvider === "opencode" || llmProvider === "openrouter" || llmProvider === "aigateway" || llmProvider === "openai-compatible"
+  const showApiKey = llmProvider === "openai" || llmProvider === "anthropic" || llmProvider === "google" || llmProvider === "opencode" || llmProvider === "opencode-zen" || llmProvider === "opencode-go" || llmProvider === "openrouter" || llmProvider === "aigateway" || llmProvider === "openai-compatible"
   const requiresApiKey = llmProvider === "openai" || llmProvider === "anthropic" || llmProvider === "google" || llmProvider === "openrouter" || llmProvider === "aigateway"
   const requiresBaseURL = llmProvider === "ollama" || llmProvider === "openai-compatible"
   const showBaseURL = llmProvider === "ollama" || llmProvider === "openai-compatible" || llmProvider === "aigateway"
@@ -180,6 +182,46 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
     loadModels()
   }, [open])
+
+  // Fetch OpenCode models when provider/apiKey changes
+  const currentOpenCodeApiKey = providerConfigs[llmProvider]?.apiKey ?? ""
+  useEffect(() => {
+    if (!open) return
+    if (llmProvider !== "opencode-zen" && llmProvider !== "opencode-go") return
+    if (!currentOpenCodeApiKey.trim()) return
+
+    let cancelled = false
+
+    async function fetchModels() {
+      try {
+        setModelsLoading(true)
+        const result = await window.ipc.invoke("models:list-opencode", {
+          flavor: llmProvider,
+          apiKey: currentOpenCodeApiKey.trim(),
+        })
+        if (cancelled) return
+        if (result?.providers?.length) {
+          setModelsCatalog((prev) => {
+            const next = { ...prev }
+            for (const p of result.providers) {
+              next[p.id] = p.models || []
+            }
+            return next
+          })
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to fetch OpenCode models:", err)
+          setModelsError("Failed to load OpenCode models")
+        }
+      } finally {
+        if (!cancelled) setModelsLoading(false)
+      }
+    }
+
+    fetchModels()
+    return () => { cancelled = true }
+  }, [open, llmProvider, currentOpenCodeApiKey])
 
   // Preferred default models for each provider
   const preferredDefaults: Partial<Record<LlmProviderFlavor, string>> = {
@@ -862,7 +904,8 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
       { id: "anthropic", name: "Anthropic", description: "Use your Anthropic API key" },
       { id: "google", name: "Gemini", description: "Use your Google AI Studio key" },
       { id: "ollama", name: "Ollama (Local)", description: "Run a local model via Ollama" },
-      { id: "opencode", name: "OpenCode", description: "OpenCode models" },
+      { id: "opencode-zen", name: "OpenCode Zen", description: "Curated premium models" },
+      { id: "opencode-go", name: "OpenCode Go", description: "Open models subscription" },
     ]
 
     const moreProviders: Array<{ id: LlmProviderFlavor; name: string; description: string }> = [

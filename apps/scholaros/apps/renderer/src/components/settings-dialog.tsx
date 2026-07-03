@@ -291,7 +291,9 @@ type LlmProviderFlavor =
   | "aigateway"
   | "ollama"
   | "openai-compatible"
-  | "opencode";
+  | "opencode"
+  | "opencode-zen"
+  | "opencode-go";
 
 interface LlmModelOption {
   id: string;
@@ -308,7 +310,8 @@ const primaryProviders: Array<{
   { id: "anthropic", name: "Anthropic", description: "Claude models" },
   { id: "google", name: "Gemini", description: "Google AI Studio" },
   { id: "ollama", name: "Ollama (Local)", description: "Run models locally" },
-  { id: "opencode", name: "OpenCode", description: "OpenCode models" },
+  { id: "opencode-zen", name: "OpenCode Zen", description: "Curated premium models" },
+  { id: "opencode-go", name: "OpenCode Go", description: "Open models subscription" },
 ];
 
 const moreProviders: Array<{
@@ -341,6 +344,8 @@ const preferredDefaults: Partial<Record<LlmProviderFlavor, string>> = {
 const defaultBaseURLs: Partial<Record<LlmProviderFlavor, string>> = {
   ollama: "http://localhost:11434",
   "openai-compatible": "http://localhost:1234/v1",
+  "opencode-zen": "https://opencode.ai/zen/v1",
+  "opencode-go": "https://opencode.ai/zen/go/v1",
 };
 
 function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
@@ -416,9 +421,17 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       meetingNotesModel: "",
       trackBlockModel: "",
     },
-    opencode: {
+    "opencode-zen": {
       apiKey: "",
-      baseURL: "",
+      baseURL: "https://opencode.ai/zen/v1",
+      models: [""],
+      knowledgeGraphModel: "",
+      meetingNotesModel: "",
+      trackBlockModel: "",
+    },
+    "opencode-go": {
+      apiKey: "",
+      baseURL: "https://opencode.ai/zen/go/v1",
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
@@ -445,7 +458,9 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
     provider === "openrouter" ||
     provider === "aigateway" ||
     provider === "openai-compatible" ||
-    provider === "opencode";
+    provider === "opencode" ||
+    provider === "opencode-zen" ||
+    provider === "opencode-go";
   const requiresApiKey =
     provider === "openai" ||
     provider === "anthropic" ||
@@ -455,7 +470,9 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
   const showBaseURL =
     provider === "ollama" ||
     provider === "openai-compatible" ||
-    provider === "aigateway";
+    provider === "aigateway" ||
+    provider === "opencode-zen" ||
+    provider === "opencode-go";
   const requiresBaseURL =
     provider === "ollama" || provider === "openai-compatible";
   const isLocalProvider =
@@ -623,6 +640,46 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
 
     loadModels();
   }, [dialogOpen]);
+
+  // Fetch OpenCode models when provider/apiKey changes
+  const currentOpenCodeApiKey = providerConfigs[provider]?.apiKey ?? "";
+  useEffect(() => {
+    if (!dialogOpen) return;
+    if (provider !== "opencode-zen" && provider !== "opencode-go") return;
+    if (!currentOpenCodeApiKey.trim()) return;
+
+    let cancelled = false;
+
+    async function fetchModels() {
+      try {
+        setModelsLoading(true);
+        const result = await window.ipc.invoke("models:list-opencode", {
+          flavor: provider,
+          apiKey: currentOpenCodeApiKey.trim(),
+        });
+        if (cancelled) return;
+        if (result?.providers?.length) {
+          setModelsCatalog((prev) => {
+            const next = { ...prev };
+            for (const p of result.providers) {
+              next[p.id] = p.models || [];
+            }
+            return next;
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to fetch OpenCode models:", err);
+          setModelsError("Failed to load OpenCode models");
+        }
+      } finally {
+        if (!cancelled) setModelsLoading(false);
+      }
+    }
+
+    fetchModels();
+    return () => { cancelled = true; };
+  }, [dialogOpen, provider, currentOpenCodeApiKey]);
 
   // Set default models from catalog when catalog loads
   useEffect(() => {

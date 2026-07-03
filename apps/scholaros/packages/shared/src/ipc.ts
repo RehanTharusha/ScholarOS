@@ -289,6 +289,26 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
+  "models:list-opencode": {
+    req: z.object({
+      flavor: z.enum(["opencode-zen", "opencode-go"]),
+      apiKey: z.string().optional(),
+    }),
+    res: z.object({
+      providers: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          models: z.array(
+            z.object({
+              id: z.string(),
+              name: z.string().optional(),
+            }),
+          ),
+        }),
+      ),
+    }),
+  },
   "oauth:connect": {
     req: z.object({
       provider: z.string(),
@@ -494,6 +514,68 @@ const ipcSchemas = {
       ),
       errors: z.array(z.string()),
     }),
+  },
+  "ingest:enqueue": {
+    req: z.object({
+      files: z.array(z.string().min(1)).min(1),
+      courseId: z.string(),
+      courseCode: z.string().optional(),
+      semester: z.string().optional(),
+    }),
+    res: z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          sourcePath: z.string(),
+          fileName: z.string(),
+          status: z.enum(["queued", "processing", "completed", "failed", "cancelled"]),
+          retryCount: z.number(),
+          maxRetries: z.number(),
+          progress: z.number(),
+          stage: z.string(),
+          error: z.string().optional(),
+          createdAt: z.number(),
+          updatedAt: z.number(),
+        }),
+      ),
+    }),
+  },
+  "ingest:cancel": {
+    req: z.object({
+      itemId: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+    }),
+  },
+  "ingest:queueStatus": {
+    req: z.null(),
+    res: z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          sourcePath: z.string(),
+          fileName: z.string(),
+          status: z.enum(["queued", "processing", "completed", "failed", "cancelled"]),
+          retryCount: z.number(),
+          maxRetries: z.number(),
+          progress: z.number(),
+          stage: z.string(),
+          error: z.string().optional(),
+          createdAt: z.number(),
+          updatedAt: z.number(),
+        }),
+      ),
+    }),
+  },
+  "ingest:progress": {
+    req: z.object({
+      itemId: z.string(),
+      progress: z.number(),
+      stage: z.string(),
+      fileName: z.string(),
+    }),
+    res: z.null(),
   },
   // Knowledge version history channels
   "knowledge:history": {
@@ -848,6 +930,122 @@ const ipcSchemas = {
           course: z.string().optional(),
         }),
       ),
+    }),
+  },
+  // Wiki-link Knowledge Graph channels
+  "knowledge-graph:buildWiki": {
+    req: z.object({
+      projectPath: z.string().optional(),
+    }),
+    res: z.object({
+      nodes: z.array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          type: z.string(),
+          path: z.string(),
+          linkCount: z.number(),
+          community: z.number(),
+        }),
+      ),
+      edges: z.array(
+        z.object({
+          source: z.string(),
+          target: z.string(),
+          weight: z.number(),
+        }),
+      ),
+      communities: z.array(
+        z.object({
+          id: z.number(),
+          nodeCount: z.number(),
+          cohesion: z.number(),
+          topNodes: z.array(z.string()),
+        }),
+      ),
+    }),
+  },
+  "knowledge-graph:getInsights": {
+    req: z.null(),
+    res: z.object({
+      surprisingConnections: z.array(
+        z.object({
+          source: z.object({
+            id: z.string(),
+            label: z.string(),
+            type: z.string(),
+            path: z.string(),
+            linkCount: z.number(),
+            community: z.number(),
+          }),
+          target: z.object({
+            id: z.string(),
+            label: z.string(),
+            type: z.string(),
+            path: z.string(),
+            linkCount: z.number(),
+            community: z.number(),
+          }),
+          score: z.number(),
+          reasons: z.array(z.string()),
+          key: z.string(),
+        }),
+      ),
+      knowledgeGaps: z.array(
+        z.object({
+          type: z.enum(["isolated-node", "sparse-community", "bridge-node"]),
+          title: z.string(),
+          description: z.string(),
+          nodeIds: z.array(z.string()),
+          suggestion: z.string(),
+        }),
+      ),
+    }),
+  },
+  // Review System channels
+  "review:getItems": {
+    req: z.object({
+      type: z.enum(["contradiction", "duplicate", "missing-page", "confirm", "suggestion"]).optional(),
+    }),
+    res: z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          type: z.enum(["contradiction", "duplicate", "missing-page", "confirm", "suggestion"]),
+          title: z.string(),
+          description: z.string(),
+          sourcePath: z.string().optional(),
+          affectedPages: z.array(z.string()).optional(),
+          searchQueries: z.array(z.string()).optional(),
+          options: z.array(z.object({ label: z.string(), action: z.string() })),
+          resolved: z.boolean(),
+          resolvedAction: z.string().optional(),
+          createdAt: z.number(),
+        }),
+      ),
+    }),
+  },
+  "review:resolve": {
+    req: z.object({
+      id: z.string(),
+      action: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+    }),
+  },
+  "review:dismiss": {
+    req: z.object({
+      id: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+    }),
+  },
+  "review:clearResolved": {
+    req: z.null(),
+    res: z.object({
+      success: z.boolean(),
     }),
   },
   // Deep Research channels

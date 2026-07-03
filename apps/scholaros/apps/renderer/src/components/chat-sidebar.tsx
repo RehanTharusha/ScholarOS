@@ -29,6 +29,11 @@ import {
 } from "@/components/ai-elements/message";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import {
+  Reasoning,
+  ReasoningTrigger,
+  ReasoningContent,
+} from "@/components/ai-elements/reasoning";
+import {
   Tool,
   ToolContent,
   ToolHeader,
@@ -458,7 +463,8 @@ export function ChatSidebar({
   );
   const hasConversation =
     activeTabState.conversation.length > 0 ||
-    Boolean(activeTabState.currentAssistantMessage) ||
+    activeTabState.currentAssistantMessage !== "" ||
+    activeTabState.currentReasoningMessage !== "" ||
     activeTabState.currentToolDraftActive;
 
   const renderConversationItem = (item: ConversationItem, tabId: string) => {
@@ -511,6 +517,12 @@ export function ChatSidebar({
       }
       return (
         <Message key={item.id} from={item.role} data-message-id={item.id}>
+          {item.reasoning && (
+            <Reasoning isStreaming={false} defaultOpen={false}>
+              <ReasoningTrigger />
+              <ReasoningContent>{item.reasoning}</ReasoningContent>
+            </Reasoning>
+          )}
           <MessageContent>
             <MessageResponse components={streamdownComponents}>
               {item.content}
@@ -747,7 +759,8 @@ export function ChatSidebar({
                   const tabState = getTabState(tab.id);
                   const tabHasConversation =
                     tabState.conversation.length > 0 ||
-                    Boolean(tabState.currentAssistantMessage) ||
+                    tabState.currentAssistantMessage !== "" ||
+                    tabState.currentReasoningMessage !== "" ||
                     tabState.currentToolDraftActive;
                   return (
                     <div
@@ -874,6 +887,15 @@ export function ChatSidebar({
                                   />
                                 ))}
 
+                              {tabState.currentReasoningMessage && (
+                                <Reasoning isStreaming>
+                                  <ReasoningTrigger />
+                                  <ReasoningContent>
+                                    {tabState.currentReasoningMessage}
+                                  </ReasoningContent>
+                                </Reasoning>
+                              )}
+
                               {tabState.currentToolDraftActive && (
                                 <Message from="assistant">
                                   <MessageContent>
@@ -899,6 +921,7 @@ export function ChatSidebar({
 
                               {isActive &&
                                 isProcessing &&
+                                !tabState.currentReasoningMessage &&
                                 !tabState.currentAssistantMessage &&
                                 !tabState.currentToolDraftActive && (
                                   <Message from="assistant">

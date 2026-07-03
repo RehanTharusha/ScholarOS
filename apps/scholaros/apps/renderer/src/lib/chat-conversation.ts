@@ -18,6 +18,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  reasoning?: string;
   attachments?: MessageAttachment[];
   timestamp: number;
 }
@@ -45,6 +46,7 @@ export type ChatTabViewState = {
   runId: string | null;
   conversation: ConversationItem[];
   currentAssistantMessage: string;
+  currentReasoningMessage: string;
   currentToolDraftActive: boolean;
   pendingAskHumanRequests: Map<string, z.infer<typeof AskHumanRequestEvent>>;
   allPermissionRequests: Map<
@@ -98,6 +100,7 @@ export const createEmptyChatTabViewState = (): ChatTabViewState => ({
   runId: null,
   conversation: [],
   currentAssistantMessage: "",
+  currentReasoningMessage: "",
   currentToolDraftActive: false,
   pendingAskHumanRequests: new Map(),
   allPermissionRequests: new Map(),
