@@ -1,0 +1,80 @@
+{
+  "cards": [
+    {
+      "id": "wYPOQobkHXAS",
+      "noteSource": "Bio 301 - Lecture 5",
+      "course": "Bio 301",
+      "topic": "Osmosis & Diffusion",
+      "question": "What is the primary difference between osmosis and simple diffusion?",
+      "answer": "Osmosis is the movement of water molecules through a selectively permeable membrane from a region of lower solute concentration to higher solute concentration. Simple diffusion is the movement of any molecule from high to low concentration and does not require a membrane.",
+      "type": "qa",
+      "interval": 0,
+      "easeFactor": 2.5,
+      "repetitions": 0,
+      "lastReview": null,
+      "nextReview": "2026-07-06T21:02:52.054Z",
+      "lastQuality": null
+    },
+    {
+      "id": "O5LXY75wJcfk",
+      "noteSource": "Math 201 - Chapter 4",
+      "course": "Math 201",
+      "topic": "Linear Transformations",
+      "question": "What defines a linear transformation T: V → W?",
+      "answer": "A linear transformation satisfies two properties: T(u + v) = T(u) + T(v) for all u,v in V (additivity), and T(cu) = cT(u) for all scalars c and vectors u in V (homogeneity).",
+      "type": "qa",
+      "interval": 0,
+      "easeFactor": 2.5,
+      "repetitions": 0,
+      "lastReview": null,
+      "nextReview": "2026-07-06T21:02:52.054Z",
+      "lastQuality": null
+    },
+    {
+      "id": "mN44kV3um0D1",
+      "noteSource": "Bio 301 - Lecture 7",
+      "course": "Bio 301",
+      "topic": "Cell Cycle Regulation",
+      "question": "What role do cyclin-dependent kinases (CDKs) play in the cell cycle?",
+      "answer": "CDKs are enzymes that phosphorylate target proteins to drive the cell through different phases of the cell cycle. They are activated by binding to cyclins, whose concentrations oscillate throughout the cycle. Different cyclin-CDK complexes regulate different transitions (G1/S, G2/M).",
+      "type": "qa",
+      "interval": 0,
+      "easeFactor": 2.5,
+      "repetitions": 0,
+      "lastReview": null,
+      "nextReview": "2026-07-06T21:02:52.054Z",
+      "lastQuality": null
+    },
+    {
+      "id": "AhgJJCRF3emw",
+      "noteSource": "Bio 301 - Lecture 8",
+      "course": "Bio 301",
+      "topic": "The Krebs Cycle",
+      "question": "What are the net products of one turn of the Krebs (citric acid) cycle?",
+      "answer": "One turn of the Krebs cycle yields: 3 NADH, 1 FADH2, 1 GTP (or ATP), and 2 CO2. The cycle also regenerates oxaloacetate to combine with the next acetyl-CoA.",
+      "type": "qa",
+      "interval": 0,
+      "easeFactor": 2.5,
+      "repetitions": 0,
+      "lastReview": null,
+      "nextReview": "2026-07-06T21:02:52.054Z",
+      "lastQuality": null
+    },
+    {
+      "id": "iIrsToK4dMej",
+      "noteSource": "CS 450 - Lecture 3",
+      "course": "CS 450",
+      "topic": "Algorithm Complexity",
+      "question": "What is the difference between O(n), Ω(n), and Θ(n) notation?",
+      "answer": "O(n) (Big-O) is an upper bound — the algorithm runs in at most n time. Ω(n) (Big-Omega) is a lower bound — the algorithm takes at least n time. Θ(n) (Big-Theta) is a tight bound — the algorithm grows exactly like n for sufficiently large inputs.",
+      "type": "qa",
+      "interval": 0,
+      "easeFactor": 2.5,
+      "repetitions": 0,
+      "lastReview": null,
+      "nextReview": "2026-07-06T21:02:52.054Z",
+      "lastQuality": null
+    }
+  ],
+  "sessions": []
+}
