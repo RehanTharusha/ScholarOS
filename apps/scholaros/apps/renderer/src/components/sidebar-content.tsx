@@ -84,7 +84,7 @@ import {
 } from "@/contexts/sidebar-context";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { CourseSidebar } from "@/components/course-sidebar";
-import { toast } from "@/lib/toast";
+import { toast } from "sonner";
 import { useBilling } from "@/hooks/useBilling";
 
 /**

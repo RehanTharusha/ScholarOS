@@ -56,6 +56,7 @@ import {
   saveVaultPath,
   getVaultPath,
   clearVaultPath,
+  clearWorkDir,
   listVaults,
   addVault,
   removeVault,
@@ -1175,16 +1176,13 @@ export function setupIpcHandlers() {
               }
             }
           } else {
-            // Last vault removed — reset to default (no vault)
+            // Last vault removed — no vault active, disable workspace
             clearVaultPath();
-            refreshWorkDir();
+            clearWorkDir();
             stopWorkspaceWatcher();
-            await startWorkspaceWatcher();
             stopRunsWatcher();
-            await startRunsWatcher();
             stopServicesWatcher();
-            await startServicesWatcher();
-            try { emitVaultChanged(WorkDir); } catch (err) {
+            try { emitVaultChanged(""); } catch (err) {
               console.warn("[Vault] Failed to emit vault change:", err);
             }
           }

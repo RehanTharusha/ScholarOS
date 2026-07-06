@@ -85,6 +85,7 @@ import { PermissionRequest } from "@/components/ai-elements/permission-request";
 import { AskHumanRequest } from "@/components/ai-elements/ask-human-request";
 import { Suggestions } from "@/components/ai-elements/suggestions";
 import { StudyDashboard } from "@/components/study-dashboard";
+import { VaultPickerDashboard } from "@/components/vault-picker-dashboard";
 import { ReviewSession } from "@/components/review-session";
 import {
   ToolPermissionRequestEvent,
@@ -1263,6 +1264,9 @@ function App() {
   // Workspace root for full paths
   const [workspaceRoot, setWorkspaceRoot] = useState<string>("");
 
+  // Whether a vault is currently active (no vault = picker screen)
+  const [hasVault, setHasVault] = useState(true);
+
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -1454,15 +1458,22 @@ function App() {
       );
   }, []);
 
-  // Load initial tree
+  // Load initial tree (skip if no vault yet — vault:changed will trigger load)
   useEffect(() => {
+    if (!hasVault) return;
     loadDirectory().then(setTree);
-  }, [loadDirectory]);
+  }, [loadDirectory, hasVault]);
 
   // Refresh workspace state when vault changes
   useEffect(() => {
     const cleanup = window.ipc.on("vault:changed", async (event) => {
       console.debug("[Renderer] vault:changed received ->", event.path);
+      if (!event.path) {
+        setHasVault(false);
+        resetWorkspaceState("");
+        return;
+      }
+      setHasVault(true);
       resetWorkspaceState(event.path);
       await window.ipc
         .invoke("workspace:mkdir", { path: "bases", recursive: true })
@@ -4924,10 +4935,14 @@ function App() {
     return visible;
   }, [knowledgeFiles, expandedPaths]);
 
-  // Load workspace root on mount
+  // Load workspace root and vault status on mount
   useEffect(() => {
-    window.ipc.invoke("workspace:getRoot", null).then((result) => {
-      setWorkspaceRoot(result.root);
+    Promise.all([
+      window.ipc.invoke("workspace:getRoot", null),
+      window.ipc.invoke("vault:getPath", null),
+    ]).then(([rootResult, vaultResult]) => {
+      setWorkspaceRoot(rootResult.root);
+      setHasVault(!!vaultResult.path);
     });
   }, []);
 
@@ -5709,7 +5724,7 @@ function App() {
               } as React.CSSProperties
             }
           >
-            <SidebarContentPanel
+            {hasVault && <SidebarContentPanel
               tree={sidebarTree}
               selectedPath={selectedPath}
               expandedPaths={expandedPaths}
@@ -5863,7 +5878,7 @@ function App() {
               onOpenCalendar={() => {
                 void navigateToView({ type: "calendar" });
               }}
-            />
+            />}
             <SidebarInset
               className={cn(
                 "overflow-hidden! min-h-0 min-w-0 transition-[max-width] duration-200 ease-linear",
@@ -6093,7 +6108,11 @@ function App() {
                 transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex-1 flex flex-col min-h-0 overflow-hidden"
               >
-                {isBrowserOpen ? (
+                {!hasVault ? (
+                  <VaultPickerDashboard
+                    onRunOnboarding={() => setShowOnboarding(true)}
+                  />
+                ) : isBrowserOpen ? (
                   <BrowserPane onClose={handleCloseBrowser} />
                 ) : isArtifactsOpen ? (
                   <ArtifactsView
@@ -6817,9 +6836,11 @@ function App() {
               />
             )}
             {/* Rendered last so its no-drag region paints over the sidebar drag region */}
-            <FixedSidebarToggle
-              leftInsetPx={isMac ? MACOS_TRAFFIC_LIGHTS_RESERVED_PX : 0}
-            />
+            {hasVault && (
+              <FixedSidebarToggle
+                leftInsetPx={isMac ? MACOS_TRAFFIC_LIGHTS_RESERVED_PX : 0}
+              />
+            )}
           </SidebarProvider>
         </div>
         <CommandPalette

@@ -134,6 +134,7 @@ export function statToSchema(
  * Ensure workspace root exists
  */
 export async function ensureWorkspaceRoot(): Promise<void> {
+  if (!WorkDir) return;
   await fs.mkdir(WorkDir, { recursive: true });
   await fs.mkdir(getScholarOSDir(), { recursive: true });
 }
@@ -143,6 +144,7 @@ export async function ensureWorkspaceRoot(): Promise<void> {
 // ============================================================================
 
 export async function getRoot(): Promise<{ root: string }> {
+  if (!WorkDir) return { root: "" };
   await ensureWorkspaceRoot();
   return { root: WorkDir };
 }

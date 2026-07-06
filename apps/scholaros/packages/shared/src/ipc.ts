@@ -155,6 +155,7 @@ const ipcSchemas = {
     req: z.null(),
     res: z.object({
       success: z.boolean(),
+      id: z.string().optional(),
       vaults: z
         .array(
           z.object({
@@ -172,6 +173,7 @@ const ipcSchemas = {
     req: z.null(),
     res: z.object({
       success: z.boolean(),
+      id: z.string().optional(),
       vaults: z
         .array(
           z.object({

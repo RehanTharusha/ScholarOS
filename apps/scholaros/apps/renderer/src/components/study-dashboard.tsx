@@ -4,6 +4,7 @@ import { Clock, Layers, Flame, Target, LayoutDashboard, MessageSquare } from "lu
 import { cn } from "@/lib/utils";
 import { ReviewButton } from "@/components/review-button";
 import { loadReviewData, getDueCards, getCardStats, type Flashcard, type ReviewSession } from "@/lib/spaced-repetition";
+import { getGreeting } from "@/lib/greeting";
 
 // ---------------------------------------------------------------------------
 // Display item types
@@ -28,17 +29,6 @@ interface UpcomingItem {
   topic: string;
   course: string;
   nextReview: string;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getGreeting(): { greeting: string; emoji: string } {
-  const h = new Date().getHours();
-  if (h < 12) return { greeting: "Good morning", emoji: "\u2600\uFE0F" };
-  if (h < 17) return { greeting: "Good afternoon", emoji: "\uD83C\uDF3F" };
-  return { greeting: "Good evening", emoji: "\uD83C\uDF19" };
 }
 
 function statusDot(status: ReviewItem["status"]) {

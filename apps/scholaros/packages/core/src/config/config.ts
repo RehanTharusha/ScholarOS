@@ -121,6 +121,15 @@ export const GlobalConfigDir = path.join(homedir(), ".scholarOS", "config");
 export let WorkDir = resolveWorkDir();
 
 /**
+ * Set WorkDir to an empty string (no vault active).
+ * Any workspace operations will short-circuit gracefully.
+ */
+export function clearWorkDir(): void {
+  WorkDir = "";
+  console.log("[Config] WorkDir cleared (no vault active)");
+}
+
+/**
  * Refresh WorkDir value by re-resolving vault config and ensuring directories exist
  */
 export function refreshWorkDir(): void {
@@ -235,7 +244,7 @@ export function listVaults(): { vaults: VaultsConfig["vaults"]; activeVaultId: s
  * Add a vault path to the vaults list.
  * Generates an ID and derives the display name from the folder name.
  */
-export function addVault(vaultPath: string): { vaults: VaultsConfig["vaults"]; activeVaultId: string | null } {
+export function addVault(vaultPath: string): { vaults: VaultsConfig["vaults"]; activeVaultId: string | null; id: string } {
   const config = readVaultsConfig();
   const expandedPath = path.resolve(
     vaultPath.startsWith("~/") || vaultPath.startsWith("~\\")
@@ -244,11 +253,12 @@ export function addVault(vaultPath: string): { vaults: VaultsConfig["vaults"]; a
   );
   // Skip if already added
   const existing = config.vaults.find((v) => v.path === expandedPath);
-  if (existing) return { vaults: config.vaults, activeVaultId: config.activeVaultId };
+  if (existing) return { vaults: config.vaults, activeVaultId: config.activeVaultId, id: existing.id };
+  const id = generateVaultId();
   const name = expandedPath.split(/[\\/]/).pop() || "Vault";
-  config.vaults.push({ id: generateVaultId(), name, path: expandedPath });
+  config.vaults.push({ id, name, path: expandedPath });
   writeVaultsConfig(config);
-  return { vaults: config.vaults, activeVaultId: config.activeVaultId };
+  return { vaults: config.vaults, activeVaultId: config.activeVaultId, id };
 }
 
 /**
