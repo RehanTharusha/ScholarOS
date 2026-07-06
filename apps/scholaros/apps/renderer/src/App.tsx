@@ -5903,6 +5903,7 @@ function App() {
                 canNavigateForward={canNavigateForward}
                 collapsedLeftPaddingPx={collapsedLeftPaddingPx}
               >
+                {hasVault && <>
                 {!isFocusMode && (
                   <>
                 {(selectedPath ||
@@ -6097,6 +6098,7 @@ function App() {
                     {isFocusMode ? "Exit focus mode (Shift+Cmd+F)" : "Focus mode (Shift+Cmd+F)"}
                   </TooltipContent>
                 </Tooltip>
+                </>}
               </ContentHeader>
 
               <AnimatePresence mode="wait">
