@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tool Call Grouping — ScholarOS Prototype</title>
+  <style>
+    /* ═══════════════════════════════════════════════════════════════
+       SCHOLAROS THEME TOKENS — exact values from App.css
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* Light theme (default) */
+    :root {
+      --bg: #FDFDFC;
+      --bg-card: #ffffff;
+      --bg-muted: #F7F6F3;
+      --border: #E9E9E7;
+      --border-subtle: #F0EFED;
+      --text: oklch(0.145 0 0);
+      --text-muted: oklch(0.556 0 0);
+      --text-dim: oklch(0.7 0 0);
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --green-border: #bbf7d0;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --red-border: #fecaca;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-full: 9999px;
+
+      /* transitions-dev tokens */
+      --resize-dur: 300ms;
+      --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --panel-open-dur: 350ms;
+      --panel-close-dur: 250ms;
+      --panel-blur: 2px;
+      --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --check-opacity-dur: 550ms;
+      --check-rotate-dur: 550ms;
+      --check-rotate-from: 80deg;
+      --check-bob-dur: 450ms;
+      --check-y-amount: 20px;
+      --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+      --icon-swap-dur: 200ms;
+      --icon-swap-blur: 2px;
+      --icon-swap-start-scale: 0.25;
+      --icon-swap-ease: ease-in-out;
+    }
+
+    /* Paper theme — warm parchment, serif-led */
+    html.paper {
+      --bg: #f5f4ed;
+      --bg-card: #faf9f5;
+      --bg-muted: #e8e6dc;
+      --border: #e8e6dc;
+      --border-subtle: #ebe9e0;
+      --text: #3d3d3a;
+      --text-muted: #6b6a64;
+      --text-dim: #9a9890;
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --green-border: #bbf7d0;
+      --red: var(--error-color, oklch(0.577 0.245 27.325));
+      --red-bg: #fef2f2;
+      --red-border: #fecaca;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+    }
+    html.paper body {
+      font-family: "Charter", "Georgia", "Palatino", "Times New Roman", serif;
+    }
+    html.paper .tool-row-name code,
+    html.paper .tool-detail-content {
+      font-family: "SF Mono", "Fira Code", "Menlo", monospace;
+    }
+
+    /* Dark theme — warm dark with ink tones */
+    html.dark {
+      --bg: #1F1E1B;
+      --bg-card: #23221F;
+      --bg-muted: #2D2B27;
+      --border: #34322D;
+      --border-subtle: #2D2B27;
+      --text: #E6E1D8;
+      --text-muted: oklch(0.708 0 0);
+      --text-dim: oklch(0.55 0 0);
+      --green: #22c55e;
+      --green-bg: oklch(0.25 0.04 150);
+      --green-border: oklch(0.35 0.06 150);
+      --red: oklch(0.704 0.191 22.216);
+      --red-bg: oklch(0.25 0.04 25);
+      --red-border: oklch(0.35 0.06 25);
+      --amber: #f59e0b;
+      --amber-bg: oklch(0.25 0.04 70);
+      --amber-border: oklch(0.35 0.06 70);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       BASE
+       ═══════════════════════════════════════════════════════════════ */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 32px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 32px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SCENE — simulates a chat message from the AI
+       ═══════════════════════════════════════════════════════════════ */
+    .scene {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .scene-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+    .scene-chat {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       TOOL GROUP — the main component
+       ═══════════════════════════════════════════════════════════════ */
+    .tool-group {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 12px 0;
+      transition:
+        border-color var(--resize-dur) var(--resize-ease),
+        box-shadow var(--resize-dur) var(--resize-ease);
+    }
+    .tool-group:hover {
+      border-color: color-mix(in oklch, var(--border) 70%, var(--text) 30%);
+    }
+
+    /* ── Group Header ──────────────────────────────────────────── */
+    .tool-group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--resize-dur) var(--resize-ease);
+    }
+    .tool-group-header:hover {
+      background: var(--bg-muted);
+    }
+
+    .tool-group-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+    }
+    .tool-group-icon.all-completed {
+      background: var(--green-bg);
+      color: var(--green);
+    }
+    .tool-group-icon.has-errors {
+      background: var(--red-bg);
+      color: var(--red);
+    }
+    .tool-group-icon.in-progress {
+      background: var(--amber-bg);
+      color: var(--amber);
+    }
+
+    /* ── 10-success-check.md (verbatim) ─────────────────────────── */
+    .t-success-check {
+      display: inline-block;
+      transform-origin: center;
+      opacity: 0;
+      will-change: transform, opacity, filter;
+    }
+    .t-success-check svg { display: block; overflow: visible; }
+    .t-success-check svg path {
+      stroke-dasharray: 20;
+      stroke-dashoffset: 20;
+    }
+    .t-success-check[data-state="in"] {
+      animation:
+        t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) forwards,
+        t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  forwards,
+        t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     forwards,
+        t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     forwards;
+    }
+    .t-success-check[data-state="in"] svg path {
+      animation: t-check-draw var(--check-path-dur) var(--check-ease-path) var(--check-path-delay, 0ms) forwards;
+    }
+    @keyframes t-check-fade   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes t-check-rotate { from { transform: rotate(var(--check-rotate-from)); } to { transform: rotate(0deg); } }
+    @keyframes t-check-blur   { from { filter: blur(var(--check-blur-from)); } to { filter: blur(0); } }
+    @keyframes t-check-bob    { from { translate: 0 var(--check-y-amount); } to { translate: 0 0; } }
+    @keyframes t-check-draw   { to { stroke-dashoffset: 0; } }
+
+    .tool-group-title {
+      flex: 1;
+      min-width: 0;
+    }
+    .tool-group-title-main {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tool-group-title-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* progress bar */
+    .tool-group-progress {
+      width: 80px;
+      height: 4px;
+      background: var(--border);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .tool-group-progress-bar {
+      height: 100%;
+      background: var(--green);
+      border-radius: var(--radius-full);
+      transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* status pill */
+    .tool-group-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      flex-shrink: 0;
+    }
+    .tool-group-status.completed {
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid var(--green-border);
+    }
+    .tool-group-status.running {
+      background: var(--amber-bg);
+      color: var(--amber);
+      border: 1px solid var(--amber-border);
+    }
+    .tool-group-status.error {
+      background: var(--red-bg);
+      color: var(--red);
+      border: 1px solid var(--red-border);
+    }
+
+    /* chevron */
+    .tool-group-chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--text-dim);
+      transition: transform var(--resize-dur) var(--resize-ease);
+      flex-shrink: 0;
+    }
+    .tool-group.open .tool-group-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* ── Group Body (expandable) ────────────────────────────────── */
+    .tool-group-body {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--resize-dur) var(--resize-ease);
+    }
+    .tool-group-body > div {
+      overflow: hidden;
+    }
+    .tool-group.open .tool-group-body {
+      grid-template-rows: 1fr;
+    }
+
+    .tool-group-body-inner {
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    /* ── Individual Tool Row ────────────────────────────────────── */
+    .tool-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background 150ms ease;
+    }
+    .tool-row:last-child {
+      border-bottom: none;
+    }
+    .tool-row:hover {
+      background: var(--bg-muted);
+    }
+
+    /* status dot */
+    .tool-row-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background var(--icon-swap-dur) var(--icon-swap-ease);
+    }
+    .tool-row-dot.completed { background: var(--green); }
+    .tool-row-dot.running {
+      background: var(--amber);
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    .tool-row-dot.error { background: var(--red); }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    /* ── 12-error-state-shake.md (verbatim) ───────────────────── */
+    :root {
+      --shake-x: -6px;
+      --shake-dur-a: 80ms;
+      --shake-dur-b: 60ms;
+      --shake-color: var(--red, #dc2626);
+    }
+    .t-input-wrap.is-error {
+      position: relative;
+      isolation: isolate;
+    }
+    .t-input-wrap.is-error::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      border: 1.5px solid var(--shake-color);
+      opacity: 0;
+      pointer-events: none;
+      z-index: -1;
+      transition: opacity var(--shake-dur-a) var(--shake-dur-b);
+    }
+    .t-input-wrap.is-error.is-shaking::after {
+      opacity: 1;
+    }
+    .t-input.is-shaking {
+      animation:
+        t-shake-a var(--shake-dur-a) ease-in-out infinite alternate,
+        t-shake-b var(--shake-dur-b) ease-in-out infinite alternate;
+    }
+    @keyframes t-shake-a {
+      from { translate: var(--shake-x) 0; }
+      to   { translate: calc(var(--shake-x) * -1) 0; }
+    }
+    @keyframes t-shake-b {
+      from { translate: 0 var(--shake-x); }
+      to   { translate: 0 calc(var(--shake-x) * -1); }
+    }
+    .t-error-msg {
+      color: var(--shake-color);
+      opacity: 0;
+      transition: opacity var(--shake-dur-a) var(--shake-dur-b);
+    }
+    .t-input-wrap.is-error.is-shaking .t-error-msg { opacity: 1; }
+
+    /* vertical connector line */
+    .tool-row-name {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tool-row-name code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      background: var(--bg-muted);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    .tool-row-time {
+      font-size: 11px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    /* ── Tool Detail Panel (expandable inline) ───────────────────── */
+    .tool-detail {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--panel-close-dur) var(--panel-ease);
+    }
+    .tool-detail > div {
+      overflow: hidden;
+    }
+    .tool-detail.open {
+      grid-template-rows: 1fr;
+      transition: grid-template-rows var(--panel-open-dur) var(--panel-ease);
+    }
+    .tool-detail-inner {
+      padding: 8px 14px 12px 32px;
+      background: var(--bg-muted);
+      border-top: 1px solid var(--border-subtle);
+      font-size: 12px;
+    }
+    .tool-detail-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 8px;
+    }
+    .tool-detail-tab {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border: none;
+      background: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 150ms ease, border-color 150ms ease;
+    }
+    .tool-detail-tab:hover { color: var(--text-muted); }
+    .tool-detail-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+    .tool-detail-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      max-height: 180px;
+      overflow: auto;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text-muted);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       STANDALONE TOOL CARD (for comparison)
+       ═══════════════════════════════════════════════════════════════ */
+    .tool-card-standalone {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin: 8px 0;
+      overflow: hidden;
+    }
+    .tool-card-standalone-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+    }
+    .tool-card-standalone-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tool-card-standalone-left svg {
+      width: 16px;
+      height: 16px;
+      color: var(--text-dim);
+    }
+    .tool-card-standalone-name {
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .tool-card-standalone-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid var(--green-border);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       CONTROLS
+       ═══════════════════════════════════════════════════════════════ */
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .btn {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+    .btn:hover {
+      background: var(--bg-muted);
+    }
+    .btn.primary {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+    }
+    .btn.primary:hover {
+      opacity: 0.9;
+    }
+
+    /* ── Theme Switcher ────────────────────────────────────────── */
+    .theme-switcher {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-left: auto;
+    }
+    .theme-btn {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border: none;
+      background: var(--bg-card);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease;
+      border-right: 1px solid var(--border);
+    }
+    .theme-btn:last-child { border-right: none; }
+    .theme-btn:hover { background: var(--bg-muted); }
+    .theme-btn.active {
+      background: var(--text);
+      color: var(--bg);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       COMPARISON SECTION
+       ═══════════════════════════════════════════════════════════════ */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 32px;
+    }
+    .comparison-col {
+      min-width: 0;
+    }
+    .comparison-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       REDUCED MOTION
+       ═══════════════════════════════════════════════════════════════ */
+    @media (prefers-reduced-motion: reduce) {
+      .t-success-check { animation: none !important; opacity: 1; }
+      .t-success-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }
+      .tool-group-body { transition: none !important; }
+      .tool-detail { transition: none !important; }
+      .tool-group-chevron { transition: none !important; }
+      .tool-row-dot.running { animation: none !important; }
+      .tool-group-progress-bar { transition: none !important; }
+      .t-input.is-shaking { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Tool Call Grouping</h1>
+  <p class="subtitle">Prototype — click headers to expand/collapse, click rows to see details</p>
+
+  <div class="controls">
+    <button class="btn primary" onclick="addToolCall()">+ Simulate Tool Call</button>
+    <button class="btn" onclick="completeNext()">Complete Next Running</button>
+    <button class="btn" onclick="resetAll()">Reset</button>
+    <div class="theme-switcher">
+      <button class="theme-btn active" data-theme="light" onclick="setTheme('light')">Light</button>
+      <button class="theme-btn" data-theme="paper" onclick="setTheme('paper')">Paper</button>
+      <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')">Dark</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCENARIO 1: Completed batch (collapsed by default)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="scene">
+    <div class="scene-label">Scenario 1 — All Completed (auto-collapsed)</div>
+    <div class="scene-chat">
+      <p>I've created the project structure for you. Here are the files I set up:</p>
+
+      <div class="tool-group" id="group1">
+        <div class="tool-group-header" onclick="toggleGroup('group1')">
+          <div class="tool-group-icon all-completed">
+            <svg class="t-success-check" data-state="in" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="tool-group-title">
+            <div class="tool-group-title-main">6 operations completed</div>
+            <div class="tool-group-title-sub">Writing files, Creating directories</div>
+          </div>
+          <div class="tool-group-progress">
+            <div class="tool-group-progress-bar" style="width: 100%"></div>
+          </div>
+          <div class="tool-group-status completed">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Done
+          </div>
+          <svg class="tool-group-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="tool-group-body">
+          <div class="tool-group-body-inner" id="group1-items">
+            <!-- populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <p>The project is ready. You can start development by running <code>npm run dev</code>.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCENARIO 2: In-progress batch
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="scene">
+    <div class="scene-label">Scenario 2 — In Progress (auto-expanded)</div>
+    <div class="scene-chat">
+      <p>Let me set up the component library. Working on it now:</p>
+
+      <div class="tool-group open" id="group2">
+        <div class="tool-group-header" onclick="toggleGroup('group2')">
+          <div class="tool-group-icon in-progress">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 2">
+                <animateTransform attributeName="transform" type="rotate" values="0 8 8;360 8 8" dur="2s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+          </div>
+          <div class="tool-group-title">
+            <div class="tool-group-title-main">Writing files</div>
+            <div class="tool-group-title-sub">3 of 5 completed</div>
+          </div>
+          <div class="tool-group-progress">
+            <div class="tool-group-progress-bar" style="width: 60%"></div>
+          </div>
+          <div class="tool-group-status running">
+            <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="currentColor"><animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>
+            Running
+          </div>
+          <svg class="tool-group-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="tool-group-body">
+          <div class="tool-group-body-inner">
+            <div class="tool-row tool-row-connector" onclick="toggleDetail('detail2a')">
+              <div class="tool-row-dot completed"></div>
+              <div class="tool-row-name"><code>src/components/Button.tsx</code></div>
+              <div class="tool-row-time">0.3s</div>
+            </div>
+            <div class="tool-detail" id="detail2a">
+              <div class="tool-detail-inner">
+                <div class="tool-detail-tabs">
+                  <button class="tool-detail-tab active">Parameters</button>
+                  <button class="tool-detail-tab">Result</button>
+                </div>
+                <div class="tool-detail-content">{
+  "path": "src/components/Button.tsx",
+  "content": "export const Button = ({ children, ...props }) => {"
+}</div>
+              </div>
+            </div>
+
+            <div class="tool-row tool-row-connector" onclick="toggleDetail('detail2b')">
+              <div class="tool-row-dot completed"></div>
+              <div class="tool-row-name"><code>src/components/Input.tsx</code></div>
+              <div class="tool-row-time">0.2s</div>
+            </div>
+            <div class="tool-detail" id="detail2b">
+              <div class="tool-detail-inner">
+                <div class="tool-detail-tabs">
+                  <button class="tool-detail-tab active">Parameters</button>
+                  <button class="tool-detail-tab">Result</button>
+                </div>
+                <div class="tool-detail-content">{
+  "path": "src/components/Input.tsx",
+  "content": "export const Input = forwardRef(({ ...props }, ref) => {"
+}</div>
+              </div>
+            </div>
+
+            <div class="tool-row tool-row-connector" onclick="toggleDetail('detail2c')">
+              <div class="tool-row-dot completed"></div>
+              <div class="tool-row-name"><code>src/components/Select.tsx</code></div>
+              <div class="tool-row-time">0.4s</div>
+            </div>
+            <div class="tool-detail" id="detail2c">
+              <div class="tool-detail-inner">
+                <div class="tool-detail-tabs">
+                  <button class="tool-detail-tab active">Parameters</button>
+                  <button class="tool-detail-tab">Result</button>
+                </div>
+                <div class="tool-detail-content">{
+  "path": "src/components/Select.tsx",
+  "content": "export const Select = ({ options, value, onChange }) => {"
+}</div>
+              </div>
+            </div>
+
+            <div class="tool-row tool-row-connector" onclick="toggleDetail('detail2d')">
+              <div class="tool-row-dot running"></div>
+              <div class="tool-row-name"><code>src/components/Modal.tsx</code></div>
+              <div class="tool-row-time">...</div>
+            </div>
+            <div class="tool-detail" id="detail2d">
+              <div class="tool-detail-inner">
+                <div class="tool-detail-tabs">
+                  <button class="tool-detail-tab active">Parameters</button>
+                  <button class="tool-detail-tab">Result</button>
+                </div>
+                <div class="tool-detail-content">(writing...)</div>
+              </div>
+            </div>
+
+            <div class="tool-row">
+              <div class="tool-row-dot running" style="opacity:0.3"></div>
+              <div class="tool-row-name" style="color: var(--text-dim)"><code>src/components/Tooltip.tsx</code></div>
+              <div class="tool-row-time">queued</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCENARIO 3: Mixed states (error)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="scene">
+    <div class="scene-label">Scenario 3 — With Error</div>
+    <div class="scene-chat">
+      <p>Encountered an issue while setting up the config:</p>
+
+      <div class="tool-group open" id="group3">
+        <div class="tool-group-header" onclick="toggleGroup('group3')">
+          <div class="tool-group-icon has-errors">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 5V9M8 11V11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="tool-group-title">
+            <div class="tool-group-title-main">3 operations — 1 failed</div>
+            <div class="tool-group-title-sub">Creating directories, Writing config</div>
+          </div>
+          <div class="tool-group-progress">
+            <div class="tool-group-progress-bar" style="width: 66%; background: var(--red)"></div>
+          </div>
+          <div class="tool-group-status error">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Error
+          </div>
+          <svg class="tool-group-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="tool-group-body">
+          <div class="tool-group-body-inner">
+            <div class="tool-row tool-row-connector">
+              <div class="tool-row-dot completed"></div>
+              <div class="tool-row-name"><code>src/config/</code></div>
+              <div class="tool-row-time">0.1s</div>
+            </div>
+            <div class="tool-row tool-row-connector">
+              <div class="tool-row-dot completed"></div>
+              <div class="tool-row-name"><code>src/config/database.ts</code></div>
+              <div class="tool-row-time">0.3s</div>
+            </div>
+            <div class="tool-row">
+              <div class="tool-row-dot error"></div>
+              <div class="tool-row-name t-input-wrap is-error" id="tool-error-row"><span class="t-input" id="tool-error-input"><code>src/config/auth.ts</code> — EACCES: permission denied</span><span class="t-error-msg">Permission denied</span></div>
+              <div class="tool-row-time">failed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCENARIO 4: Live simulation
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="scene">
+    <div class="scene-label">Scenario 4 — Live Simulation (use buttons above)</div>
+    <div class="scene-chat">
+      <p>Waiting for tool calls...</p>
+      <div id="live-output"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       COMPARISON
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="comparison">
+    <div class="comparison-col">
+      <div class="comparison-label">Before — Individual Cards</div>
+      <div id="before-comparison"></div>
+    </div>
+    <div class="comparison-col">
+      <div class="comparison-label">After — Grouped Timeline</div>
+      <div id="after-comparison"></div>
+    </div>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // DATA
+    // ═══════════════════════════════════════════════════════════
+    const sampleTools = [
+      { name: 'Writing file', path: 'src/main.ts', status: 'completed', time: '0.3s' },
+      { name: 'Writing file', path: 'src/utils.ts', status: 'completed', time: '0.2s' },
+      { name: 'Creating directory', path: 'src/components/', status: 'completed', time: '0.1s' },
+      { name: 'Creating directory', path: 'src/lib/', status: 'completed', time: '0.1s' },
+      { name: 'Writing file', path: 'src/types.ts', status: 'completed', time: '0.4s' },
+      { name: 'Writing file', path: 'package.json', status: 'completed', time: '0.2s' },
+    ];
+
+    let liveTools = [];
+    let toolCounter = 0;
+
+    // ═══════════════════════════════════════════════════════════
+    // POPULATE SCENARIO 1
+    // ═══════════════════════════════════════════════════════════
+    function populateGroup1() {
+      const container = document.getElementById('group1-items');
+      container.innerHTML = sampleTools.map((t, i) => `
+        <div class="tool-row tool-row-connector" onclick="toggleDetail('detail1-${i}')">
+          <div class="tool-row-dot completed"></div>
+          <div class="tool-row-name"><code>${t.path}</code></div>
+          <div class="tool-row-time">${t.time}</div>
+        </div>
+        <div class="tool-detail" id="detail1-${i}">
+          <div class="tool-detail-inner">
+            <div class="tool-detail-tabs">
+              <button class="tool-detail-tab active" onclick="event.stopPropagation()">Parameters</button>
+              <button class="tool-detail-tab" onclick="event.stopPropagation()">Result</button>
+            </div>
+            <div class="tool-detail-content">${t.name}: ${t.path}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // POPULATE COMPARISON
+    // ═══════════════════════════════════════════════════════════
+    function populateComparison() {
+      const before = document.getElementById('before-comparison');
+      const after = document.getElementById('after-comparison');
+
+      // Before: 6 individual cards
+      before.innerHTML = sampleTools.slice(0, 4).map(t => `
+        <div class="tool-card-standalone">
+          <div class="tool-card-standalone-header">
+            <div class="tool-card-standalone-left">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M11.5 6.5L6 12H3V9L8.5 3.5L12.5 7.5L11.5 6.5Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-card-standalone-name">${t.name}</span>
+            </div>
+            <div class="tool-card-standalone-badge">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Completed
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      // After: one grouped card
+      after.innerHTML = `
+        <div class="tool-group open" style="margin:0">
+          <div class="tool-group-header" onclick="toggleGroup('comp-after')" style="padding:8px 12px">
+            <div class="tool-group-icon all-completed" style="width:24px;height:24px">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="tool-group-title">
+              <div class="tool-group-title-main" style="font-size:12px">4 operations completed</div>
+            </div>
+            <div class="tool-group-status completed" style="font-size:10px">Done</div>
+            <svg class="tool-group-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="tool-group-body" id="comp-after-body">
+            <div class="tool-group-body-inner">
+              ${sampleTools.slice(0, 4).map(t => `
+                <div class="tool-row tool-row-connector">
+                  <div class="tool-row-dot completed"></div>
+                  <div class="tool-row-name" style="font-size:12px"><code>${t.path}</code></div>
+                  <div class="tool-row-time">${t.time}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INTERACTIONS
+    // ═══════════════════════════════════════════════════════════
+    function toggleGroup(id) {
+      document.getElementById(id).classList.toggle('open');
+    }
+
+    function toggleDetail(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('open');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // LIVE SIMULATION
+    // ═══════════════════════════════════════════════════════════
+    const fileNames = [
+      'src/App.tsx', 'src/index.ts', 'src/utils.ts', 'src/types.ts',
+      'src/components/Header.tsx', 'src/components/Footer.tsx',
+      'src/hooks/useAuth.ts', 'src/hooks/useTheme.ts',
+      'src/styles/globals.css', 'src/styles/components.css',
+      'lib/api.ts', 'lib/db.ts', 'config/app.json',
+      'public/favicon.svg', 'README.md',
+    ];
+
+    function addToolCall() {
+      const file = fileNames[Math.floor(Math.random() * fileNames.length)];
+      const isDir = Math.random() > 0.7;
+      toolCounter++;
+      liveTools.push({
+        id: toolCounter,
+        name: isDir ? 'Creating directory' : 'Writing file',
+        path: file,
+        status: 'running',
+        time: '...',
+      });
+      renderLive();
+    }
+
+    function completeNext() {
+      const running = liveTools.find(t => t.status === 'running');
+      if (running) {
+        running.status = 'completed';
+        running.time = (Math.random() * 0.5 + 0.1).toFixed(1) + 's';
+        renderLive();
+      }
+    }
+
+    function resetAll() {
+      liveTools = [];
+      toolCounter = 0;
+      renderLive();
+    }
+
+    function renderLive() {
+      const container = document.getElementById('live-output');
+      if (liveTools.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const completed = liveTools.filter(t => t.status === 'completed').length;
+      const total = liveTools.length;
+      const hasErrors = liveTools.some(t => t.status === 'error');
+      const allDone = completed === total;
+
+      // group by name
+      const groups = {};
+      liveTools.forEach(t => {
+        const key = t.name;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(t);
+      });
+
+      let html = '';
+      for (const [name, tools] of Object.entries(groups)) {
+        const gCompleted = tools.filter(t => t.status === 'completed').length;
+        const gTotal = tools.length;
+        const gAllDone = gCompleted === gTotal;
+        const gHasRunning = tools.some(t => t.status === 'running');
+        const pct = Math.round((gCompleted / gTotal) * 100);
+
+        const statusClass = gAllDone ? 'completed' : gHasRunning ? 'running' : 'error';
+        const iconClass = gAllDone ? 'all-completed' : gHasRunning ? 'in-progress' : 'has-errors';
+
+        const icon = gAllDone
+          ? `<svg class="t-success-check" data-state="in" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+          : gHasRunning
+            ? `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 2"><animateTransform attributeName="transform" type="rotate" values="0 8 8;360 8 8" dur="2s" repeatCount="indefinite"/></circle></svg>`
+            : `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V9M8 11V11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
+        const statusLabel = gAllDone ? 'Done' : gHasRunning ? 'Running' : 'Error';
+        const statusIcon = gAllDone
+          ? `<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+          : gHasRunning
+            ? `<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="currentColor"><animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/></circle></svg>`
+            : `<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+        const subtext = gAllDone
+          ? `${gTotal} completed`
+          : `${gCompleted} of ${gTotal} completed`;
+
+        const gid = 'live-' + name.replace(/\s+/g, '-');
+        const isOpen = !gAllDone || liveTools.length <= 6;
+
+        html += `
+          <div class="tool-group ${isOpen ? 'open' : ''}" id="${gid}" style="margin:12px 0">
+            <div class="tool-group-header" onclick="toggleGroup('${gid}')">
+              <div class="tool-group-icon ${iconClass}">${icon}</div>
+              <div class="tool-group-title">
+                <div class="tool-group-title-main">${name}</div>
+                <div class="tool-group-title-sub">${subtext}</div>
+              </div>
+              <div class="tool-group-progress">
+                <div class="tool-group-progress-bar" style="width:${pct}%"></div>
+              </div>
+              <div class="tool-group-status ${statusClass}">
+                ${statusIcon}
+                ${statusLabel}
+              </div>
+              <svg class="tool-group-chevron" viewBox="0 0 16 16" fill="none"><path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="tool-group-body">
+              <div class="tool-group-body-inner">
+                ${tools.map((t, i) => {
+                  const dotClass = t.status === 'completed' ? 'completed' : t.status === 'running' ? 'running' : 'error';
+                  return `
+                    <div class="tool-row ${i > 0 ? 'tool-row-connector' : ''}" onclick="toggleDetail('detail-live-${t.id}')">
+                      <div class="tool-row-dot ${dotClass}"></div>
+                      <div class="tool-row-name"><code>${t.path}</code></div>
+                      <div class="tool-row-time">${t.time}</div>
+                    </div>
+                    <div class="tool-detail" id="detail-live-${t.id}">
+                      <div class="tool-detail-inner">
+                        <div class="tool-detail-tabs">
+                          <button class="tool-detail-tab active">Parameters</button>
+                          <button class="tool-detail-tab">Result</button>
+                        </div>
+                        <div class="tool-detail-content">${t.name}: ${t.path}</div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+
+      // trigger success check animations
+      container.querySelectorAll('.t-success-check[data-state="in"]').forEach(el => {
+        el.setAttribute('data-state', 'out');
+        void el.offsetWidth;
+        el.setAttribute('data-state', 'in');
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ERROR STATE SHAKE (12-error-state-shake.md — verbatim JS)
+    // ═══════════════════════════════════════════════════════════
+    const errorWrap = document.getElementById("tool-error-row");
+    const errorInput = document.getElementById("tool-error-input");
+    if (errorWrap && errorInput) {
+      const cs = getComputedStyle(document.documentElement);
+      const ms = (name, fb) => {
+        const v = parseFloat(cs.getPropertyValue(name));
+        return Number.isFinite(v) ? v : fb;
+      };
+      errorInput.classList.add("is-shaking");
+      const shakeMs = ms("--shake-dur-a", 80) * 2 + ms("--shake-dur-b", 60) * 2;
+      setTimeout(() => errorInput.classList.remove("is-shaking"), shakeMs + 20);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // THEME SWITCHING
+    // ═══════════════════════════════════════════════════════════
+    function setTheme(theme) {
+      const html = document.documentElement;
+      html.classList.remove('light', 'paper', 'dark');
+      if (theme !== 'light') html.classList.add(theme);
+
+      document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === theme);
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    populateGroup1();
+    populateComparison();
+  </script>
+</body>
+</html>

@@ -31,6 +31,9 @@ import {
 import { BuiltinTools } from "../application/lib/builtin-tools.js";
 import { buildCopilotAgent } from "../application/assistant/agent.js";
 import {
+  buildVolatileInstructions,
+} from "../application/assistant/instructions.js";
+import {
   isDestructive,
   extractCommandNames,
 } from "../application/lib/command-executor.js";
@@ -52,7 +55,11 @@ import { PrefixLogger } from "@scholaros/shared";
 import { parse } from "yaml";
 import { getRaw as getNoteCreationRaw } from "../knowledge/note_creation.js";
 import { getRaw as getLabelingAgentRaw } from "../knowledge/note_tagging_agent.js";
+import { getRaw as getKbRetrievalRaw } from "../application/assistant/agents/kb-retrieval.js";
 import { shouldDisableTools } from "../config/config.js";
+import { compactSkillResults, compactConversationHistory } from "./history-compaction.js";
+import { getCacheControlProviderOptions } from "../models/cache-control.js";
+import { enforceBudget } from "./budget.js";
 
 function loadAgentNotesContext(): string | null {
   return null;
@@ -427,6 +434,33 @@ export async function loadAgent(id: string): Promise<z.infer<typeof Agent>> {
     return agent;
   }
 
+  if (id === "kb-retrieval") {
+    const raw = getKbRetrievalRaw();
+    let agent: z.infer<typeof Agent> = {
+      name: id,
+      instructions: raw,
+    };
+
+    if (raw.startsWith("---")) {
+      const end = raw.indexOf("\n---", 3);
+      if (end !== -1) {
+        const fm = raw.slice(3, end).trim();
+        const content = raw.slice(end + 4).trim();
+        const yaml = parse(fm);
+        const parsed = Agent.omit({ name: true, instructions: true }).parse(
+          yaml,
+        );
+        agent = {
+          ...agent,
+          ...parsed,
+          instructions: content,
+        };
+      }
+    }
+
+    return agent;
+  }
+
   const repo = container.resolve<IAgentsRepo>("agentsRepo");
   return await repo.fetch(id);
 }
@@ -439,7 +473,26 @@ function formatBytes(bytes: number): string {
 
 export function convertFromMessages(
   messages: z.infer<typeof Message>[],
+  instructions?: string,
 ): ModelMessage[] {
+  // Compact old loadSkill results to avoid bloat from skill text in history
+  compactSkillResults(messages);
+
+  // Summarize old conversation turns when history grows long (Phase 4.3)
+  compactConversationHistory(messages);
+
+  // Enforce per-turn token budget (Phase 4.1)
+  if (instructions) {
+    const { messages: trimmed, report } = enforceBudget(messages, instructions);
+    if (report.trimmedTurns > 0) {
+      console.log(
+        `[Budget] ${report.note} (est: ${report.estimatedTotal}/${report.totalBudget})`,
+      );
+    }
+    messages.length = 0;
+    messages.push(...trimmed);
+  }
+
   const result: ModelMessage[] = [];
   for (const msg of messages) {
     const { providerOptions } = msg;
@@ -1025,19 +1078,38 @@ export async function* streamAgent({
       minute: "2-digit",
       timeZoneName: "short",
     });
+
+    // Stable prefix: agent instructions + volatile suffix: turn-specific context
+    // For provider prompt caching, the stable prefix stays consistent turn-to-turn
     let instructionsWithDateTime = `Current date and time: ${currentDateTime}\n\n${agent.instructions}`;
     // Inject Agent Notes context for copilot
     if (state.agentName === "copilot" || state.agentName === "scholaros") {
+      const volatileTurnParts: string[] = [];
       const agentNotesContext = loadAgentNotesContext();
       if (agentNotesContext) {
-        instructionsWithDateTime += `\n\n${agentNotesContext}`;
+        volatileTurnParts.push(`\n\n${agentNotesContext}`);
       }
-      // Always inject a Middle Pane section so the LLM has a clear, up-to-date signal
-      // that supersedes any earlier middle-pane mention in the conversation history.
+      // Lazy Middle-Pane: inject compact header; auto-expand full content only when
+      // the user's latest message contains referential language (2.1).
+      // This saves ~10K+ tokens/turn for unrelated questions while keeping full context
+      // available when the question actually relates to the open item.
       const middlePaneHeader = `\n\n# Middle Pane (Current State)\nThis section reflects what the user has open in the middle pane RIGHT NOW, at the time of their latest message. **This is authoritative and overrides any earlier mention of a note or web page in this conversation** — if the conversation history references a different note or browser page, the user has since closed or navigated away from it. Do not treat earlier context as current.\n\n`;
+      // Check latest user message for referential language that signals the question
+      // relates to the open item. These are unambiguous cues to auto-expand.
+      const latestUserMsg = [...state.messages].reverse().find(m => m.role === "user");
+      const latestUserText = latestUserMsg && typeof latestUserMsg.content === "string"
+        ? latestUserMsg.content.toLowerCase()
+        : "";
+      const referentialSignals = ["this", "here", "above", "below", "what i'm looking at",
+        "this note", "this lecture", "explain this", "the part about", "this file",
+        "this document", "this page", "summarize this", "quiz me on this",
+        "what does this mean"];
+      const shouldExpand = referentialSignals.some(s => latestUserText.includes(s))
+        || voiceOutput !== null; // Voice mode always expands (model needs to read aloud)
+
       if (!middlePaneContext) {
         loopLogger.log("injecting middle pane context (empty)");
-        instructionsWithDateTime += `${middlePaneHeader}**Nothing relevant is open in the middle pane right now.** The user is not looking at any note or web page. If earlier in this conversation you referenced a note or browser page as "what the user is viewing", that is no longer accurate — do not refer to it as currently open. Answer the user's latest message on its own merits.`;
+        volatileTurnParts.push(`${middlePaneHeader}**Nothing relevant is open in the middle pane right now.** The user is not looking at any note or web page. If earlier in this conversation you referenced a note or browser page as "what the user is viewing", that is no longer accurate — do not refer to it as currently open. Answer the user's latest message on its own merits.`);
       } else if (middlePaneContext.kind === "file") {
         loopLogger.log(
           "injecting middle pane context (file)",
@@ -1057,24 +1129,47 @@ export async function* streamAgent({
             }
           }
         }
-        if (extractedContent) {
-          instructionsWithDateTime += `${middlePaneHeader}The user has a ${parsedFormat} file open. Its path and extracted text are provided below so you can reference it when relevant.\n\n**How to use this context:**\n- The user may or may not be talking about this file. Do NOT assume every message is about it.\n- Only reference or act on this file when the user's message clearly relates to it.\n- For unrelated questions, ignore this context entirely and answer normally.\n- Do not mention that you can see this file unless it is relevant to the answer.\n\n## Open file path\n${middlePaneContext.path}\n\n## Open file content\n\`\`\`\n${extractedContent}\n\`\`\``;
+        if (extractedContent && shouldExpand) {
+          // Auto-expand: user question relates to this file
+          volatileTurnParts.push(`${middlePaneHeader}The user has a ${parsedFormat} file open. Its path and extracted text are provided below so you can reference it when relevant.\n\n## Open file path\n${middlePaneContext.path}\n\n## Open file content\n\`\`\`\n${extractedContent}\n\`\`\``);
+        } else if (extractedContent) {
+          // Lazy mode: compact header only (saves ~10K tokens for unrelated questions)
+          const sectionCount = (extractedContent.match(/^#{1,3}\s/gm) || []).length;
+          const wordCount = extractedContent.split(/\s+/).length;
+          volatileTurnParts.push(`${middlePaneHeader}[Open file: ${path.basename(middlePaneContext.path)} | ${parsedFormat} | ~${wordCount} words | ${sectionCount} sections | path: ${middlePaneContext.path}]\n\nUse \`readOpenContext()\` to read the full content if the user's next question relates to this file.`);
         } else {
-          instructionsWithDateTime += `${middlePaneHeader}The user has a file open, but it could not be parsed into readable text. If the user's question depends on its contents, ask them to provide a clearer source or use the file tools to inspect it.`;
+          volatileTurnParts.push(`${middlePaneHeader}The user has a file open, but it could not be parsed into readable text. If the user's question depends on its contents, ask them to provide a clearer source or use the file tools to inspect it.`);
         }
       } else if (middlePaneContext.kind === "note") {
         loopLogger.log(
           "injecting middle pane context (note)",
           middlePaneContext.path,
         );
-        instructionsWithDateTime += `${middlePaneHeader}The user has a note open. Its path and full content are provided below so you can reference it when relevant.\n\n**How to use this context:**\n- The user may or may not be talking about this note. Do NOT assume every message is about it.\n- Only reference or act on this note when the user's message clearly relates to it (e.g. "this note", "what I'm looking at", "here", "above", "below", or questions whose subject is plainly this note's content).\n- For unrelated questions (general chat, questions about other notes, tasks, emails, calendar, etc.), ignore this context entirely and answer normally.\n- Do not mention that you can see this note unless it is relevant to the answer.\n\n## Open note path\n${middlePaneContext.path}\n\n## Open note content\n\`\`\`\n${middlePaneContext.content}\n\`\`\``;
+        const noteContent = middlePaneContext.content || "";
+        const sectionCount = (noteContent.match(/^#{1,3}\s/gm) || []).length;
+        const wordCount = noteContent.split(/\s+/).length;
+        const noteTitle = path.basename(middlePaneContext.path, ".md");
+        if (shouldExpand) {
+          // Auto-expand: user question relates to this note
+          volatileTurnParts.push(`${middlePaneHeader}The user has a note open. Its path and full content are provided below so you can reference it when relevant.\n\n## Open note path\n${middlePaneContext.path}\n\n## Open note content\n\`\`\`\n${noteContent}\n\`\`\``);
+        } else {
+          // Lazy mode: compact header with section index
+          const sections = (noteContent.match(/^#{2,3}\s.+/gm) || []).map(s => s.trim()).join(" | ");
+          volatileTurnParts.push(`${middlePaneHeader}[Open note: "${noteTitle}" | ~${wordCount} words | ${sectionCount} sections | path: ${middlePaneContext.path}]\n${sections ? `\nSections: ${sections}` : ""}\n\nUse \`readOpenContext()\` to read the full content or a specific section if the user's next question relates to this note.`);
+        }
       } else if (middlePaneContext.kind === "browser") {
         loopLogger.log(
           "injecting middle pane context (browser)",
           middlePaneContext.url,
         );
-        instructionsWithDateTime += `${middlePaneHeader}The user has the embedded browser open and is viewing a web page. Only the URL and page title are shown below — the page content itself is NOT included here. If you need the page content to answer, use the browser tools available to you to read the page.\n\n**How to use this context:**\n- The user may or may not be talking about this page. Do NOT assume every message is about it.\n- Only reference or act on this page when the user's message clearly relates to it (e.g. "this page", "this article", "what I'm looking at", "this site", "summarize this").\n- For unrelated questions (general chat, questions about other notes, tasks, emails, calendar, etc.), ignore this context entirely and answer normally.\n- Do not mention that you can see the browser unless it is relevant to the answer.\n\n## Current page\nURL: ${middlePaneContext.url}\nTitle: ${middlePaneContext.title}`;
+        volatileTurnParts.push(`${middlePaneHeader}The user has the embedded browser open and is viewing a web page. Only the URL and page title are shown below — the page content itself is NOT included here. If you need the page content to answer, use the browser tools available to you to read the page.\n\n**How to use this context:**\n- The user may or may not be talking about this page. Do NOT assume every message is about it.\n- Only reference or act on this page when the user's message clearly relates to it (e.g. "this page", "this article", "what I'm looking at", "this site", "summarize this").\n- For unrelated questions (general chat, questions about other notes, tasks, emails, calendar, etc.), ignore this context entirely and answer normally.\n- Do not mention that you can see the browser unless it is relevant to the answer.\n\n## Current page\nURL: ${middlePaneContext.url}\nTitle: ${middlePaneContext.title}`);
       }
+      // Inject volatile instructions (calendar, warm profile) — these change per-turn
+      const volatileInstructions = await buildVolatileInstructions();
+      if (volatileInstructions) {
+        volatileTurnParts.push(`\n\n${volatileInstructions}`);
+      }
+      instructionsWithDateTime += volatileTurnParts.join("");
     }
     if (voiceInput) {
       loopLogger.log("voice input enabled, injecting voice input prompt");
@@ -1084,7 +1179,7 @@ export async function* streamAgent({
       loopLogger.log(
         "voice output enabled (summary mode), injecting voice output prompt",
       );
-      instructionsWithDateTime += `\n\n# Voice Output (MANDATORY — READ THIS FIRST)\nThe user has voice output enabled. THIS IS YOUR #1 PRIORITY: you MUST start your response with <voice></voice> tags. If your response does not begin with <voice> tags, the user will hear nothing — which is a broken experience. NEVER skip this.\n\nRules:\n1. YOUR VERY FIRST OUTPUT MUST BE A <voice> TAG. No exceptions. Do not start with markdown, headings, or any other text. The literal first characters of your response must be "<voice>".\n2. Place ALL <voice> tags at the BEGINNING of your response, before any detailed content. Do NOT intersperse <voice> tags throughout the response.\n3. Wrap EACH spoken sentence in its own separate <voice> tag so it can be spoken incrementally. Do NOT wrap everything in a single <voice> block.\n4. Use voice as a TL;DR and navigation aid — do NOT read the entire response aloud.\n5. After all <voice> tags, you may include detailed written content (markdown, tables, code, etc.) that will be shown visually but not spoken.\n\n## Examples\n\nExample 1 — User asks: "what happened in my meeting with Alex yesterday?"\n\n<voice>Your meeting with Alex covered three main things: the Q2 roadmap timeline, hiring for the backend role, and the client demo next week.</voice>\n<voice>I've pulled out the key details and action items below — the demo prep notes are at the end.</voice>\n\n## Meeting with Alex — March 11\n### Roadmap\n- Agreed to push Q2 launch to April 15...\n(detailed written content continues)\n\nExample 2 — User asks: "summarize my emails"\n\n<voice>You have five new emails since this morning.</voice>\n<voice>Two are from your team — Jordan sent the RFC you requested and Taylor flagged a contract issue.</voice>\n<voice>There's also a warm intro from a VC partner connecting you with someone at a prospective customer.</voice>\n<voice>I've drafted responses for three of them. The details and drafts are below.</voice>\n\n(email blocks, tables, and detailed content follow)\n\nExample 3 — User asks: "what's on my calendar today?"\n\n<voice>You've got a pretty packed day — seven meetings starting with standup at 9.</voice>\n<voice>The big ones are your investor call at 11, lunch with a partner from your lead VC at 12:30, and a customer call at 4.</voice>\n<voice>Your only free block for deep work is 2:30 to 4.</voice>\n\n(calendar block with full event details follows)\n\nExample 4 — User asks: "draft an email to Sam with our metrics"\n\n<voice>Done — I've drafted the email to Sam with your latest WAU and churn numbers.</voice>\n<voice>Take a look at the draft below and send it when you're ready.</voice>\n\n(email block with draft follows)\n\nREMEMBER: If you do not start with <voice> tags, the user hears silence. Always speak first, then write.`;
+      instructionsWithDateTime += `\n\n# Voice Output (MANDATORY — READ THIS FIRST)\nThe user has voice output enabled. THIS IS YOUR #1 PRIORITY: you MUST start your response with <voice></voice> tags. If your response does not begin with <voice> tags, the user will hear nothing — which is a broken experience. NEVER skip this.\n\nRules:\n1. YOUR VERY FIRST OUTPUT MUST BE A <voice> TAG. No exceptions. Do not start with markdown, headings, or any other text. The literal first characters of your response must be "<voice>".\n2. Place ALL <voice> tags at the BEGINNING of your response, before any detailed content. Do NOT intersperse <voice> tags throughout the response.\n3. Wrap EACH spoken sentence in its own separate <voice> tag so it can be spoken incrementally. Do NOT wrap everything in a single <voice> block.\n4. Use voice as a TL;DR and navigation aid — do NOT read the entire response aloud.\n5. After all <voice> tags, you may include detailed written content (markdown, tables, code, etc.) that will be shown visually but not spoken.\n\n## Examples\n\nExample 1 — User asks: "what happened in my meeting with Alex yesterday?"\n\n<voice>Your meeting with Alex covered three main things: the Q2 roadmap timeline, hiring for the backend role, and the client demo next week.</voice>\n<voice>I've pulled out the key details and action items below — the demo prep notes are at the end.</voice>\n\n## Meeting with Alex — March 11\n### Roadmap\n- Agreed to push Q2 launch to April 15...\n(detailed written content continues)\n\nExample 2 — User asks: "summarize my emails"\n\n<voice>You have five new emails since this morning.</voice>\n<voice>Two are from your team — Jordan sent the RFC you requested and Taylor flagged a contract issue.</voice>\n<voice>There's also a warm intro from a VC partner connecting you with someone at a prospective customer.</voice>\n<voice>I've drafted responses for three of them. The details and drafts are below.</voice>\n\n(email blocks, tables, and detailed content follow)\n\nExample 3 — User asks: "what's on my calendar today?"\n\n<voice>You've got a pretty packed day — seven meetings starting with standup at 9.</voice>\n<voice>The big ones are your investor call at 11, lunch with a partner from your lead VC at 12:30, and a customer call at 4.</voice>\n<voice>Your only free block for deep work is 2:30 to 4.</voice>\n\n(calendar block with full event details follows)\n\nExample 4 — User asks: "draft an email to Sam with our metrics"\n\n<voice>Done — I've drafted the email to Sam with your latest WAU and churn numbers.</voice>\n<voice>Take a look at the draft below and send it when you're ready.</voice>\n\n(email block with draft follows)\n\nREMEMBER: If you do not start with <voice> tags, the user hears silence. Always speak first, then write.\n`;
     } else if (voiceOutput === "full") {
       loopLogger.log(
         "voice output enabled (full mode), injecting voice output prompt",
@@ -1101,6 +1196,7 @@ export async function* streamAgent({
       state.messages,
       instructionsWithDateTime,
       tools,
+      state.runProvider,
       signal,
     )) {
       messageBuilder.ingest(event);
@@ -1215,10 +1311,41 @@ async function* streamLlm(
   messages: z.infer<typeof MessageList>,
   instructions: string,
   tools: ToolSet,
+  providerName: string,
   signal?: AbortSignal,
 ): AsyncGenerator<z.infer<typeof LlmStepStreamEvent>, void, unknown> {
-  const converted = convertFromMessages(messages);
-  console.log(`! SENDING payload to model: `, JSON.stringify(converted));
+  const converted = convertFromMessages(messages, instructions);
+
+  // Pass the system prompt appropriately for the provider. The previous
+  // implementation always unshifted a `{ role: "system" }` message into the
+  // `messages` array. That breaks the openai-compatible provider used by
+  // opencode-zen / opencode-go: the model ends up not seeing the user
+  // message and hallucinates one (recent run logs with
+  // deepseek-v4-flash-free showed reasoning like "The user hasn't said
+  // anything yet" or fabricated "The user said 'Looking for something…'").
+  //
+  // The AI SDK v5 `streamText` `system` field accepts only a string — it
+  // has no part-array form, so it cannot carry Anthropic `cacheControl`
+  // markers. To keep prompt caching on Anthropic while restoring the working
+  // `system` parameter path for every other provider, we use the messages
+  // array form only for Anthropic and the dedicated `system` parameter for
+  // all others.
+  const cacheOptions = getCacheControlProviderOptions(providerName);
+  const useMessagesArraySystem = Object.keys(cacheOptions).length > 0;
+
+  let streamMessages = converted;
+  if (useMessagesArraySystem) {
+    streamMessages = [
+      {
+        role: "system" as const,
+        content: instructions,
+        providerOptions: cacheOptions,
+      },
+      ...converted,
+    ];
+  }
+
+  console.log(`! SENDING payload to model: `, JSON.stringify(streamMessages));
 
   // Development mode: allow disabling tools for LLMs without tool support
   const disableTools = shouldDisableTools();
@@ -1228,8 +1355,8 @@ async function* streamLlm(
 
   const { fullStream } = streamText({
     model,
-    messages: converted,
-    system: instructions,
+    messages: streamMessages,
+    system: useMessagesArraySystem ? undefined : instructions,
     tools: disableTools ? undefined : tools,
     stopWhen: stepCountIs(1),
     abortSignal: signal,

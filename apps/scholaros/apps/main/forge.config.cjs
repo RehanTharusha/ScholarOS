@@ -239,20 +239,6 @@ module.exports = {
         );
       }
 
-      console.log("Copying ingestion assets...");
-      // Optional ingest files - only copy if they exist
-      const preloadIngestSrc = path.join(__dirname, "preload-ingest.js");
-      const ingestHtmlSrc = path.join(__dirname, "../renderer/ingest.html");
-      if (fs.existsSync(preloadIngestSrc)) {
-        fs.copyFileSync(
-          preloadIngestSrc,
-          path.join(packageDir, "preload-ingest.js"),
-        );
-      }
-      if (fs.existsSync(ingestHtmlSrc)) {
-        fs.copyFileSync(ingestHtmlSrc, path.join(rendererDest, "ingest.html"));
-      }
-
       console.log("✅ All assets staged in .package/");
     },
   },

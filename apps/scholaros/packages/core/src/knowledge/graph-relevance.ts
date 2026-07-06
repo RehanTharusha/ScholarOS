@@ -29,9 +29,10 @@ function edgeKey(a: string, b: string): string {
 
 export function buildRetrievalGraph(
   nodes: { id: string; label: string; type: string; path: string; linkCount: number; community: number; sources?: string[] }[],
+  edges?: { source: string; target: string; weight: number }[],
 ): RetrievalGraph {
   const graphNodes = new Map<string, RetrievalNode>()
-  const edges = new Map<string, number>()
+  const edgeMap = new Map<string, number>()
 
   for (const n of nodes) {
     graphNodes.set(n.id, {
@@ -45,7 +46,14 @@ export function buildRetrievalGraph(
     })
   }
 
-  return { nodes: graphNodes, edges }
+  if (edges) {
+    for (const e of edges) {
+      const key = edgeKey(e.source, e.target)
+      edgeMap.set(key, (edgeMap.get(key) ?? 0) + e.weight)
+    }
+  }
+
+  return { nodes: graphNodes, edges: edgeMap }
 }
 
 export function calculateRelevance(nodeA: RetrievalNode, nodeB: RetrievalNode, graph: RetrievalGraph): number {

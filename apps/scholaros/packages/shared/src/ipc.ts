@@ -501,7 +501,8 @@ const ipcSchemas = {
   // Ingestion channels
   "ingest:addFiles": {
     req: z.object({
-      files: z.array(z.string().min(1)).min(1),
+      files: z.array(z.string()).default([]),
+      folders: z.array(z.string()).optional(),
     }),
     res: z.object({
       ok: z.literal(true),
@@ -510,70 +511,39 @@ const ipcSchemas = {
           sourcePath: z.string(),
           targetPath: z.string(),
           name: z.string(),
+          size: z.number().optional(),
+          sourceFolder: z.string().optional(),
         }),
       ),
       errors: z.array(z.string()),
     }),
   },
-  "ingest:enqueue": {
-    req: z.object({
-      files: z.array(z.string().min(1)).min(1),
-      courseId: z.string(),
-      courseCode: z.string().optional(),
-      semester: z.string().optional(),
-    }),
-    res: z.object({
-      items: z.array(
-        z.object({
-          id: z.string(),
-          sourcePath: z.string(),
-          fileName: z.string(),
-          status: z.enum(["queued", "processing", "completed", "failed", "cancelled"]),
-          retryCount: z.number(),
-          maxRetries: z.number(),
-          progress: z.number(),
-          stage: z.string(),
-          error: z.string().optional(),
-          createdAt: z.number(),
-          updatedAt: z.number(),
-        }),
-      ),
-    }),
-  },
-  "ingest:cancel": {
-    req: z.object({
-      itemId: z.string(),
-    }),
-    res: z.object({
-      success: z.boolean(),
-    }),
-  },
-  "ingest:queueStatus": {
+  "ingest:pickFolder": {
     req: z.null(),
     res: z.object({
-      items: z.array(
-        z.object({
-          id: z.string(),
-          sourcePath: z.string(),
-          fileName: z.string(),
-          status: z.enum(["queued", "processing", "completed", "failed", "cancelled"]),
-          retryCount: z.number(),
-          maxRetries: z.number(),
-          progress: z.number(),
-          stage: z.string(),
-          error: z.string().optional(),
-          createdAt: z.number(),
-          updatedAt: z.number(),
-        }),
-      ),
+      paths: z.array(z.string()),
+      cancelled: z.boolean(),
     }),
   },
-  "ingest:progress": {
+  "ingest:watchRaw": {
     req: z.object({
-      itemId: z.string(),
-      progress: z.number(),
-      stage: z.string(),
-      fileName: z.string(),
+      enabled: z.boolean(),
+    }),
+    res: z.object({
+      ok: z.boolean(),
+    }),
+  },
+  "ingest:rawFileEvent": {
+    req: z.object({
+      files: z.array(
+        z.object({
+          sourcePath: z.string(),
+          targetPath: z.string(),
+          name: z.string(),
+          size: z.number().optional(),
+          sourceFolder: z.string().optional(),
+        }),
+      ),
     }),
     res: z.null(),
   },

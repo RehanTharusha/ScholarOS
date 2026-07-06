@@ -657,3 +657,22 @@
 .paper [data-slot="message-content"] th {
   background-color: #e8e6dc;
 }
+
+/* ── Research UI animations ──────────────────────────────────────── */
+@keyframes globe-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes gear-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes gear-spin-reverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="globe-spin"] { animation: none !important; }
+  [style*="gear-spin"] { animation: none !important; }
+}

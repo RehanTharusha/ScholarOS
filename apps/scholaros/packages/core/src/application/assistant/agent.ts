@@ -13,6 +13,11 @@ export async function buildCopilotAgent(): Promise<z.infer<typeof Agent>> {
     for (const name of Object.keys(BuiltinTools)) {
         tools[name] = { type: "builtin", name };
     }
+    // Register the course-aware retrieval sub-agent as an agent-type tool
+    tools["retrieveFromKB"] = {
+        type: "agent",
+        name: "kb-retrieval",
+    };
     const instructions = await buildCopilotInstructions();
     return {
         name: "scholaros",

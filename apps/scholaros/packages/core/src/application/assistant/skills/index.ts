@@ -13,7 +13,9 @@ import { skill as cavemanSkill } from "./caveman/skill.js";
 import { skill as revisionGuideSkill } from "./revision-guide/skill.js";
 import { skill as youtubeVideoWorkflowSkill } from "./youtube-video-workflow/skill.js";
 import { skill as pdfSkill } from "./pdf/skill.js";
+import { reference as pdfReference } from "./pdf/reference.js";
 import { skill as pptxSkill } from "./pptx/skill.js";
+import { reference as pptxReference } from "./pptx/reference.js";
 import { skill as docxSkill } from "./docx/skill.js";
 import { skill as xlsxSkill } from "./xlsx/skill.js";
 import { skill as webArtifactsBuilderSkill } from "./web-artifacts-builder/skill.js";
@@ -315,7 +317,127 @@ for (const entry of skillEntries) {
   }
 }
 
+/**
+ * Build a relevance-filtered skill catalog based on session context.
+ * Returns only the skills that are plausibly relevant to the current task,
+ * keeping the catalog compact (~80-150 tokens instead of ~500).
+ */
+export function buildContextualSkillCatalog(context: {
+  hasFileAttachment?: boolean;
+  attachedMimeTypes?: string[];
+  recentMessageKeywords?: string[];
+}): string {
+  const relevantIds = new Set<string>();
+
+  // File attachment signals
+  if (context.hasFileAttachment) {
+    const mimeTypes = context.attachedMimeTypes ?? [];
+    if (mimeTypes.some((m) => m.includes("pdf"))) relevantIds.add("pdf");
+    if (mimeTypes.some((m) => m.includes("presentation") || m.includes("pptx")))
+      relevantIds.add("pptx");
+    if (mimeTypes.some((m) => m.includes("word") || m.includes("docx")))
+      relevantIds.add("docx");
+    if (mimeTypes.some((m) => m.includes("sheet") || m.includes("xlsx") || m.includes("csv")))
+      relevantIds.add("xlsx");
+    relevantIds.add("organize-files");
+    relevantIds.add("course-management");
+  }
+
+  const keywords = context.recentMessageKeywords ?? [];
+
+  // Study/quiz/exam signals
+  const studySignals = ["study", "quiz", "review", "exam", "revise", "flashcard", "practice", "test", "memorize", "midterm", "final"];
+  if (keywords.some((k) => studySignals.some((s) => k.includes(s)))) {
+    relevantIds.add("study-workflow");
+    relevantIds.add("auto-flashcards");
+    relevantIds.add("anki-flashcards");
+    relevantIds.add("revision-guide");
+    relevantIds.add("app-navigation");
+  }
+
+  // Writing signals
+  const writingSignals = ["essay", "paper", "write", "assignment", "draft", "outline", "citation", "bibliography", "references"];
+  if (keywords.some((k) => writingSignals.some((s) => k.includes(s)))) {
+    relevantIds.add("writing-mode");
+    relevantIds.add("citation-management");
+  }
+
+  // Research signals
+  const researchSignals = ["research", "literature review", "compare", "synthesize", "analyze", "find papers", "source"];
+  if (keywords.some((k) => researchSignals.some((s) => k.includes(s)))) {
+    relevantIds.add("deep-research");
+    relevantIds.add("citation-management");
+  }
+
+  // YouTube/audio signal
+  if (keywords.some((k) => k.includes("youtube") || k.includes("video") || k.includes("lecture recording"))) {
+    relevantIds.add("youtube-video-workflow");
+  }
+
+  // Browser signal
+  if (keywords.some((k) => k.includes("browser") || k.includes("website") || k.includes("open") || k.includes("web page"))) {
+    relevantIds.add("browser-control");
+  }
+
+  // PPTX/DOC creation signal
+  if (keywords.some((k) => k.includes("presentation") || k.includes("slide") || k.includes("powerpoint"))) {
+    relevantIds.add("pptx");
+  }
+  if (keywords.some((k) => k.includes("document") || k.includes("word") || k.includes("report"))) {
+    relevantIds.add("docx");
+  }
+
+  // Always include essential meta-skills
+  relevantIds.add("builtin-tools");
+  relevantIds.add("deletion-guardrails");
+  relevantIds.add("app-navigation");
+  relevantIds.add("mcp-integration");
+
+  const entries = skillEntries.filter((e) => relevantIds.has(e.id));
+
+  // If no context signals matched (cold start), show the broader set
+  if (entries.length <= 3) {
+    const core = skillEntries.filter((e) =>
+      ["builtin-tools", "deletion-guardrails", "app-navigation", "mcp-integration",
+       "study-workflow", "auto-flashcards", "pdf", "writing-mode", "course-management"].includes(e.id)
+    );
+    return buildCatalogString(core);
+  }
+
+  return buildCatalogString(entries);
+}
+
+function buildCatalogString(entries: typeof skillEntries): string {
+  const sections = entries.map((entry) =>
+    [
+      `## ${entry.title}`,
+      `- **Skill file:** \`${entry.catalogPath}\``,
+      `- **Use it for:** ${entry.summary}`,
+    ].join("\n"),
+  );
+  return [
+    "# ScholarOS Skill Catalog",
+    "",
+    "Use this catalog to see which specialized skills you can load. Each entry lists the exact skill file plus a short description of when it helps.",
+    "",
+    sections.join("\n\n"),
+  ].join("\n");
+}
+
 export const availableSkills = skillEntries.map((entry) => entry.id);
+
+/**
+ * Expanded (full reference) content for skills that support compression (4.2).
+ * Maps skill ID → full reference string. Loaded via expandSkill().
+ */
+const expandedSkills = new Map<string, string>([
+  ["pdf", pdfReference],
+  ["pptx", pptxReference],
+]);
+
+export function resolveExpandedSkill(skillId: string): string | null {
+  return expandedSkills.get(skillId) ?? null;
+}
 
 export function resolveSkill(identifier: string): ResolvedSkill | null {
   const normalized = normalizeIdentifier(identifier);

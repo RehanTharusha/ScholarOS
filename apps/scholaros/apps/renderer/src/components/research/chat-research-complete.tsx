@@ -93,7 +93,9 @@ export function ChatResearchComplete({
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
-          <CheckCircle className="h-5 w-5 text-emerald-500" />
+          <span className="t-success-check" data-state="in" aria-hidden="true">
+            <CheckCircle className="h-5 w-5 text-emerald-500" />
+          </span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

@@ -7,7 +7,8 @@ import { execSync } from "child_process";
 import { homedir } from "os";
 import { glob } from "glob";
 import { executeCommand, executeCommandAbortable } from "./command-executor.js";
-import { resolveSkill, availableSkills } from "../assistant/skills/index.js";
+import { resolveSkill, availableSkills, resolveExpandedSkill } from "../assistant/skills/index.js";
+import { resolveCapability } from "../assistant/modules/capabilities.js";
 import { executeTool, listServers, listTools } from "../../mcp/mcp.js";
 import * as anki from "../../anki/service.js";
 import container from "../../di/container.js";
@@ -412,6 +413,109 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         path: resolved.catalogPath,
         content: resolved.content,
       };
+    },
+  },
+
+  loadCapability: {
+    description:
+      "Load an on-demand capability module into context. Capability modules contain detailed instructions for specific workflows (file ingest, KB access, save-to-memory, etc.). They are listed in the Capability Modules section of the core prompt.",
+    inputSchema: z.object({
+      id: z
+        .string()
+        .describe(
+          "Capability ID — one of: file-ingest, kb-access, save-to-memory, file-path-formatting, builtin-tools-reference",
+        ),
+    }),
+    execute: async ({ id }: { id: string }) => {
+      const resolved = resolveCapability(id);
+      if (!resolved) {
+        return {
+          success: false,
+          error: `Capability '${id}' not found. Available capabilities: file-ingest, kb-access, save-to-memory, file-path-formatting, builtin-tools-reference`,
+        };
+      }
+      return {
+        success: true,
+        capabilityName: resolved.id,
+        title: resolved.title,
+        content: resolved.getContent(),
+      };
+    },
+  },
+
+  listAllSkills: {
+    description:
+      "List all available skills with their IDs and summaries. Use this if you need to discover skills beyond the contextual catalog.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return {
+        skills: availableSkills.join(", "),
+        count: availableSkills.length,
+      };
+    },
+  },
+
+  expandSkill: {
+    description:
+      "Expand a compressed skill with its full reference content. Skills now load in compressed form (~500 tokens: workflow + key rules). Call this when you need the detailed API reference, code examples, or advanced usage patterns for a skill. Currently available for: pdf, pptx.",
+    inputSchema: z.object({
+      skillId: z
+        .string()
+        .describe(
+          "Skill identifier to expand (e.g., 'pdf', 'pptx')",
+        ),
+    }),
+    execute: async ({ skillId }: { skillId: string }) => {
+      const resolved = resolveExpandedSkill(skillId);
+      if (!resolved) {
+        return {
+          success: false,
+          error: `No expanded reference available for skill '${skillId}'. Available: pdf, pptx`,
+        };
+      }
+      return {
+        success: true,
+        skillId,
+        content: resolved,
+      };
+    },
+  },
+
+  readOpenContext: {
+    description:
+      "Read the full content of the currently open file or note, optionally filtering to a specific section by header text. Use this when the middle pane shows a compact header and you need the full content to answer the user's question about the open item.",
+    inputSchema: z.object({
+      path: z.string().describe("Path to the open file or note"),
+      sectionId: z.string().optional().describe("Optional section header text to filter to (e.g. '## Krebs Cycle'). Only returns content from that section onward."),
+    }),
+    execute: async ({ path: filePath, sectionId }: { path: string; sectionId?: string }) => {
+      try {
+        const result = await workspace.readFile(filePath);
+        const content = result.data;
+        if (sectionId && content) {
+          const sectionIndex = content.indexOf(sectionId);
+          if (sectionIndex !== -1) {
+            const afterHeader = content.slice(sectionIndex + sectionId.length);
+            const headerMatch = afterHeader.match(/\n#{1,3}\s/);
+            const endIndex = headerMatch ? headerMatch.index! : afterHeader.length;
+            return {
+              path: filePath,
+              section: sectionId,
+              content: (sectionId + afterHeader.slice(0, endIndex)).trim(),
+            };
+          }
+        }
+        return {
+          path: filePath,
+          content: content || "",
+          wordCount: (content || "").split(/\s+/).length,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Failed to read file",
+          path: filePath,
+        };
+      }
     },
   },
 
@@ -2801,6 +2905,47 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
       }
     },
   },
+  searchKB: {
+    description:
+      "Search the knowledge base using a hybrid TF-IDF + vector index. Fast, deterministic, no API calls. Returns ranked results with title, preview, course, type, and relevance score. Supports fast/standard/deep query modes, course/type filtering, and optional graph expansion for related concepts. Use this as the PRIMARY search tool — it is faster and more precise than workspace-grep.",
+    inputSchema: z.object({
+      query: z.string().min(1).describe("Search query (natural language or keywords)"),
+      course: z.string().optional().describe("Optional: filter by course folder name"),
+      type: z.enum(["concept", "lecture", "assignment", "paper", "synthesis", "resource"]).optional().describe("Optional: filter by file type"),
+      topN: z.number().int().min(1).max(50).optional().default(10).describe("Number of results to return (default: 10, max: 50)"),
+      mode: z.enum(["fast", "standard", "deep"]).optional().describe("Query mode: fast (single concept, tokenized only), standard (multi-concept, hybrid TF-IDF+vector), deep (broad synthesis, full pipeline). Default: auto-classified from query."),
+      graphExpand: z.boolean().optional().describe("Enable graph expansion via wiki-link graph to find related concepts (standard/deep modes)."),
+      vectorSearch: z.boolean().optional().describe("Enable vector semantic search alongside TF-IDF. Default: enabled for standard/deep, disabled for fast."),
+    }),
+    execute: async ({ query, course, type, topN = 10, mode, graphExpand, vectorSearch }: { query: string; course?: string; type?: "concept" | "lecture" | "assignment" | "paper" | "synthesis" | "resource"; topN?: number; mode?: "fast" | "standard" | "deep"; graphExpand?: boolean; vectorSearch?: boolean }) => {
+      try {
+        const { buildSearchIndex, searchIndex, loadSearchIndex, saveSearchIndex, classifyQuery } = await import("../../academic/search-index.js");
+        let index = await loadSearchIndex();
+        if (!index) {
+          index = await buildSearchIndex();
+          await saveSearchIndex(index);
+        }
+        const resolvedMode = mode ?? classifyQuery(query);
+        const opts: Record<string, unknown> = { course, type, topN, mode: resolvedMode };
+        if (graphExpand !== undefined) opts.graphExpand = graphExpand;
+        if (vectorSearch !== undefined) opts.vectorSearch = vectorSearch;
+        const results = searchIndex(index, query, opts as { course?: string; type?: "concept" | "lecture" | "assignment" | "paper" | "synthesis" | "resource"; topN?: number; mode?: "fast" | "standard" | "deep"; graphExpand?: boolean; vectorSearch?: boolean });
+        return {
+          query,
+          mode: resolvedMode,
+          results,
+          count: results.length,
+          totalDocs: index.docCount,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : "Search failed",
+          query,
+        };
+      }
+    },
+  },
+
   "deep-research": {
     description: "Perform deep multi-round academic research on a topic. Use for complex questions requiring synthesis from multiple sources. Returns immediately with a sessionId — the user tracks progress in the Deep Research panel.",
     inputSchema: z.object({

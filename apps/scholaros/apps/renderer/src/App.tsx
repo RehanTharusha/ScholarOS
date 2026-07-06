@@ -732,7 +732,6 @@ function App() {
   const [canvasDataByPath, setCanvasDataByPath] = useState<
     Record<string, CanvasData>
   >({});
-  const [isIngestProcessing, setIsIngestProcessing] = useState(false);
   const [expandedFrom, setExpandedFrom] = useState<{
     path: string | null;
     graph: boolean;
@@ -1659,6 +1658,14 @@ function App() {
     let cancelled = false;
     (async () => {
       try {
+        // Virtual paths (starts with __scholar) handle their own rendering — skip file ops.
+        if (pathToLoad.startsWith("__scholar")) {
+          setFileContent("");
+          setEditorContent("");
+          editorContentRef.current = "";
+          initialContentRef.current = "";
+          return;
+        }
         // For .md files (from the knowledge tree), skip stat and read directly.
         // For other file types, stat first to check if it's a file vs directory.
         const isKnownFile = pathToLoad.endsWith(".md");
@@ -1997,6 +2004,7 @@ function App() {
             if (msg.role === "user" || msg.role === "assistant") {
               // Extract text content from message
               let textContent = "";
+              let reasoningText: string | undefined;
               let msgAttachments: ChatMessage["attachments"] = undefined;
               if (typeof msg.content === "string") {
                 textContent = msg.content;
@@ -2018,7 +2026,7 @@ function App() {
                   .map((part) => part.text || "")
                   .join("");
 
-                const reasoningText = contentParts
+                reasoningText = contentParts
                   .filter((part) => part.type === "reasoning")
                   .map((part) => ("text" in part ? part.text : "") || "")
                   .join("");
@@ -3938,21 +3946,33 @@ function App() {
     setIsBrowserOpen(false);
   }, []);
 
-  const handleIngestProcess = useCallback(async () => {
-    setIsIngestProcessing(true);
-    try {
-      // Use submitFromPalette which handles creating a new tab, run, and submitting
-      // This will create a new chat tab and send the "ingest" command to the agent
-      submitFromPalette("ingest", null);
+  const handleIngestProcess = useCallback(
+    async (
+      targets?: string[],
+      ingestMode?: "guided" | "autonomous",
+      courseName?: string,
+      semester?: string,
+      topicHint?: string,
+    ) => {
+      try {
+        const flags: string[] = [];
+        if (ingestMode === "guided") flags.push("[INGEST_MODE=guided]");
+        if (courseName) flags.push(`[COURSE=${courseName}]`);
+        if (semester) flags.push(`[SEMESTER=${semester}]`);
+        if (topicHint) flags.push(`[TOPIC=${topicHint}]`);
+        const flagsText = flags.length > 0 ? ` ${flags.join(" ")}` : "";
 
-      toast.success(
-        "Agent started ingesting files. Check the new chat tab for progress.",
-      );
-    } catch (error) {
+        const base = targets?.length
+          ? `ingest${flagsText}\n\nPlease load the file-ingest capability via \`loadCapability("file-ingest")\` and parse the following ${targets.length} file(s) using \`parseFile\`, then classify them and write concept pages as instructed by the capability:\n\n${targets.map((t) => `- ${t}`).join("\n")}`
+          : `ingest${flagsText}`;
+        submitFromPalette(base, null);
+
+        toast.success(
+          "Agent started ingesting files. Check the new chat tab for progress.",
+        );
+      } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(`Failed to start ingestion: ${message}`);
-    } finally {
-      setIsIngestProcessing(false);
     }
   }, [submitFromPalette]);
 
@@ -4302,6 +4322,13 @@ function App() {
       currentViewState,
       setHistory,
     ],
+  );
+
+  const handleOpenPage = useCallback(
+    (path: string) => {
+      navigateToView({ type: "file", path });
+    },
+    [navigateToView],
   );
 
   const navigateBack = useCallback(async () => {
@@ -5585,6 +5612,11 @@ function App() {
     () => createEmptyChatTabViewState(),
     [],
   );
+
+  const activeIngestRunId = React.useMemo(() => {
+    if (selectedPath !== INGEST_TAB_PATH) return undefined;
+    return activeChatTabState.runId ?? undefined;
+  }, [selectedPath, activeChatTabState.runId]);
   const getChatTabStateForRender = useCallback(
     (tabId: string): ChatTabViewState => {
       if (tabId === activeChatTabId) return activeChatTabState;
@@ -6090,7 +6122,8 @@ function App() {
                 ) : selectedPath === INGEST_TAB_PATH ? (
                   <IngestWindow
                     onProcessIngest={handleIngestProcess}
-                    isProcessing={isIngestProcessing}
+                    activeRunId={activeIngestRunId}
+                    onOpenPage={handleOpenPage}
                   />
                 ) : isSuggestedTopicsOpen ? (
                   <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

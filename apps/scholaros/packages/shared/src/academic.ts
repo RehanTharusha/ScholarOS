@@ -12,6 +12,7 @@ export interface AcademicFrontmatter {
   course?: string;
   semester?: string;
   difficulty?: "beginner" | "intermediate" | "advanced";
+  lifecycle?: "fresh" | "needs-review" | "stale";
   sources?: string[]; // File paths or URLs
   tags?: string[];
   relatedConcepts?: string[]; // Links to other concept pages

@@ -45,7 +45,7 @@ const HASHED_DIMENSIONS = 512;
  * Fast, zero dependencies, runs in <1ms. Good enough for course-level classification
  * because academic subjects have distinct vocabulary distributions.
  */
-function hashedEmbedding(text: string, dimensions = HASHED_DIMENSIONS): number[] {
+export function hashedEmbedding(text: string, dimensions = HASHED_DIMENSIONS): number[] {
   const vector = new Array<number>(dimensions).fill(0);
   const tokens = text.toLowerCase().match(/[a-z0-9]+(?:'[a-z0-9]+)?/g) ?? [];
 
@@ -59,13 +59,13 @@ function hashedEmbedding(text: string, dimensions = HASHED_DIMENSIONS): number[]
   return normalizeVector(vector);
 }
 
-function normalizeVector(vector: number[]): number[] {
+export function normalizeVector(vector: number[]): number[] {
   const magnitude = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
   if (!magnitude) return vector;
   return vector.map((v) => v / magnitude);
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   let dot = 0;
   for (let i = 0; i < a.length; i++) {

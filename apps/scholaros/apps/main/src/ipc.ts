@@ -14,7 +14,7 @@ import * as mcpCore from "@scholaros/core/dist/mcp/mcp.js";
 import * as runsCore from "@scholaros/core/dist/runs/runs.js";
 import { bus } from "@scholaros/core/dist/runs/bus.js";
 import { serviceBus } from "@scholaros/core/dist/services/service_bus.js";
-import type { FSWatcher } from "chokidar";
+import chokidar, { type FSWatcher } from "chokidar";
 import fs from "node:fs/promises";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
@@ -47,8 +47,6 @@ import {
 import * as composioHandler from "./composio-handler.js";
 import { search } from "@scholaros/core/dist/search/search.js";
 import { ResearchHandler } from "@scholaros/core/dist/research/research-handler.js";
-import { IngestQueue } from "@scholaros/core/dist/knowledge/ingest-queue.js";
-import { IngestCache } from "@scholaros/core/dist/knowledge/ingest-cache.js";
 import { versionHistory, voice } from "@scholaros/core";
 import { getBillingInfo } from "@scholaros/core/dist/billing/billing.js";
 import { getAccessToken } from "@scholaros/core/dist/auth/tokens.js";
@@ -510,51 +508,7 @@ export function getReviewStore(): ReviewStore | null {
   return reviewStore;
 }
 
-// Ingest Queue lifecycle
-let ingestQueue: IngestQueue | null = null;
-let ingestCache: IngestCache | null = null;
-
-export async function initIngestSystem(): Promise<void> {
-  if (ingestQueue) return;
-  try {
-    ingestQueue = new IngestQueue();
-    await ingestQueue.load();
-
-    ingestCache = new IngestCache();
-    await ingestCache.load();
-
-    // Forward queue events to renderer windows
-    ingestQueue.on("progress", (event) => {
-      const windows = BrowserWindow.getAllWindows();
-      for (const win of windows) {
-        if (!win.isDestroyed() && win.webContents) {
-          win.webContents.send("ingest:progress", event);
-        }
-      }
-    });
-
-    ingestQueue.on("status", (event) => {
-      const windows = BrowserWindow.getAllWindows();
-      for (const win of windows) {
-        if (!win.isDestroyed() && win.webContents) {
-          win.webContents.send("ingest:progress", { ...event, stage: event.status });
-        }
-      }
-    });
-
-    console.log('[Ingest] System initialized');
-  } catch (err) {
-    console.error('[Ingest] Failed to initialize:', err);
-  }
-}
-
-export function getIngestQueue(): IngestQueue | null {
-  return ingestQueue;
-}
-
-export function getIngestCache(): IngestCache | null {
-  return ingestCache;
-}
+let rawWatcher: ReturnType<typeof chokidar.watch> | null = null;
 
 // ============================================================================
 // Handler Implementations
@@ -622,16 +576,18 @@ export function setupIpcHandlers() {
         sourcePath: string;
         targetPath: string;
         name: string;
+        size?: number;
+        sourceFolder?: string;
       }> = [];
       const errors: string[] = [];
 
-      for (const sourcePath of args.files) {
+      const stageSingleFile = async (
+        sourcePath: string,
+        sourceFolder?: string,
+      ) => {
         try {
           const sourceStat = await fs.stat(sourcePath);
-          if (!sourceStat.isFile()) {
-            errors.push(`${sourcePath} is not a file`);
-            continue;
-          }
+          if (!sourceStat.isFile()) return;
 
           const originalName = path.basename(sourcePath);
           const destinationPath = await ensureUniqueWorkspaceDestination(
@@ -646,68 +602,108 @@ export function setupIpcHandlers() {
             sourcePath,
             targetPath: destinationPath,
             name: path.basename(destinationPath),
+            size: sourceStat.size,
+            sourceFolder,
           });
         } catch (error) {
           errors.push(error instanceof Error ? error.message : String(error));
+        }
+      };
+
+      const walkFolder = async (
+        dirPath: string,
+        rootPath: string,
+      ): Promise<void> => {
+        try {
+          const entries = await fs.readdir(dirPath, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path.join(dirPath, entry.name);
+            if (entry.isDirectory()) {
+              await walkFolder(fullPath, rootPath);
+            } else if (entry.isFile()) {
+              const relativeDir = path.relative(rootPath, path.dirname(fullPath));
+              await stageSingleFile(fullPath, relativeDir || undefined);
+            }
+          }
+        } catch (error) {
+          errors.push(
+            `Failed to read folder ${dirPath}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      };
+
+      for (const sourcePath of args.files) {
+        await stageSingleFile(sourcePath, undefined);
+      }
+
+      if (args.folders) {
+        for (const folderPath of args.folders) {
+          await walkFolder(folderPath, folderPath);
         }
       }
 
       return { ok: true as const, stagedFiles, errors };
     },
-    "ingest:enqueue": async (_event, args) => {
-      const queue = getIngestQueue();
-      if (!queue) throw new Error("Ingest system not initialized");
+    "ingest:pickFolder": async () => {
+      const win = BrowserWindow.getFocusedWindow();
+      if (!win) return { paths: [], cancelled: true };
+      const result = await dialog.showOpenDialog(win, {
+        properties: ["openDirectory", "multiSelections"],
+      });
+      if (result.canceled) return { paths: [], cancelled: true };
+      return { paths: result.filePaths, cancelled: false };
+    },
+    "ingest:watchRaw": async (_event, args) => {
+      if (args.enabled && !rawWatcher) {
+        const { root: workspaceRoot } = await workspace.getRoot();
+        const rawDir = path.join(workspaceRoot, "raw");
+        await fs.mkdir(rawDir, { recursive: true });
 
-      const { root: workspaceRoot } = await workspace.getRoot();
-      const rawDirectory = path.join(workspaceRoot, "raw");
-      await fs.mkdir(rawDirectory, { recursive: true });
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+        const pendingFiles: Array<{
+          sourcePath: string;
+          targetPath: string;
+          name: string;
+          size?: number;
+          sourceFolder?: string;
+        }> = [];
 
-      const items: Array<{
-        id: string;
-        sourcePath: string;
-        fileName: string;
-        status: "queued" | "processing" | "completed" | "failed" | "cancelled";
-        retryCount: number;
-        maxRetries: number;
-        progress: number;
-        stage: string;
-        error?: string;
-        createdAt: number;
-        updatedAt: number;
-      }> = [];
+        rawWatcher = chokidar.watch(rawDir, {
+          ignoreInitial: true,
+          depth: 0,
+          awaitWriteFinish: { stabilityThreshold: 1500, pollInterval: 200 },
+        });
 
-      for (const sourcePath of args.files) {
-        const sourceStat = await fs.stat(sourcePath).catch(() => null);
-        if (!sourceStat?.isFile()) continue;
+        const flushPending = () => {
+          if (pendingFiles.length === 0) return;
+          const files = [...pendingFiles];
+          pendingFiles.length = 0;
+          const windows = BrowserWindow.getAllWindows();
+          for (const win of windows) {
+            if (!win.isDestroyed() && win.webContents) {
+              win.webContents.send("ingest:rawFileEvent", { files });
+            }
+          }
+        };
 
-        const originalName = path.basename(sourcePath);
-        const destinationPath = await ensureUniqueWorkspaceDestination(
-          path.join(rawDirectory, originalName),
-        );
+        rawWatcher.on("add", (filePath: string) => {
+          const fileName = path.basename(filePath);
+          pendingFiles.push({
+            sourcePath: filePath,
+            targetPath: filePath,
+            name: fileName,
+          });
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(flushPending, 1500);
+        });
 
-        if (path.resolve(sourcePath) !== path.resolve(destinationPath)) {
-          await fs.copyFile(sourcePath, destinationPath).catch(() => {});
-        }
-
-        const itemId = await queue.enqueue(destinationPath, originalName);
-        const qItem = queue.get(itemId);
-        if (qItem) {
-          items.push(qItem);
-        }
+        console.log("[Ingest] Raw watcher started");
+      } else if (!args.enabled && rawWatcher) {
+        await rawWatcher.close();
+        rawWatcher = null;
+        console.log("[Ingest] Raw watcher stopped");
       }
-
-      return { items };
-    },
-    "ingest:cancel": async (_event, args) => {
-      const queue = getIngestQueue();
-      if (!queue) return { success: false };
-      const success = await queue.cancel(args.itemId);
-      return { success };
-    },
-    "ingest:queueStatus": async () => {
-      const queue = getIngestQueue();
-      if (!queue) return { items: [] };
-      return { items: queue.getItems() };
+      return { ok: true };
     },
     "mcp:listTools": async (_event, args) => {
       return mcpCore.listTools(args.serverName, args.cursor);

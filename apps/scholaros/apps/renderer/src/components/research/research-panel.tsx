@@ -4,10 +4,9 @@ import * as React from "react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { AcademicPageShell, AcademicPageHeader } from "@/components/academic/academic-shell"
-import { ResearchSynapse } from "./research-synapse"
+import { CheckCircle, Copy, MessageSquare, Search, Trash2, XCircle } from "lucide-react"
 
 type Status = "running" | "done" | "error" | "cancelled"
 
@@ -25,6 +24,123 @@ interface JobCard {
     message?: string
   }
   startedAt: number
+}
+
+const phaseLabels: Record<string, string> = {
+  planning: "Planning",
+  searching: "Searching",
+  extracting: "Extracting",
+  synthesizing: "Synthesizing",
+  deciding: "Evaluating",
+  finalizing: "Finalizing",
+}
+
+function JobCardRunning({ job }: { job: JobCard }) {
+  const pct = job.progress.totalRounds > 0
+    ? Math.round((job.progress.round / job.progress.totalRounds) * 100)
+    : 0
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-500 opacity-40" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+        </span>
+        <span className="text-xs font-medium text-foreground">
+          {phaseLabels[job.progress.phase] || job.progress.phase}
+        </span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          R{job.progress.round}/{job.progress.totalRounds}
+        </span>
+      </div>
+      <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-blue-500 transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {job.progress.message && (
+        <p className="text-xs text-muted-foreground line-clamp-1">{job.progress.message}</p>
+      )}
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="tabular-nums">{job.progress.sourcesFound} sources</span>
+        <span className="tabular-nums">{job.progress.findingsCount} findings</span>
+      </div>
+    </div>
+  )
+}
+
+function JobCardDone({
+  job,
+  onCopy,
+  onDiscuss,
+  onDelete,
+}: {
+  job: JobCard
+  onCopy: () => void
+  onDiscuss: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="t-success-check" data-state="in" aria-hidden="true">
+          <CheckCircle className="h-4 w-4 text-emerald-500" />
+        </span>
+        <span className="text-sm font-medium text-foreground">Done</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={onCopy}>
+          <Copy className="h-3 w-3" />
+          Copy Report
+        </Button>
+        <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={onDiscuss}>
+          <MessageSquare className="h-3 w-3" />
+          Discuss
+        </Button>
+        <div className="flex-1" />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function JobCardError({
+  job,
+  onRetry,
+  onDismiss,
+}: {
+  job: JobCard
+  onRetry: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <XCircle className="h-4 w-4 text-red-500" />
+        <span className="text-sm font-medium text-foreground">Error</span>
+      </div>
+      {job.progress.message && (
+        <p className="text-xs text-destructive">{job.progress.message}</p>
+      )}
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onRetry}>
+          Retry
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={onDismiss}>
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 export function ResearchPanel({ children, onDiscuss }: { children: React.ReactNode; onDiscuss?: (query: string, report: string) => void }) {
@@ -163,70 +279,37 @@ export function ResearchPanel({ children, onDiscuss }: { children: React.ReactNo
             )}
 
             {jobs.map(job => (
-              <div key={job.sessionId} className="rounded-lg border p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{job.query}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {job.status === "running" && (
-                        <Badge variant="default" className="animate-pulse">Running</Badge>
-                      )}
-                      {job.status === "done" && <Badge variant="secondary">Done</Badge>}
-                      {job.status === "error" && <Badge variant="destructive">Error</Badge>}
-                      {job.status === "cancelled" && <Badge variant="outline">Cancelled</Badge>}
-                      {job.status === "running" && (
-                        <span className="text-xs text-muted-foreground">
-                          {job.progress.phase} • R{job.progress.round}/{job.progress.totalRounds}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {job.status === "running" && (
-                    <ResearchSynapse progress={job.progress} />
-                  )}
-                </div>
+              <div key={job.sessionId} className="rounded-lg border p-3 space-y-2">
+                <p className="text-sm font-medium truncate">{job.query}</p>
 
                 {job.status === "running" && (
-                  <div className="space-y-2">
-                    <Progress value={(job.progress.round / job.progress.totalRounds) * 100} />
-                    {job.progress.message && (
-                      <p className="text-xs text-muted-foreground">{job.progress.message}</p>
-                    )}
-                  </div>
+                  <JobCardRunning job={job} />
                 )}
 
                 {job.status === "done" && (
-                  <div className="space-y-2">
-                    <div className="flex gap-2 flex-wrap">
-                      <Button size="sm" variant="outline" onClick={() => handleCopy(job.sessionId)}>
-                        Copy Report
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDiscuss(job.sessionId)}>
-                        Discuss
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(job.sessionId)}>
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
+                  <JobCardDone
+                    job={job}
+                    onCopy={() => handleCopy(job.sessionId)}
+                    onDiscuss={() => handleDiscuss(job.sessionId)}
+                    onDelete={() => handleDelete(job.sessionId)}
+                  />
                 )}
 
                 {job.status === "error" && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-destructive">{job.progress.message || "Research failed"}</p>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleRetry(job.query)}>
-                        Retry
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDelete(job.sessionId)}>
-                        Dismiss
-                      </Button>
-                    </div>
-                  </div>
+                  <JobCardError
+                    job={job}
+                    onRetry={() => handleRetry(job.query)}
+                    onDismiss={() => handleDelete(job.sessionId)}
+                  />
                 )}
 
                 {job.status === "cancelled" && (
-                  <Button size="sm" variant="outline" onClick={() => handleDelete(job.sessionId)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-muted-foreground"
+                    onClick={() => handleDelete(job.sessionId)}
+                  >
                     Dismiss
                   </Button>
                 )}

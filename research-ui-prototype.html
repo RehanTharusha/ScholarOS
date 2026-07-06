@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Research UI — ScholarOS Prototype</title>
+  <style>
+    /* ═══════════════════════════════════════════════════════════════
+       SCHOLAROS THEME TOKENS
+       ═══════════════════════════════════════════════════════════════ */
+    :root {
+      --bg: #FDFDFC;
+      --bg-card: #ffffff;
+      --bg-muted: #F7F6F3;
+      --border: #E9E9E7;
+      --border-subtle: #F0EFED;
+      --text: oklch(0.145 0 0);
+      --text-muted: oklch(0.556 0 0);
+      --text-dim: oklch(0.7 0 0);
+      --primary: oklch(0.205 0 0);
+      --primary-fg: oklch(0.985 0 0);
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --green-border: #bbf7d0;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --red-border: #fecaca;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+      --blue: #2563eb;
+      --blue-bg: #eff6ff;
+      --blue-border: #bfdbfe;
+      --violet: #7c3aed;
+      --violet-bg: #f5f3ff;
+      --violet-border: #ddd6fe;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-full: 9999px;
+
+      /* transitions-dev */
+      --resize-dur: 300ms;
+      --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --panel-open-dur: 350ms;
+      --panel-close-dur: 250ms;
+      --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --check-opacity-dur: 550ms;
+      --check-rotate-dur: 550ms;
+      --check-rotate-from: 80deg;
+      --check-bob-dur: 450ms;
+      --check-y-amount: 20px;
+      --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+    }
+
+    html.paper {
+      --bg: #f5f4ed;
+      --bg-card: #faf9f5;
+      --bg-muted: #e8e6dc;
+      --border: #e8e6dc;
+      --border-subtle: #ebe9e0;
+      --text: #3d3d3a;
+      --text-muted: #6b6a64;
+      --text-dim: #9a9890;
+      --primary: #1b365d;
+      --primary-fg: #faf9f5;
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --green-border: #bbf7d0;
+      --red: oklch(0.577 0.245 27.325);
+      --red-bg: #fef2f2;
+      --red-border: #fecaca;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+      --blue: #2563eb;
+      --blue-bg: #eff6ff;
+      --blue-border: #bfdbfe;
+      --violet: #7c3aed;
+      --violet-bg: #f5f3ff;
+      --violet-border: #ddd6fe;
+    }
+    html.paper body { font-family: "Charter", "Georgia", "Palatino", serif; }
+
+    html.dark {
+      --bg: #1F1E1B;
+      --bg-card: #23221F;
+      --bg-muted: #2D2B27;
+      --border: #34322D;
+      --border-subtle: #2D2B27;
+      --text: #E6E1D8;
+      --text-muted: oklch(0.708 0 0);
+      --text-dim: oklch(0.55 0 0);
+      --primary: oklch(0.922 0 0);
+      --primary-fg: oklch(0.205 0 0);
+      --green: #22c55e;
+      --green-bg: oklch(0.25 0.04 150);
+      --green-border: oklch(0.35 0.06 150);
+      --red: oklch(0.704 0.191 22.216);
+      --red-bg: oklch(0.25 0.04 25);
+      --red-border: oklch(0.35 0.06 25);
+      --amber: #f59e0b;
+      --amber-bg: oklch(0.25 0.04 70);
+      --amber-border: oklch(0.35 0.06 70);
+      --blue: #60a5fa;
+      --blue-bg: oklch(0.25 0.04 250);
+      --blue-border: oklch(0.35 0.06 250);
+      --violet: #a78bfa;
+      --violet-bg: oklch(0.25 0.04 300);
+      --violet-border: oklch(0.35 0.06 300);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       BASE
+       ═══════════════════════════════════════════════════════════════ */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 32px;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+
+    /* ── Controls ─────────────────────────────────────────────── */
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; }
+    .btn {
+      font-size: 13px; font-weight: 500; padding: 7px 14px;
+      border-radius: var(--radius-sm); border: 1px solid var(--border);
+      background: var(--bg-card); color: var(--text); cursor: pointer;
+      transition: background 150ms ease;
+    }
+    .btn:hover { background: var(--bg-muted); }
+    .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .btn.primary:hover { opacity: 0.9; }
+    .btn.sm { font-size: 12px; padding: 5px 10px; }
+    .btn.ghost { border: none; background: none; }
+    .btn.ghost:hover { background: var(--bg-muted); }
+    .btn.green { background: var(--green); color: white; border-color: var(--green); }
+    .btn.red { color: var(--red); border-color: var(--red-border); }
+    .btn.red:hover { background: var(--red-bg); }
+
+    .theme-switcher { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin-left: auto; }
+    .theme-btn { font-size: 12px; font-weight: 500; padding: 6px 12px; border: none; background: var(--bg-card); color: var(--text-muted); cursor: pointer; transition: background 150ms ease, color 150ms ease; border-right: 1px solid var(--border); }
+    .theme-btn:last-child { border-right: none; }
+    .theme-btn:hover { background: var(--bg-muted); }
+    .theme-btn.active { background: var(--text); color: var(--bg); }
+
+    .divider { height: 1px; background: var(--border); margin: 28px 0; }
+    .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 14px; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       1. RESEARCH PROGRESS CARD
+       ═══════════════════════════════════════════════════════════════ */
+    .research-progress {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    .research-progress-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+    }
+
+    /* ── Synapse Visualization ─────────────────────────────────── */
+    .synapse-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .synapse-time {
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--primary);
+      background: var(--bg-card);
+      padding: 1px 6px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border);
+    }
+
+    .research-progress-body { flex: 1; min-width: 0; }
+
+    .phase-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .phase-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--primary);
+      flex-shrink: 0;
+    }
+    .phase-dot.pulse {
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    .phase-label { font-size: 13px; font-weight: 500; color: var(--text); }
+    .phase-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+
+    /* progress track */
+    .progress-track {
+      height: 4px;
+      background: var(--bg-muted);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: var(--radius-full);
+      transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .progress-fill.violet { background: linear-gradient(90deg, var(--violet), #a78bfa); }
+    .progress-fill.blue { background: linear-gradient(90deg, var(--blue), #60a5fa); }
+    .progress-fill.green { background: linear-gradient(90deg, var(--green), #4ade80); }
+    .progress-fill.amber { background: linear-gradient(90deg, var(--amber), #fbbf24); }
+    .progress-fill.red { background: linear-gradient(90deg, var(--red), #f87171); }
+    .progress-fill.fuchsia { background: linear-gradient(90deg, #d946ef, #e879f9); }
+
+    .stats-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    .stat { display: flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+    .stat svg { width: 12px; height: 12px; }
+
+    .cancel-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-full);
+      border: none;
+      background: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 150ms ease, background 150ms ease;
+    }
+    .cancel-btn:hover { color: var(--red); background: var(--red-bg); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       2. RESEARCH COMPLETE CARD
+       ═══════════════════════════════════════════════════════════════ */
+    .research-complete {
+      border: 1px solid var(--green-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    .research-complete-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+    }
+    .research-complete-icon {
+      width: 36px; height: 36px;
+      border-radius: var(--radius-full);
+      background: var(--green-bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .research-complete-icon svg { color: var(--green); }
+    .research-complete-title {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .badge {
+      font-size: 10px; font-weight: 500;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+    .badge.green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+    .badge.blue { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+    .badge.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+    .badge.red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+    .badge.muted { background: var(--bg-muted); color: var(--text-muted); border: 1px solid var(--border); }
+    .research-complete-query { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .research-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 0 16px 12px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* ── Collapsible Sections ──────────────────────────────────── */
+    .collapse-section { border-top: 1px solid var(--border-subtle); }
+    .collapse-trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease;
+    }
+    .collapse-trigger:hover { background: var(--bg-muted); color: var(--text); }
+    .collapse-trigger svg { width: 14px; height: 14px; }
+    .collapse-trigger .chevron {
+      margin-left: auto;
+      transition: transform var(--resize-dur) var(--resize-ease);
+    }
+    .collapse-trigger.open .chevron { transform: rotate(90deg); }
+
+    .collapse-body {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--resize-dur) var(--resize-ease);
+    }
+    .collapse-body > div { overflow: hidden; }
+    .collapse-body.open { grid-template-rows: 1fr; }
+
+    .collapse-content {
+      padding: 0 16px 12px;
+    }
+
+    /* source cards */
+    .source-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-muted);
+      margin-bottom: 6px;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+    .source-card:hover { border-color: var(--border); background: var(--bg-card); }
+    .source-card .icon { color: var(--text-dim); margin-top: 2px; flex-shrink: 0; }
+    .source-card .title { font-size: 12px; font-weight: 500; color: var(--text); }
+    .source-card .url { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+    .source-card .snippet { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+    .source-card .ext { color: var(--text-dim); opacity: 0; transition: opacity 150ms ease; flex-shrink: 0; margin-top: 2px; }
+    .source-card:hover .ext { opacity: 1; }
+
+    /* finding items */
+    .finding-item {
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-muted);
+      margin-bottom: 6px;
+      transition: background 150ms ease;
+    }
+    .finding-item:hover { background: var(--bg-card); }
+    .finding-title { font-size: 12px; font-weight: 500; color: var(--text); }
+    .finding-title:hover { color: var(--primary); }
+    .finding-summary { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+
+    /* report preview */
+    .report-preview {
+      max-height: 240px;
+      overflow-y: auto;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-muted);
+      padding: 12px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text-muted);
+    }
+
+    /* action bar */
+    .action-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       3. RESEARCH PANEL (side sheet mock)
+       ═══════════════════════════════════════════════════════════════ */
+    .panel-mock {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    .panel-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .panel-eyebrow {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 2px;
+    }
+    .panel-title { font-size: 16px; font-weight: 600; color: var(--text); }
+    .panel-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .panel-form {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .panel-textarea {
+      width: 100%;
+      min-height: 72px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--bg-card);
+      resize: vertical;
+      transition: border-color 150ms ease;
+    }
+    .panel-textarea:focus { outline: none; border-color: var(--primary); }
+    .panel-textarea::placeholder { color: var(--text-dim); }
+
+    .panel-row { display: flex; gap: 8px; margin-top: 8px; }
+    .panel-select {
+      flex: 1;
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0 10px;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--bg-card);
+      cursor: pointer;
+    }
+
+    .panel-jobs { padding: 16px; }
+
+    /* job card */
+    .job-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+      transition: border-color 150ms ease;
+    }
+    .job-card:hover { border-color: color-mix(in oklch, var(--border) 70%, var(--text) 30%); }
+    .job-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .job-query { font-size: 13px; font-weight: 500; color: var(--text); }
+    .job-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .job-phase { font-size: 11px; color: var(--text-dim); }
+
+    .job-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+
+    .empty-state {
+      padding: 48px 0;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       4. RESEARCH TOGGLE (chat input)
+       ═══════════════════════════════════════════════════════════════ */
+    .input-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      margin: 12px 0;
+    }
+    .input-bar input {
+      flex: 1;
+      border: none;
+      background: none;
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+    }
+    .input-bar input::placeholder { color: var(--text-dim); }
+
+    .research-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border);
+      background: var(--bg-muted);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 150ms ease;
+      flex-shrink: 0;
+    }
+    .research-toggle:hover { border-color: var(--green-border); color: var(--green); }
+    .research-toggle.active {
+      background: var(--green-bg);
+      border-color: var(--green-border);
+      color: var(--green);
+    }
+    .research-toggle svg { width: 14px; height: 14px; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       TRANSITIONS-DEV — verbatim from skill reference files
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* ── 10-success-check.md ─────────────────────────────────────── */
+    .t-success-check {
+      display: inline-block;
+      transform-origin: center;
+      opacity: 0;
+      will-change: transform, opacity, filter;
+    }
+    .t-success-check svg { display: block; overflow: visible; }
+    .t-success-check svg path {
+      stroke-dasharray: 20;
+      stroke-dashoffset: 20;
+    }
+    .t-success-check[data-state="in"] {
+      animation:
+        t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) forwards,
+        t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  forwards,
+        t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     forwards,
+        t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     forwards;
+    }
+    .t-success-check[data-state="in"] svg path {
+      animation: t-check-draw var(--check-path-dur) var(--check-ease-path) var(--check-path-delay, 0ms) forwards;
+    }
+    @keyframes t-check-fade   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes t-check-rotate { from { transform: rotate(var(--check-rotate-from)); } to { transform: rotate(0deg); } }
+    @keyframes t-check-blur   { from { filter: blur(var(--check-blur-from)); } to { filter: blur(0); } }
+    @keyframes t-check-bob    { from { translate: 0 var(--check-y-amount); } to { translate: 0 0; } }
+    @keyframes t-check-draw   { to { stroke-dashoffset: 0; } }
+
+    /* ── 04-text-states-swap.md ──────────────────────────────────── */
+    .t-text-swap {
+      display: inline-block;
+      transform: translateY(0);
+      filter: blur(0);
+      opacity: 1;
+      transition:
+        transform var(--text-swap-dur) var(--text-swap-ease),
+        filter    var(--text-swap-dur) var(--text-swap-ease),
+        opacity   var(--text-swap-dur) var(--text-swap-ease);
+      will-change: transform, filter, opacity;
+    }
+    .t-text-swap.is-exit {
+      transform: translateY(calc(var(--text-swap-translate-y) * -1));
+      filter: blur(var(--text-swap-blur));
+      opacity: 0;
+    }
+    .t-text-swap.is-enter-start {
+      transform: translateY(var(--text-swap-translate-y));
+      filter: blur(var(--text-swap-blur));
+      opacity: 0;
+      transition: none;
+    }
+
+    /* ── 02-number-pop-in.md ─────────────────────────────────────── */
+    @keyframes t-digit-pop-in {
+      0%   {
+        transform: translate(
+          calc(var(--digit-distance) * var(--digit-dir-x)),
+          calc(var(--digit-distance) * var(--digit-dir-y))
+        );
+        opacity: 0;
+        filter: blur(var(--digit-blur));
+      }
+      100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
+    }
+    .t-digit-group { display: inline-flex; align-items: baseline; }
+    .t-digit {
+      display: inline-block;
+      will-change: transform, opacity, filter;
+    }
+    .t-digit-group.is-animating .t-digit {
+      animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+    }
+    .t-digit-group.is-animating .t-digit[data-stagger="1"] {
+      animation-delay: var(--digit-stagger);
+    }
+    .t-digit-group.is-animating .t-digit[data-stagger="2"] {
+      animation-delay: calc(var(--digit-stagger) * 2);
+    }
+
+    /* ── 12-error-state-shake.md ─────────────────────────────────── */
+    .t-input {
+      transition: border-color 150ms ease-out;
+      will-change: transform;
+    }
+    .t-input.is-error {
+      transition: border-color var(--revert-dur, 280ms) ease-out;
+    }
+    .t-error-msg {
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity    var(--revert-dur, 280ms) ease-out,
+        visibility 0s linear var(--revert-dur, 280ms);
+    }
+    .t-input-wrap.is-error .t-error-msg {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity    var(--revert-dur, 280ms) ease-out,
+        visibility 0s linear 0s;
+    }
+    .t-input.is-shaking {
+      animation: t-input-shake calc(
+          var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2
+        ) linear;
+    }
+    @keyframes t-input-shake {
+      0%      { transform: translateX(0);                                 animation-timing-function: var(--shake-ease); }
+      28.57%  { transform: translateX(var(--shake-distance));             animation-timing-function: var(--shake-ease); }
+      57.14%  { transform: translateX(calc(var(--shake-distance) * -1)); animation-timing-function: var(--shake-ease); }
+      78.57%  { transform: translateX(var(--shake-overshoot));            animation-timing-function: var(--shake-ease); }
+      100%    { transform: translateX(0); }
+    }
+
+    /* ── Reduced motion (all transitions) ────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .t-success-check { animation: none !important; opacity: 1; }
+      .t-success-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }
+      .t-text-swap { transition: none !important; }
+      .t-digit-group .t-digit { animation: none !important; }
+      .t-input { animation: none !important; transform: none !important; }
+      .collapse-body, .collapse-body > div { transition: none !important; }
+      .phase-dot.pulse { animation: none !important; }
+      .progress-fill { transition: none !important; }
+      g[style*="globe-spin"] { animation: none !important; }
+      g[style*="gear-spin"] { animation: none !important; }
+    }
+
+    /* ── Custom keyframes ────────────────────────────────────────── */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    @keyframes globe-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes gear-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes gear-spin-reverse {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(-360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Deep Research UI</h1>
+  <p class="subtitle">Redesigned components — click to expand/collapse sections, toggle themes</p>
+
+  <div class="controls">
+    <div class="theme-switcher">
+      <button class="theme-btn active" data-theme="light" onclick="setTheme('light')">Light</button>
+      <button class="theme-btn" data-theme="paper" onclick="setTheme('paper')">Paper</button>
+      <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')">Dark</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       1. RESEARCH PROGRESS — Searching phase
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section-label">1. Research Progress — Searching</div>
+
+  <div class="research-progress" style="position:relative">
+    <button class="cancel-btn" title="Cancel research">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <div class="research-progress-header">
+      <!-- Radial progress ring — 50% (3/6 rounds) with spinning globe -->
+      <div class="synapse-wrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <!-- track -->
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <!-- fill: 50% -->
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--blue)" stroke-width="3"
+            stroke-linecap="round"
+            stroke-dasharray="163.36"
+            stroke-dashoffset="81.68"
+            style="transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset 600ms cubic-bezier(0.22,1,0.36,1)"/>
+          <!-- globe -->
+          <g clip-path="url(#globe-clip-blue)">
+            <!-- globe body -->
+            <circle cx="32" cy="32" r="11" fill="none" stroke="var(--blue)" stroke-width="1.5"/>
+            <!-- meridians (vertical ellipses) — spinning -->
+            <g style="animation: globe-spin 6s linear infinite; transform-origin: 32px 32px;">
+              <ellipse cx="32" cy="32" rx="11" ry="4" fill="none" stroke="var(--blue)" stroke-width="0.8" opacity="0.4"/>
+              <ellipse cx="32" cy="32" rx="6" ry="11" fill="none" stroke="var(--blue)" stroke-width="0.8" opacity="0.4"/>
+            </g>
+            <!-- equator + tropics (horizontal lines) -->
+            <line x1="21" y1="32" x2="43" y2="32" stroke="var(--blue)" stroke-width="0.8" opacity="0.5"/>
+            <line x1="22.5" y1="27" x2="41.5" y2="27" stroke="var(--blue)" stroke-width="0.6" opacity="0.3"/>
+            <line x1="22.5" y1="37" x2="41.5" y2="37" stroke="var(--blue)" stroke-width="0.6" opacity="0.3"/>
+          </g>
+        </svg>
+        <div class="synapse-time">02:34</div>
+      </div>
+
+      <div class="research-progress-body">
+        <div class="phase-row">
+          <div class="phase-dot pulse"></div>
+          <span class="phase-label t-text-swap" id="phase-label-1">Searching for sources</span>
+        </div>
+        <div class="phase-sub t-text-swap" id="phase-sub-1">Querying Google Scholar for "transformer attention mechanisms"</div>
+        <div class="progress-track">
+          <div class="progress-fill blue" style="width: 50%"></div>
+        </div>
+        <div class="stats-row">
+          <span class="stat">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 5V8L10 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Round <span class="t-digit-group is-animating" id="stat-round-1"><span class="t-digit">3</span></span>/<span class="t-digit-group is-animating"><span class="t-digit">6</span></span>
+          </span>
+          <span class="stat">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M10.5 10.5L13 13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span class="t-digit-group is-animating" id="stat-sources-1"><span class="t-digit">1</span><span class="t-digit" data-stagger="1">2</span></span> sources
+          </span>
+          <span class="stat">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 4H13M3 8H9M3 12H11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span class="t-digit-group is-animating" id="stat-findings-1"><span class="t-digit">8</span></span> findings
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       2. RESEARCH PROGRESS — Synthesizing (gears icon)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section-label">2. Research Progress — Synthesizing</div>
+
+  <div class="research-progress" style="position:relative">
+    <button class="cancel-btn" title="Cancel research">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2L10 10M10 2L2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <div class="research-progress-header">
+      <!-- gears ring -->
+      <div class="synapse-wrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--amber)" stroke-width="3"
+            stroke-linecap="round" stroke-dasharray="163.36" stroke-dashoffset="40.84"
+            style="transform:rotate(-90deg);transform-origin:center;transition:stroke-dashoffset 600ms cubic-bezier(0.22,1,0.36,1)"/>
+          <!-- gear 1 (left, larger) -->
+          <g style="animation: gear-spin 4s linear infinite; transform-origin: 26px 30px;">
+            <circle cx="26" cy="30" r="7" fill="none" stroke="var(--amber)" stroke-width="1.5"/>
+            <circle cx="26" cy="30" r="2.5" fill="var(--amber)" opacity="0.3"/>
+            <line x1="26" y1="22" x2="26" y2="24" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="26" y1="36" x2="26" y2="38" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="18" y1="30" x2="20" y2="30" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="32" y1="30" x2="34" y2="30" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="20.3" y1="24.3" x2="21.7" y2="25.7" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="30.3" y1="34.3" x2="31.7" y2="35.7" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="20.3" y1="35.7" x2="21.7" y2="34.3" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="30.3" y1="25.7" x2="31.7" y2="24.3" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <!-- gear 2 (right, smaller, counter-rotate) -->
+          <g style="animation: gear-spin-reverse 3s linear infinite; transform-origin: 38px 36px;">
+            <circle cx="38" cy="36" r="5" fill="none" stroke="var(--amber)" stroke-width="1.5"/>
+            <circle cx="38" cy="36" r="1.8" fill="var(--amber)" opacity="0.3"/>
+            <line x1="38" y1="30" x2="38" y2="31.5" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="38" y1="40.5" x2="38" y2="42" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="32" y1="36" x2="33.5" y2="36" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="42.5" y1="36" x2="44" y2="36" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+        <div class="synapse-time">05:12</div>
+      </div>
+
+      <div class="research-progress-body">
+        <div class="phase-row">
+          <div class="phase-dot pulse" style="background:var(--amber)"></div>
+          <span class="phase-label t-text-swap" id="phase-label-2">Synthesizing information</span>
+        </div>
+        <div class="phase-sub t-text-swap" id="phase-sub-2">Cross-referencing findings across 5 sources</div>
+        <div class="progress-track">
+          <div class="progress-fill amber" style="width:75%"></div>
+        </div>
+        <div class="stats-row">
+          <span class="stat">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 5V8L10 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Round <span class="t-digit-group is-animating"><span class="t-digit">5</span></span>/<span class="t-digit-group is-animating"><span class="t-digit">6</span></span>
+          </span>
+          <span class="stat">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M10.5 10.5L13 13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span class="t-digit-group is-animating"><span class="t-digit">1</span><span class="t-digit" data-stagger="1">8</span></span> sources
+          </span>
+          <span class="stat">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 4H13M3 8H9M3 12H11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span class="t-digit-group is-animating"><span class="t-digit">1</span><span class="t-digit" data-stagger="1">4</span></span> findings
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       3. RESEARCH COMPLETE
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section-label">3. Research Complete</div>
+
+  <div class="research-complete">
+    <div class="research-complete-header">
+      <div class="research-complete-icon">
+        <span class="t-success-check" data-state="in" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="research-complete-title">
+          Research Complete
+          <span class="badge green">Done</span>
+        </div>
+        <div class="research-complete-query">Comparing transformer attention mechanisms: self-attention, cross-attention, and sparse attention patterns</div>
+      </div>
+    </div>
+
+    <div class="research-stats">
+      <span class="stat">
+        <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 5V8L10 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        4m 32s
+      </span>
+      <span class="stat">
+        <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M10.5 10.5L13 13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        24 searches
+      </span>
+      <span class="stat">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M3 4H13M3 8H9M3 12H11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        18 sources
+      </span>
+      <span class="stat">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M3 3L8 1L13 3V8L8 13L3 8Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        6 rounds
+      </span>
+    </div>
+
+    <!-- Sources -->
+    <div class="collapse-section">
+      <button class="collapse-trigger" onclick="toggleCollapse(this)">
+        <svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M10.5 10.5L13 13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span>18 Sources</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="collapse-body">
+        <div>
+          <div class="collapse-content">
+            <a class="source-card" href="#" onclick="return false">
+              <svg class="icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 4M4 8H10M4 12H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <div style="flex:1;min-width:0">
+                <div class="title">Attention Is All You Need — Vaswani et al.</div>
+                <div class="url">arxiv.org/abs/1706.03762</div>
+                <div class="snippet">We propose a new simple network architecture, the Transformer, based solely on attention mechanisms...</div>
+              </div>
+              <svg class="ext" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3.5 2H10V8.5M10 2L2 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <a class="source-card" href="#" onclick="return false">
+              <svg class="icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 4M4 8H10M4 12H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <div style="flex:1;min-width:0">
+                <div class="title">Efficient Attention: Linear Complexity — Shen et al.</div>
+                <div class="url">arxiv.org/abs/2109.07958</div>
+              </div>
+              <svg class="ext" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3.5 2H10V8.5M10 2L2 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <a class="source-card" href="#" onclick="return false">
+              <svg class="icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 4M4 8H10M4 12H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <div style="flex:1;min-width:0">
+                <div class="title">Sparse Attention Patterns — Child et al.</div>
+                <div class="url">arxiv.org/abs/1904.10509</div>
+              </div>
+              <svg class="ext" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3.5 2H10V8.5M10 2L2 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+            <div style="text-align:center;font-size:11px;color:var(--text-dim);padding:4px 0">+15 more sources</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Findings -->
+    <div class="collapse-section">
+      <button class="collapse-trigger" onclick="toggleCollapse(this)">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M4 4L12 4M4 8H10M4 12H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span>5 Key Findings</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="collapse-body">
+        <div>
+          <div class="collapse-content">
+            <div class="finding-item">
+              <div class="finding-title">Self-attention computes queries, keys, and values from the same sequence</div>
+              <div class="finding-summary">The core mechanism allows each position to attend to all positions in the previous layer, enabling global dependency modeling without recurrence.</div>
+            </div>
+            <div class="finding-item">
+              <div class="finding-title">Cross-attention bridges encoder and decoder representations</div>
+              <div class="finding-summary">Queries come from the decoder while keys and values come from the encoder, enabling sequence-to-sequence alignment.</div>
+            </div>
+            <div class="finding-item">
+              <div class="finding-title">Sparse attention reduces complexity from O(n²) to O(n√n)</div>
+              <div class="finding-summary">By limiting attention to local windows + strided positions, sparse patterns maintain quality while enabling longer contexts.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Full Report -->
+    <div class="collapse-section">
+      <button class="collapse-trigger" onclick="toggleCollapse(this)">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M3 2H13V14H3Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5 5H11M5 8H11M5 11H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span>Full Report</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2L8 6L4 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="collapse-body">
+        <div>
+          <div class="collapse-content">
+            <div class="report-preview">## Transformer Attention Mechanisms: A Comparative Analysis
+
+### Self-Attention
+Self-attention is the foundational mechanism in the Transformer architecture. For each position in the input sequence, it computes three vectors: query (Q), key (K), and value (V) through learned linear projections. The attention score between positions i and j is computed as the dot product of Q_i and K_j, scaled by √d_k, and passed through a softmax to obtain attention weights.
+
+### Cross-Attention
+Cross-attention extends the self-attention mechanism to operate between two different sequences. In the Transformer decoder, queries are derived from the decoder's output while keys and values come from the encoder's representation. This enables the model to attend to relevant parts of the input sequence while generating output.
+
+### Sparse Attention
+Sparse attention patterns reduce the quadratic complexity of standard attention by limiting which positions can attend to each other. The Sparse Transformer introduces two patterns: local (attending to nearby positions) and strided (attending to positions at fixed intervals), achieving O(n√n) complexity.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-bar">
+      <button class="btn sm" onclick="this.textContent='Copied!'">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="vertical-align:-1px"><rect x="3.5" y="3.5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M8.5 3.5V2.5C8.5 1.95 8.05 1.5 7.5 1.5H2.5C1.95 1.5 1.5 1.95 1.5 2.5V7.5C1.5 8.05 1.95 8.5 2.5 8.5H3.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        Copy
+      </button>
+      <button class="btn sm">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="vertical-align:-1px"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3.5V6L7.5 7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Panel
+      </button>
+      <button class="btn sm">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="vertical-align:-1px"><path d="M2 2H10V10H2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M4 5H8M4 7H8M4 9H6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        HTML
+      </button>
+      <button class="btn sm green">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="vertical-align:-1px"><path d="M1 10V8C1 6 3 4 6 4C9 4 11 6 11 8V10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="3" r="2" stroke="currentColor" stroke-width="1.2"/></svg>
+        Discuss
+      </button>
+      <div style="flex:1"></div>
+      <button class="btn sm ghost" style="color:var(--text-dim)">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3H10M4 3V2H8V3M3 3V10.5C3 10.8 3.2 11 3.5 11H8.5C8.8 11 9 10.8 9 10.5V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       4. RESEARCH PANEL (side sheet)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section-label">4. Research Panel — Side Sheet</div>
+
+  <div class="panel-mock">
+    <div class="panel-header">
+      <div class="panel-eyebrow">ScholarOS</div>
+      <div class="panel-title">Deep Research</div>
+      <div class="panel-desc">Multi-round academic research with web search and synthesis</div>
+    </div>
+
+    <div class="panel-form">
+      <textarea class="panel-textarea" placeholder="What would you like to research?">How do transformer attention mechanisms compare to recurrent architectures for long-range dependencies?</textarea>
+      <div class="panel-row">
+        <select class="panel-select">
+          <option>Concept Exploration</option>
+          <option>Literature Review</option>
+          <option>Compare & Contrast</option>
+          <option>Methodology</option>
+          <option>Fact Check</option>
+          <option>Problem Solving</option>
+        </select>
+        <select class="panel-select" style="max-width:80px">
+          <option>4 rounds</option>
+          <option selected>6 rounds</option>
+          <option>8 rounds</option>
+          <option>12 rounds</option>
+        </select>
+        <button class="btn green" style="white-space:nowrap">Start Research</button>
+      </div>
+    </div>
+
+    <div class="panel-jobs">
+      <!-- Running job -->
+      <div class="job-card">
+        <div class="job-header">
+          <div style="flex:1;min-width:0">
+            <div class="job-query">Transformer vs RNN attention</div>
+            <div class="job-meta">
+              <span class="badge amber" style="animation:pulse-dot 1.5s ease-in-out infinite">Running</span>
+              <span class="job-phase">Searching — R3/6</span>
+            </div>
+          </div>
+          <svg width="40" height="40" viewBox="0 0 64 64" style="flex-shrink:0">
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--border)" stroke-width="3"/>
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--amber)" stroke-width="3"
+              stroke-linecap="round" stroke-dasharray="163.36" stroke-dashoffset="81.68"
+              style="transform:rotate(-90deg);transform-origin:center"/>
+            <circle cx="32" cy="32" r="11" fill="none" stroke="var(--amber)" stroke-width="1.5"/>
+            <g style="animation: globe-spin 6s linear infinite; transform-origin: 32px 32px;">
+              <ellipse cx="32" cy="32" rx="11" ry="4" fill="none" stroke="var(--amber)" stroke-width="0.8" opacity="0.4"/>
+              <ellipse cx="32" cy="32" rx="6" ry="11" fill="none" stroke="var(--amber)" stroke-width="0.8" opacity="0.4"/>
+            </g>
+            <line x1="21" y1="32" x2="43" y2="32" stroke="var(--amber)" stroke-width="0.8" opacity="0.5"/>
+          </svg>
+        </div>
+        <div style="margin-top:10px">
+          <div class="progress-track">
+            <div class="progress-fill amber" style="width:50%"></div>
+          </div>
+        </div>
+        <div class="job-actions">
+          <button class="btn sm" style="color:var(--red);border-color:var(--red-border)">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Completed job -->
+      <div class="job-card">
+        <div class="job-header">
+          <div style="flex:1;min-width:0">
+            <div class="job-query">Sparse attention complexity analysis</div>
+            <div class="job-meta">
+              <span class="badge green">Done</span>
+              <span class="job-phase" style="margin-left:4px">4m 12s · 18 sources</span>
+            </div>
+          </div>
+        </div>
+        <div class="job-actions">
+          <button class="btn sm">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="vertical-align:-1px"><rect x="3.5" y="3.5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M8.5 3.5V2.5C8.5 1.95 8.05 1.5 7.5 1.5H2.5C1.95 1.5 1.5 1.95 1.5 2.5V7.5C1.5 8.05 1.95 8.5 2.5 8.5H3.5" stroke="currentColor" stroke-width="1.2"/></svg>
+            Copy
+          </button>
+          <button class="btn sm green">Discuss</button>
+          <button class="btn sm ghost" style="color:var(--text-dim)">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 3H10M4 3V2H8V3M3 3V10.5C3 10.8 3.2 11 3.5 11H8.5C8.8 11 9 10.8 9 10.5V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Error job -->
+      <div class="job-card t-input-wrap is-error" id="error-job">
+        <div class="job-header">
+          <div style="flex:1;min-width:0">
+            <div class="job-query t-input" id="error-job-input">Quantum computing applications</div>
+            <div class="job-meta">
+              <span class="badge red">Error</span>
+              <span class="t-error-msg" style="margin-left:4px;font-size:11px;color:var(--red)">Search API rate limit exceeded</span>
+            </div>
+          </div>
+        </div>
+        <div class="job-actions">
+          <button class="btn sm">Retry</button>
+          <button class="btn sm ghost" style="color:var(--text-dim)">Dismiss</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       5. RESEARCH TOGGLE (chat input)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="section-label">5. Chat Input — Research Toggle</div>
+
+  <div class="input-bar">
+    <input type="text" placeholder="Ask anything..." />
+    <button class="research-toggle" onclick="this.classList.toggle('active')">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M2 3H14V12C14 12.6 13.6 13 13 13H3C2.4 13 2 12.6 2 12V3Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5 3V1.5H11V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 7H10M6 9.5H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      Research
+    </button>
+  </div>
+
+  <div class="input-bar">
+    <input type="text" placeholder="Ask anything..." value="Compare attention mechanisms" />
+    <button class="research-toggle active" onclick="this.classList.toggle('active')">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M2 3H14V12C14 12.6 13.6 13 13 13H3C2.4 13 2 12.6 2 12V3Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5 3V1.5H11V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 7H10M6 9.5H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      Research
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="margin-left:2px"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // THEME SWITCHING
+    // ═══════════════════════════════════════════════════════════
+    function setTheme(theme) {
+      const html = document.documentElement;
+      html.classList.remove('light', 'paper', 'dark');
+      if (theme !== 'light') html.classList.add(theme);
+      document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === theme);
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // COLLAPSE SECTIONS
+    // ═══════════════════════════════════════════════════════════
+    function toggleCollapse(trigger) {
+      trigger.classList.toggle('open');
+      const body = trigger.nextElementSibling;
+      body.classList.toggle('open');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // TEXT STATES SWAP (04-text-states-swap.md — verbatim JS)
+    // ═══════════════════════════════════════════════════════════
+    const swapDur = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("--text-swap-dur")
+    ) || 150;
+
+    function swapText(el, next) {
+      el.classList.add("is-exit");
+      setTimeout(() => {
+        el.textContent = next;
+        el.classList.remove("is-exit");
+        el.classList.add("is-enter-start");
+        void el.offsetHeight; // force reflow
+        el.classList.remove("is-enter-start");
+      }, swapDur);
+    }
+
+    // Demo: cycle phase labels every 4s
+    const phases = [
+      { label: "Planning research strategy", sub: "Analyzing query scope and identifying search strategies" },
+      { label: "Searching for sources", sub: 'Querying Google Scholar for "transformer attention mechanisms"' },
+      { label: "Extracting key findings", sub: "Reading abstracts and extracting relevant data points" },
+      { label: "Synthesizing information", sub: "Cross-referencing findings across 5 sources" },
+      { label: "Evaluating completeness", sub: "Checking coverage against research objectives" },
+      { label: "Finalizing report", sub: "Generating structured output with citations" },
+    ];
+    let phaseIdx = 1; // start at "Searching"
+    setInterval(() => {
+      phaseIdx = (phaseIdx + 1) % phases.length;
+      const label1 = document.getElementById("phase-label-1");
+      const sub1 = document.getElementById("phase-sub-1");
+      if (label1) swapText(label1, phases[phaseIdx].label);
+      if (sub1) swapText(sub1, phases[phaseIdx].sub);
+    }, 4000);
+
+    // ═══════════════════════════════════════════════════════════
+    // ERROR STATE SHAKE (12-error-state-shake.md — verbatim JS)
+    // ═══════════════════════════════════════════════════════════
+    const errorWrap = document.getElementById("error-job");
+    const errorInput = document.getElementById("error-job-input");
+    if (errorWrap && errorInput) {
+      const cs = getComputedStyle(document.documentElement);
+      const ms = (name, fb) => {
+        const v = parseFloat(cs.getPropertyValue(name));
+        return Number.isFinite(v) ? v : fb;
+      };
+
+      // shake on load
+      errorInput.classList.add("is-shaking");
+      const shakeMs = ms("--shake-dur-a", 80) * 2 + ms("--shake-dur-b", 60) * 2;
+      setTimeout(() => errorInput.classList.remove("is-shaking"), shakeMs + 20);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT — trigger success check animations
+    // ═══════════════════════════════════════════════════════════
+    document.querySelectorAll('.t-success-check[data-state="in"]').forEach(el => {
+      el.setAttribute('data-state', 'out');
+      void el.offsetWidth;
+      el.setAttribute('data-state', 'in');
+    });
+  </script>
+</body>
+</html>
