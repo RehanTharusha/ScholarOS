@@ -1163,6 +1163,8 @@ function App() {
     if (isSuggestedTopicsTabPath(tab.path)) return "Suggested Topics";
     if (isArtifactsTabPath(tab.path)) return "Artifacts";
     if (isCalendarTabPath(tab.path)) return "Calendar";
+    if (tab.path === INGEST_TAB_PATH) return "Ingest";
+    if (isCanvasesTabPath(tab.path)) return "Canvases";
     if (isCanvasTabPath(tab.path) && tab.path === CANVAS_TAB_PATH) return "Canvas";
     if (tab.path === BASES_DEFAULT_TAB_PATH) return "Bases";
     if (tab.path.endsWith(".base"))
