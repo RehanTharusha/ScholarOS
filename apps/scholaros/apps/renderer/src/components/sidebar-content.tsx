@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isKnowledgeRelPath } from "@/lib/wiki-links";
 import {
   BookOpen,
+  Check,
+  ChevronUp,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -19,6 +21,7 @@ import {
   Mic,
   Network,
   Pencil,
+  Plus,
   SearchIcon,
   SquarePen,
   Table2,
@@ -223,7 +226,41 @@ export function SidebarContentPanel({
   const { billing } = useBilling(isScholarOSConnected);
   const [vaultPath, setVaultPath] = useState<string | null>(null);
   const [vaultLoading, setVaultLoading] = useState(false);
+  const vaultMenuCloseMs = 120; // matches --dropdown-close-dur in transitions-dev.css
+  const [vaultMenuOpen, setVaultMenuOpen] = useState(false);
+  const [vaultMenuAnim, setVaultMenuAnim] = useState<"open" | "closing" | null>(null);
+  const [manageVaultsOpen, setManageVaultsOpen] = useState(false);
+  type VaultInfo = { id: string; name: string; path: string };
+  const [vaultList, setVaultList] = useState<VaultInfo[]>([]);
+  const [activeVaultId, setActiveVaultId] = useState<string | null>(null);
   const [sidebarView, setSidebarView] = useState<"courses" | "files">("files");
+  const vaultMenuRef = useRef<HTMLDivElement>(null);
+  const vaultTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const cancelVaultTimer = useCallback(() => {
+    if (vaultTimerRef.current) clearTimeout(vaultTimerRef.current);
+  }, []);
+
+  const closeVaultMenu = useCallback(() => {
+    cancelVaultTimer();
+    setVaultMenuAnim("closing");
+    vaultTimerRef.current = setTimeout(() => {
+      setVaultMenuOpen(false);
+      setVaultMenuAnim(null);
+    }, vaultMenuCloseMs);
+  }, [cancelVaultTimer]);
+
+  // Close vault menu on click outside
+  useEffect(() => {
+    if (!vaultMenuOpen && vaultMenuAnim !== "closing") return;
+    const handleClick = (e: MouseEvent) => {
+      if (vaultMenuRef.current && !vaultMenuRef.current.contains(e.target as Node)) {
+        closeVaultMenu();
+      }
+    };
+    document.addEventListener("mousedown", handleClick, true);
+    return () => document.removeEventListener("mousedown", handleClick, true);
+  }, [vaultMenuOpen, vaultMenuAnim, closeVaultMenu]);
 
   // Check if courses.json exists to set default sidebar view
   useEffect(() => {
@@ -237,45 +274,58 @@ export function SidebarContentPanel({
       .catch(() => {});
   }, []);
 
-  // Load saved vault path on mount
+  // Load saved vault path and vault list on mount
   useEffect(() => {
-    ipc
-      .invoke("vault:getPath", null)
-      .then((result) => {
-        if (result.path) {
-          setVaultPath(result.path);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to get vault path:", err);
-      });
+    const load = async () => {
+      try {
+        const [vaultResult, listResult] = await Promise.all([
+          ipc.invoke("vault:getPath", null),
+          ipc.invoke("vault:list", null),
+        ]);
+        if (vaultResult.path) setVaultPath(vaultResult.path);
+        setVaultList(listResult.vaults || []);
+        setActiveVaultId(listResult.activeVaultId);
+      } catch (err) {
+        console.error("Failed to load vault data:", err);
+      }
+    };
+    load();
   }, []);
 
   useEffect(() => {
-    const cleanup = ipc.on("vault:changed", (event) => {
+    const cleanup = ipc.on("vault:changed", async (event) => {
       setVaultPath(event.path);
+      try {
+        const listResult = await ipc.invoke("vault:list", null);
+        setVaultList(listResult.vaults || []);
+        setActiveVaultId(listResult.activeVaultId);
+      } catch {}
     });
     return cleanup;
   }, []);
 
-  // Handle vault selection
-  const handleVaultSelect = useCallback(async () => {
+  // Handle vault switch via vault list
+  const handleVaultSwitch = useCallback(async (id: string) => {
     try {
       setVaultLoading(true);
-      const result = await ipc.invoke("vault:select", null);
+      const result = await ipc.invoke("vault:switch", { id });
       if (result.success && result.path) {
-        setVaultPath(result.path);
-        toast(
-          `Vault changed to: ${result.path.split(/[\\/]/).pop()}.`,
-          "success",
-        );
+        toast(`Switched to vault: ${result.path.split(/[\\/]/).pop()}`, "success");
       }
     } catch (err) {
-      console.error("Failed to select vault:", err);
-      toast("Failed to select vault", "error");
+      console.error("Failed to switch vault:", err);
+      toast("Failed to switch vault", "error");
     } finally {
       setVaultLoading(false);
     }
+  }, []);
+
+  const refreshVaultList = useCallback(async () => {
+    try {
+      const listResult = await ipc.invoke("vault:list", null);
+      setVaultList(listResult.vaults || []);
+      setActiveVaultId(listResult.activeVaultId);
+    } catch {}
   }, []);
 
   // Get display name for vault (just the folder name)
@@ -550,25 +600,85 @@ export function SidebarContentPanel({
               <span>Settings</span>
             </button>
           </SettingsDialog>
-          {/* Vault Selector Button */}
-          <button
-            onClick={handleVaultSelect}
-            disabled={vaultLoading}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            title={vaultPath || "Select a vault folder"}
-          >
-            {vaultLoading ? (
-              <LoaderIcon className="size-4 animate-spin" />
-            ) : (
-              <FolderOpen className="size-4" />
+          {/* Vaults selector — t-dropdown floating above trigger */}
+          <div ref={vaultMenuRef} className="relative">
+            <button
+              onClick={() => {
+                if (vaultMenuOpen || vaultMenuAnim === "closing") {
+                  if (vaultMenuOpen) closeVaultMenu();
+                } else {
+                  setVaultMenuAnim("open");
+                  setVaultMenuOpen(true);
+                }
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+              title={vaultPath || "No vault selected"}
+            >
+              {vaultMenuOpen ? (
+                <ChevronUp className="size-3" />
+              ) : (
+                <ChevronRight className="size-3" />
+              )}
+              <span className="font-medium">Vaults</span>
+              {vaultPath && !vaultMenuOpen && (
+                <span className="truncate text-sidebar-foreground/50 ml-auto">
+                  {vaultDisplayName}
+                </span>
+              )}
+            </button>
+            {(vaultMenuOpen || vaultMenuAnim === "closing") && (
+              <div
+                className="t-dropdown absolute bottom-full left-0 right-0 mb-1 rounded-md border border-sidebar-border bg-sidebar py-1 shadow-lg"
+                data-side="top"
+                data-state={vaultMenuAnim === "closing" ? "closed" : "open"}
+              >
+                {vaultList.length === 0 ? (
+                  <div className="px-3 py-2 text-[11px] text-sidebar-foreground/40">
+                    No vaults yet
+                  </div>
+                ) : (
+                  vaultList.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        handleVaultSwitch(v.id);
+                        closeVaultMenu();
+                      }}
+                      disabled={vaultLoading}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors text-left"
+                      title={v.path}
+                    >
+                      <Folder className="size-3.5 shrink-0" />
+                      <span className="truncate flex-1">{v.name}</span>
+                      {v.id === activeVaultId && (
+                        <Check className="size-3 text-primary shrink-0" />
+                      )}
+                    </button>
+                  ))
+                )}
+                <div className="my-1 border-t border-sidebar-border" />
+                <button
+                  onClick={() => {
+                    setManageVaultsOpen(true);
+                    closeVaultMenu();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                >
+                  <Plus className="size-3.5 shrink-0" />
+                  <span>Manage vaults...</span>
+                </button>
+              </div>
             )}
-            <span className="truncate flex-1 text-left">
-              {vaultDisplayName}
-            </span>
-            <ChevronsUpDown className="size-3 opacity-50" />
-          </button>
+          </div>
         </div>
       </div>
+      <VaultManagerDialog
+        open={manageVaultsOpen}
+        onOpenChange={setManageVaultsOpen}
+        vaults={vaultList}
+        activeVaultId={activeVaultId}
+        onRefresh={refreshVaultList}
+      />
       <SidebarRail />
     </Sidebar>
   );
@@ -836,6 +946,114 @@ path: ${currentRelativePath}
         {isRecording ? "Stop Recording" : "New Voice Note"}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+// Vault Manager Dialog
+function VaultManagerDialog({
+  open,
+  onOpenChange,
+  vaults,
+  activeVaultId,
+  onRefresh,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  vaults: Array<{ id: string; name: string; path: string }>;
+  activeVaultId: string | null;
+  onRefresh: () => Promise<void>;
+}) {
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const handleAdd = async () => {
+    const result = await ipc.invoke("vault:add", null);
+    if (result.success) {
+      toast("Vault added", "success");
+      await onRefresh();
+    }
+  };
+
+  const handleCreate = async () => {
+    const result = await ipc.invoke("vault:create", null);
+    if (result.success) {
+      toast("Vault created", "success");
+      await onRefresh();
+    }
+  };
+
+  const handleRemove = async (id: string) => {
+    setRemovingId(id);
+    const result = await ipc.invoke("vault:remove", { id });
+    if (result.success) {
+      toast("Vault removed from list", "success");
+      await onRefresh();
+    }
+    setRemovingId(null);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Manage Vaults</DialogTitle>
+          <DialogDescription>
+            Add existing folders as vaults or create new ones. Removing a vault
+            does not delete the folder.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+          {vaults.length === 0 ? (
+            <div className="text-sm text-sidebar-foreground/50 py-4 text-center">
+              No vaults yet. Add a folder to get started.
+            </div>
+          ) : (
+            vaults.map((v) => (
+              <div
+                key={v.id}
+                className="flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/20 px-3 py-2"
+              >
+                <Folder className="size-4 shrink-0 text-sidebar-foreground/60" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium truncate">{v.name}</span>
+                    {v.id === activeVaultId && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-sidebar-foreground/50 truncate">
+                    {v.path}
+                  </div>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => handleRemove(v.id)}
+                      disabled={removingId === v.id}
+                      className="shrink-0 rounded-md p-1.5 text-sidebar-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Remove from list</TooltipContent>
+                </Tooltip>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Button variant="outline" size="sm" onClick={handleAdd} className="w-full justify-start gap-2">
+            <FolderOpen className="size-4" />
+            Add Existing Folder
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCreate} className="w-full justify-start gap-2">
+            <Plus className="size-4" />
+            Create New Vault
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

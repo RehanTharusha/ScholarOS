@@ -138,6 +138,82 @@ const ipcSchemas = {
     }),
     res: z.null(),
   },
+  "vault:list": {
+    req: z.null(),
+    res: z.object({
+      vaults: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          path: z.string(),
+        }),
+      ),
+      activeVaultId: z.string().nullable(),
+    }),
+  },
+  "vault:add": {
+    req: z.null(),
+    res: z.object({
+      success: z.boolean(),
+      vaults: z
+        .array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            path: z.string(),
+          }),
+        )
+        .optional(),
+      activeVaultId: z.string().nullable().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "vault:create": {
+    req: z.null(),
+    res: z.object({
+      success: z.boolean(),
+      vaults: z
+        .array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            path: z.string(),
+          }),
+        )
+        .optional(),
+      activeVaultId: z.string().nullable().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "vault:remove": {
+    req: z.object({
+      id: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      vaults: z
+        .array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            path: z.string(),
+          }),
+        )
+        .optional(),
+      activeVaultId: z.string().nullable().optional(),
+      error: z.string().optional(),
+    }),
+  },
+  "vault:switch": {
+    req: z.object({
+      id: z.string(),
+    }),
+    res: z.object({
+      success: z.boolean(),
+      path: z.string().optional(),
+      error: z.string().optional(),
+    }),
+  },
   "mcp:listTools": {
     req: z.object({
       serverName: z.string(),

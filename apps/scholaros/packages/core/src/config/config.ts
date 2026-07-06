@@ -160,6 +160,103 @@ export function saveVaultPath(vaultPath: string): void {
   );
 }
 
+// ============================================================================
+// Multi-vault management
+// ============================================================================
+
+const VAULTS_CONFIG_PATH = path.join(homedir(), ".scholarOS", "config", "vaults.json");
+
+interface VaultsConfig {
+  vaults: Array<{
+    id: string;
+    name: string;
+    path: string;
+  }>;
+  activeVaultId: string | null;
+}
+
+function generateVaultId(): string {
+  return Math.random().toString(36).substring(2, 10);
+}
+
+function readVaultsConfig(): VaultsConfig {
+  try {
+    if (fs.existsSync(VAULTS_CONFIG_PATH)) {
+      const raw = fs.readFileSync(VAULTS_CONFIG_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.vaults)) {
+        return parsed as VaultsConfig;
+      }
+    }
+  } catch (err) {
+    console.error("[Config] Failed to read vaults config:", err);
+  }
+  return { vaults: [], activeVaultId: null };
+}
+
+function writeVaultsConfig(config: VaultsConfig): void {
+  const dir = path.dirname(VAULTS_CONFIG_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(VAULTS_CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+/**
+ * Get all registered vaults and the active vault ID.
+ */
+export function listVaults(): { vaults: VaultsConfig["vaults"]; activeVaultId: string | null } {
+  const config = readVaultsConfig();
+  return { vaults: config.vaults, activeVaultId: config.activeVaultId };
+}
+
+/**
+ * Add a vault path to the vaults list.
+ * Generates an ID and derives the display name from the folder name.
+ */
+export function addVault(vaultPath: string): { vaults: VaultsConfig["vaults"]; activeVaultId: string | null } {
+  const config = readVaultsConfig();
+  const expandedPath = path.resolve(
+    vaultPath.startsWith("~/") || vaultPath.startsWith("~\\")
+      ? path.join(homedir(), vaultPath.slice(2))
+      : vaultPath,
+  );
+  // Skip if already added
+  const existing = config.vaults.find((v) => v.path === expandedPath);
+  if (existing) return { vaults: config.vaults, activeVaultId: config.activeVaultId };
+  const name = expandedPath.split(/[\\/]/).pop() || "Vault";
+  config.vaults.push({ id: generateVaultId(), name, path: expandedPath });
+  writeVaultsConfig(config);
+  return { vaults: config.vaults, activeVaultId: config.activeVaultId };
+}
+
+/**
+ * Remove a vault from the vaults list by ID.
+ * Does NOT delete the folder on disk.
+ */
+export function removeVault(id: string): { vaults: VaultsConfig["vaults"]; activeVaultId: string | null } {
+  const config = readVaultsConfig();
+  config.vaults = config.vaults.filter((v) => v.id !== id);
+  if (config.activeVaultId === id) {
+    config.activeVaultId = config.vaults.length > 0 ? config.vaults[0]!.id : null;
+  }
+  writeVaultsConfig(config);
+  return { vaults: config.vaults, activeVaultId: config.activeVaultId };
+}
+
+/**
+ * Set the active vault by ID, updating both vaults.json and vault.json.
+ */
+export function setActiveVault(id: string): boolean {
+  const config = readVaultsConfig();
+  const vault = config.vaults.find((v) => v.id === id);
+  if (!vault) return false;
+  config.activeVaultId = id;
+  writeVaultsConfig(config);
+  saveVaultPath(vault.path);
+  return true;
+}
+
 /**
  * Get the saved vault path, if any.
  * Returns null if no vault has been saved.

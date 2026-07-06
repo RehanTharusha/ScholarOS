@@ -55,6 +55,10 @@ import {
   WorkDir,
   saveVaultPath,
   getVaultPath,
+  listVaults,
+  addVault,
+  removeVault,
+  setActiveVault,
 } from "@scholaros/core/dist/config/config.js";
 import { browserIpcHandlers } from "./browser/ipc.js";
 
@@ -1100,6 +1104,117 @@ export function setupIpcHandlers() {
     "vault:setPath": async (_event, args) => {
       saveVaultPath(args.path);
       return { success: true as const };
+    },
+    "vault:list": async () => {
+      return listVaults();
+    },
+    "vault:add": async () => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: "Add Existing Folder",
+          message: "Choose a folder to add as a vault",
+          properties: ["openDirectory"],
+          buttonLabel: "Add Folder",
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+          return { success: false };
+        }
+        const vaultPath = result.filePaths[0]!;
+        return { success: true, ...addVault(vaultPath) };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+    "vault:create": async () => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: "Create New Vault",
+          message: "Choose a location for the new vault folder",
+          properties: ["openDirectory", "createDirectory"],
+          buttonLabel: "Create Vault",
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+          return { success: false };
+        }
+        const vaultPath = result.filePaths[0]!;
+        // Create .scholarOS subdirectory to mark it as a ScholarOS vault
+        const scholarDir = path.join(vaultPath, ".scholarOS");
+        await fs.mkdir(scholarDir, { recursive: true });
+        return { success: true, ...addVault(vaultPath) };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+    "vault:remove": async (_event, args) => {
+      try {
+        const { activeVaultId } = listVaults();
+        const wasActive = activeVaultId === args.id;
+        const result = removeVault(args.id);
+        // If the removed vault was the active vault, auto-switch to the new active vault
+        if (wasActive && result.activeVaultId && result.activeVaultId !== args.id) {
+          const vault = result.vaults.find((v) => v.id === result.activeVaultId);
+          if (vault) {
+            setActiveVault(result.activeVaultId);
+            refreshWorkDir();
+            stopWorkspaceWatcher();
+            await startWorkspaceWatcher();
+            stopRunsWatcher();
+            await startRunsWatcher();
+            stopServicesWatcher();
+            await startServicesWatcher();
+            try {
+              emitVaultChanged(WorkDir);
+            } catch (err) {
+              console.warn("[Vault] Failed to emit vault change:", err);
+            }
+          }
+        }
+        return { success: true, ...result };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+    "vault:switch": async (_event, args) => {
+      try {
+        const { vaults } = listVaults();
+        const vault = vaults.find((v) => v.id === args.id);
+        if (!vault) {
+          return { success: false, error: "Vault not found" };
+        }
+        const ok = setActiveVault(args.id);
+        if (!ok) {
+          return { success: false, error: "Failed to set active vault" };
+        }
+        // Refresh WorkDir so any newly-created services use the correct path
+        refreshWorkDir();
+        // Restart watchers so they pick up the new WorkDir
+        stopWorkspaceWatcher();
+        await startWorkspaceWatcher();
+        stopRunsWatcher();
+        await startRunsWatcher();
+        stopServicesWatcher();
+        await startServicesWatcher();
+        try {
+          emitVaultChanged(WorkDir);
+        } catch (err) {
+          console.warn("[Vault] Failed to emit vault change:", err);
+        }
+        return { success: true, path: vault.path };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
     },
     // Calendar / Tasks handlers
     "calendar:list": async () => {
