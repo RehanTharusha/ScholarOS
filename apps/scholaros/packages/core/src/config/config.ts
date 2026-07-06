@@ -158,6 +158,17 @@ export function saveVaultPath(vaultPath: string): void {
     vaultConfigPath,
     JSON.stringify({ path: expandedPath }, null, 2),
   );
+  // Keep vaults.json in sync
+  const vaultsCfg = readVaultsConfig();
+  if (!vaultsCfg.vaults.find((v) => v.path === expandedPath)) {
+    const name = expandedPath.split(/[\\/]/).pop() || "Vault";
+    vaultsCfg.vaults.push({ id: generateVaultId(), name, path: expandedPath });
+    if (!vaultsCfg.activeVaultId) {
+      const added = vaultsCfg.vaults[vaultsCfg.vaults.length - 1];
+      vaultsCfg.activeVaultId = added?.id ?? null;
+    }
+    writeVaultsConfig(vaultsCfg);
+  }
 }
 
 // ============================================================================
@@ -204,9 +215,19 @@ function writeVaultsConfig(config: VaultsConfig): void {
 
 /**
  * Get all registered vaults and the active vault ID.
+ * Auto-migrates the legacy vault.json path into vaults.json if missing.
  */
 export function listVaults(): { vaults: VaultsConfig["vaults"]; activeVaultId: string | null } {
   const config = readVaultsConfig();
+  const savedPath = getVaultPath();
+  if (savedPath && !config.vaults.find((v) => v.path === savedPath)) {
+    const name = savedPath.split(/[\\/]/).pop() || "Vault";
+    config.vaults.push({ id: generateVaultId(), name, path: savedPath });
+    if (!config.activeVaultId) {
+      config.activeVaultId = config.vaults[config.vaults.length - 1]!.id;
+    }
+    writeVaultsConfig(config);
+  }
   return { vaults: config.vaults, activeVaultId: config.activeVaultId };
 }
 
@@ -255,6 +276,27 @@ export function setActiveVault(id: string): boolean {
   writeVaultsConfig(config);
   saveVaultPath(vault.path);
   return true;
+}
+
+/**
+ * Clear the saved vault path (set to no vault).
+ * WorkDir will fall back to ~/.scholarOS on next refresh.
+ */
+export function clearVaultPath(): void {
+  const vaultConfigPath = path.join(
+    homedir(),
+    ".scholarOS",
+    "config",
+    "vault.json",
+  );
+  try {
+    if (fs.existsSync(vaultConfigPath)) {
+      fs.unlinkSync(vaultConfigPath);
+      console.log("[Config] Vault path cleared");
+    }
+  } catch (err) {
+    console.error("[Config] Failed to clear vault path:", err);
+  }
 }
 
 /**

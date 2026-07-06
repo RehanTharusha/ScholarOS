@@ -55,6 +55,7 @@ import {
   WorkDir,
   saveVaultPath,
   getVaultPath,
+  clearVaultPath,
   listVaults,
   addVault,
   removeVault,
@@ -1156,11 +1157,26 @@ export function setupIpcHandlers() {
         const { activeVaultId } = listVaults();
         const wasActive = activeVaultId === args.id;
         const result = removeVault(args.id);
-        // If the removed vault was the active vault, auto-switch to the new active vault
-        if (wasActive && result.activeVaultId && result.activeVaultId !== args.id) {
-          const vault = result.vaults.find((v) => v.id === result.activeVaultId);
-          if (vault) {
-            setActiveVault(result.activeVaultId);
+        if (wasActive) {
+          if (result.activeVaultId) {
+            // Another vault exists — switch to it
+            const vault = result.vaults.find((v) => v.id === result.activeVaultId);
+            if (vault) {
+              setActiveVault(result.activeVaultId);
+              refreshWorkDir();
+              stopWorkspaceWatcher();
+              await startWorkspaceWatcher();
+              stopRunsWatcher();
+              await startRunsWatcher();
+              stopServicesWatcher();
+              await startServicesWatcher();
+              try { emitVaultChanged(WorkDir); } catch (err) {
+                console.warn("[Vault] Failed to emit vault change:", err);
+              }
+            }
+          } else {
+            // Last vault removed — reset to default (no vault)
+            clearVaultPath();
             refreshWorkDir();
             stopWorkspaceWatcher();
             await startWorkspaceWatcher();
@@ -1168,9 +1184,7 @@ export function setupIpcHandlers() {
             await startRunsWatcher();
             stopServicesWatcher();
             await startServicesWatcher();
-            try {
-              emitVaultChanged(WorkDir);
-            } catch (err) {
+            try { emitVaultChanged(WorkDir); } catch (err) {
               console.warn("[Vault] Failed to emit vault change:", err);
             }
           }

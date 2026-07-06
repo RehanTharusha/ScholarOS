@@ -31,9 +31,9 @@
   --text-swap-ease: ease-in-out;
   /* Menu dropdown */
   --dropdown-open-dur: 200ms;
-  --dropdown-close-dur: 120ms;
+  --dropdown-close-dur: 150ms;
   --dropdown-pre-scale: 0.97;
-  --dropdown-closing-scale: 0.99;
+  --dropdown-closing-scale: 0.95;
   --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* Modal open / close */
   --modal-open-dur: 200ms;

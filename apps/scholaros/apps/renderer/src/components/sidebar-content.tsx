@@ -226,7 +226,7 @@ export function SidebarContentPanel({
   const { billing } = useBilling(isScholarOSConnected);
   const [vaultPath, setVaultPath] = useState<string | null>(null);
   const [vaultLoading, setVaultLoading] = useState(false);
-  const vaultMenuCloseMs = 120; // matches --dropdown-close-dur in transitions-dev.css
+  const vaultMenuCloseMs = 150; // matches --dropdown-close-dur in transitions-dev.css
   const [vaultMenuOpen, setVaultMenuOpen] = useState(false);
   const [vaultMenuAnim, setVaultMenuAnim] = useState<"open" | "closing" | null>(null);
   const [manageVaultsOpen, setManageVaultsOpen] = useState(false);
@@ -241,13 +241,31 @@ export function SidebarContentPanel({
     if (vaultTimerRef.current) clearTimeout(vaultTimerRef.current);
   }, []);
 
+  const openVaultMenu = useCallback(() => {
+    cancelVaultTimer();
+    // Phase 1: mount element at base state (scale 0.97, opacity 0)
+    setVaultMenuAnim(null);
+    setVaultMenuOpen(true);
+  }, [cancelVaultTimer]);
+
+  // Phase 2: after mount, add data-state="open" to trigger scale-up transition
+  useEffect(() => {
+    if (!vaultMenuOpen || vaultMenuAnim !== null) return;
+    const id = requestAnimationFrame(() => {
+      setVaultMenuAnim("open");
+    });
+    return () => cancelAnimationFrame(id);
+  }, [vaultMenuOpen, vaultMenuAnim]);
+
   const closeVaultMenu = useCallback(() => {
     cancelVaultTimer();
     setVaultMenuAnim("closing");
-    vaultTimerRef.current = setTimeout(() => {
-      setVaultMenuOpen(false);
-      setVaultMenuAnim(null);
-    }, vaultMenuCloseMs);
+    requestAnimationFrame(() => {
+      vaultTimerRef.current = setTimeout(() => {
+        setVaultMenuOpen(false);
+        setVaultMenuAnim(null);
+      }, vaultMenuCloseMs);
+    });
   }, [cancelVaultTimer]);
 
   // Close vault menu on click outside
@@ -604,12 +622,8 @@ export function SidebarContentPanel({
           <div ref={vaultMenuRef} className="relative">
             <button
               onClick={() => {
-                if (vaultMenuOpen || vaultMenuAnim === "closing") {
-                  if (vaultMenuOpen) closeVaultMenu();
-                } else {
-                  setVaultMenuAnim("open");
-                  setVaultMenuOpen(true);
-                }
+                if (vaultMenuOpen) closeVaultMenu();
+                else openVaultMenu();
               }}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
               title={vaultPath || "No vault selected"}
@@ -630,7 +644,13 @@ export function SidebarContentPanel({
               <div
                 className="t-dropdown absolute bottom-full left-0 right-0 mb-1 rounded-md border border-sidebar-border bg-sidebar py-1 shadow-lg"
                 data-side="top"
-                data-state={vaultMenuAnim === "closing" ? "closed" : "open"}
+                data-state={
+                  vaultMenuAnim === "closing"
+                    ? "closed"
+                    : vaultMenuAnim === "open"
+                      ? "open"
+                      : undefined
+                }
               >
                 {vaultList.length === 0 ? (
                   <div className="px-3 py-2 text-[11px] text-sidebar-foreground/40">
@@ -983,9 +1003,14 @@ function VaultManagerDialog({
 
   const handleRemove = async (id: string) => {
     setRemovingId(id);
+    const wasLast = vaults.length === 1;
     const result = await ipc.invoke("vault:remove", { id });
     if (result.success) {
-      toast("Vault removed from list", "success");
+      if (wasLast) {
+        toast("No vault selected — add or create a vault to get started", "info");
+      } else {
+        toast("Vault removed from list", "success");
+      }
       await onRefresh();
     }
     setRemovingId(null);
