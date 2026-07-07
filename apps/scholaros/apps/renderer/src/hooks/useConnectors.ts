@@ -1,8 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  setGoogleCredentials,
-  clearGoogleCredentials,
-} from "@/lib/google-credentials-store";
 import { toast } from "sonner";
 
 // Safe accessor for window.ipc — returns undefined when running outside Electron
@@ -28,34 +24,7 @@ export function useConnectors(active: boolean) {
   const [providerStatus, setProviderStatus] = useState<
     Record<string, ProviderStatus>
   >({});
-  const [googleClientIdOpen, setGoogleClientIdOpen] = useState(false);
-  const [googleClientIdDescription, setGoogleClientIdDescription] = useState<
-    string | undefined
-  >(undefined);
 
-  // Composio API key state
-  const [composioApiKeyOpen, setComposioApiKeyOpen] = useState(false);
-  const [composioApiKeyTarget, setComposioApiKeyTarget] = useState<
-    "slack" | "gmail"
-  >("gmail");
-
-  // Slack state
-  const [slackEnabled, setSlackEnabled] = useState(false);
-  const [slackLoading, setSlackLoading] = useState(true);
-  const [slackWorkspaces, setSlackWorkspaces] = useState<
-    Array<{ url: string; name: string }>
-  >([]);
-  const [slackAvailableWorkspaces, setSlackAvailableWorkspaces] = useState<
-    Array<{ url: string; name: string }>
-  >([]);
-  const [slackSelectedUrls, setSlackSelectedUrls] = useState<Set<string>>(
-    new Set(),
-  );
-  const [slackPickerOpen, setSlackPickerOpen] = useState(false);
-  const [slackDiscovering, setSlackDiscovering] = useState(false);
-  const [slackDiscoverError, setSlackDiscoverError] = useState<string | null>(
-    null,
-  );
 
   // Load available providers on mount
   useEffect(() => {
@@ -72,103 +41,6 @@ export function useConnectors(active: boolean) {
       }
     }
     loadProviders();
-  }, []);
-
-  // Slack
-  const refreshSlackConfig = useCallback(async () => {
-    try {
-      setSlackLoading(true);
-      const result = await getIpc()?.invoke("slack:getConfig", null);
-      setSlackEnabled(result.enabled);
-      setSlackWorkspaces(result.workspaces || []);
-    } catch (error) {
-      console.error("Failed to load Slack config:", error);
-      setSlackEnabled(false);
-      setSlackWorkspaces([]);
-    } finally {
-      setSlackLoading(false);
-    }
-  }, []);
-
-  const handleSlackEnable = useCallback(async () => {
-    setSlackDiscovering(true);
-    setSlackDiscoverError(null);
-    try {
-      const result = await getIpc()?.invoke("slack:listWorkspaces", null);
-      if (result.error || result.workspaces.length === 0) {
-        setSlackDiscoverError(
-          result.error ||
-            "No Slack workspaces found. Set up with: agent-slack auth import-desktop",
-        );
-        setSlackAvailableWorkspaces([]);
-        setSlackPickerOpen(true);
-      } else {
-        setSlackAvailableWorkspaces(result.workspaces);
-        setSlackSelectedUrls(
-          new Set(result.workspaces.map((w: { url: string }) => w.url)),
-        );
-        setSlackPickerOpen(true);
-      }
-    } catch (error) {
-      console.error("Failed to discover Slack workspaces:", error);
-      setSlackDiscoverError("Failed to discover Slack workspaces");
-      setSlackPickerOpen(true);
-    } finally {
-      setSlackDiscovering(false);
-    }
-  }, []);
-
-  const handleSlackSaveWorkspaces = useCallback(async () => {
-    const selected = slackAvailableWorkspaces.filter((w) =>
-      slackSelectedUrls.has(w.url),
-    );
-    try {
-      setSlackLoading(true);
-      await getIpc()?.invoke("slack:setConfig", {
-        enabled: true,
-        workspaces: selected,
-      });
-      setSlackEnabled(true);
-      setSlackWorkspaces(selected);
-      setSlackPickerOpen(false);
-      toast.success("Slack enabled");
-    } catch (error) {
-      console.error("Failed to save Slack config:", error);
-      toast.error("Failed to save Slack settings");
-    } finally {
-      setSlackLoading(false);
-    }
-  }, [slackAvailableWorkspaces, slackSelectedUrls]);
-
-  const handleSlackDisable = useCallback(async () => {
-    try {
-      setSlackLoading(true);
-      await getIpc()?.invoke("slack:setConfig", {
-        enabled: false,
-        workspaces: [],
-      });
-      setSlackEnabled(false);
-      setSlackWorkspaces([]);
-      setSlackPickerOpen(false);
-      toast.success("Slack disabled");
-    } catch (error) {
-      console.error("Failed to update Slack config:", error);
-      toast.error("Failed to update Slack settings");
-    } finally {
-      setSlackLoading(false);
-    }
-  }, []);
-
-  // Composio API key
-  const handleComposioApiKeySubmit = useCallback(async (apiKey: string) => {
-    try {
-      await getIpc()?.invoke("composio:set-api-key", { apiKey });
-      setComposioApiKeyOpen(false);
-      toast.success("Composio API key saved");
-    } catch (error) {
-      console.error("Failed to save Composio API key:", error);
-      toast.error("Failed to save API key");
-    }
   }, []);
 
   // OAuth connect/disconnect
@@ -219,23 +91,7 @@ export function useConnectors(active: boolean) {
 
   const handleConnect = useCallback(
     async (provider: string) => {
-      if (provider === "google") {
-        setGoogleClientIdDescription(undefined);
-        setGoogleClientIdOpen(true);
-        return;
-      }
-
       await startConnect(provider);
-    },
-    [startConnect],
-  );
-
-  const handleGoogleClientIdSubmit = useCallback(
-    (clientId: string, clientSecret: string) => {
-      setGoogleCredentials(clientId, clientSecret);
-      setGoogleClientIdOpen(false);
-      setGoogleClientIdDescription(undefined);
-      startConnect("google", { clientId, clientSecret });
     },
     [startConnect],
   );
@@ -250,13 +106,7 @@ export function useConnectors(active: boolean) {
       const result = await getIpc()?.invoke("oauth:disconnect", { provider });
 
       if (result.success) {
-        if (provider === "google") {
-          clearGoogleCredentials();
-        }
-        const displayName =
-          provider === "fireflies-ai"
-            ? "Fireflies"
-            : provider.charAt(0).toUpperCase() + provider.slice(1);
+        const displayName = provider.charAt(0).toUpperCase() + provider.slice(1);
         toast.success(
           provider === "scholaros"
             ? "Logged out of ScholarOS"
@@ -297,8 +147,6 @@ export function useConnectors(active: boolean) {
 
   // Refresh all statuses
   const refreshAllStatuses = useCallback(async () => {
-    refreshSlackConfig();
-
     if (providers.length === 0) return;
 
     const newStates: Record<string, ProviderState> = {};
@@ -334,7 +182,7 @@ export function useConnectors(active: boolean) {
     }
 
     setProviderStates(newStates);
-  }, [providers, refreshSlackConfig]);
+  }, [providers]);
 
   // Refresh when active or providers change
   useEffect(() => {
@@ -345,7 +193,7 @@ export function useConnectors(active: boolean) {
 
   // Listen for OAuth events
   useEffect(() => {
-    const cleanup = getIpc()?.on("oauth:didConnect", async (event) => {
+    const cleanup = getIpc()?.on("oauth:didConnect", async (event: { provider: string; success: boolean }) => {
       const { provider, success } = event;
 
       setProviderStates((prev) => ({
@@ -358,22 +206,8 @@ export function useConnectors(active: boolean) {
       }));
 
       if (success) {
-        const displayName =
-          provider === "fireflies-ai"
-            ? "Fireflies"
-            : provider.charAt(0).toUpperCase() + provider.slice(1);
-        if (provider === "scholaros") {
-          toast.success("Logged in to ScholarOS");
-        } else if (provider === "google" || provider === "fireflies-ai") {
-          toast.success(`Connected to ${displayName}`, {
-            description:
-              "Syncing your data in the background. This may take a few minutes before changes appear.",
-            duration: 8000,
-          });
-        } else {
-          toast.success(`Connected to ${displayName}`);
-        }
-
+        const displayName = provider.charAt(0).toUpperCase() + provider.slice(1);
+        toast.success(`Connected to ${displayName}`);
         refreshAllStatuses();
       }
     });
@@ -395,35 +229,6 @@ export function useConnectors(active: boolean) {
     handleConnect,
     handleDisconnect,
     startConnect,
-
-    // Google credentials modal
-    googleClientIdOpen,
-    setGoogleClientIdOpen,
-    googleClientIdDescription,
-    setGoogleClientIdDescription,
-    handleGoogleClientIdSubmit,
-
-    // Composio API key modal
-    composioApiKeyOpen,
-    setComposioApiKeyOpen,
-    composioApiKeyTarget,
-    setComposioApiKeyTarget,
-    handleComposioApiKeySubmit,
-
-    // Slack
-    slackEnabled,
-    slackLoading,
-    slackWorkspaces,
-    slackAvailableWorkspaces,
-    slackSelectedUrls,
-    setSlackSelectedUrls,
-    slackPickerOpen,
-    setSlackPickerOpen,
-    slackDiscovering,
-    slackDiscoverError,
-    handleSlackEnable,
-    handleSlackSaveWorkspaces,
-    handleSlackDisable,
 
     // Refresh
     refreshAllStatuses,

@@ -80,7 +80,7 @@ import {
 } from "@/components/ai-elements/tool";
 import { WebSearchResult } from "@/components/ai-elements/web-search-result";
 import { AppActionCard } from "@/components/ai-elements/app-action-card";
-import { ComposioConnectCard } from "@/components/ai-elements/composio-connect-card";
+
 import { PermissionRequest } from "@/components/ai-elements/permission-request";
 import { AskHumanRequest } from "@/components/ai-elements/ask-human-request";
 import { Suggestions } from "@/components/ai-elements/suggestions";
@@ -140,7 +140,6 @@ import {
   createEmptyChatTabViewState,
   getWebSearchCardData,
   getAppActionCardData,
-  getComposioConnectCardData,
   getToolDisplayName,
   inferRunTitleFromMessage,
   isChatMessage,
@@ -151,7 +150,6 @@ import {
   parseAttachedFiles,
   toToolState,
 } from "@/lib/chat-conversation";
-import { COMPOSIO_DISPLAY_NAMES as composioDisplayNames } from "@scholaros/shared/src/composio.js";
 import { toast } from "sonner";
 import { useVoiceMode } from "@/hooks/useVoiceMode";
 import { useVoiceTTS } from "@/hooks/useVoiceTTS";
@@ -3074,15 +3072,6 @@ function App() {
     );
   }, []);
 
-  const handleComposioConnected = useCallback((toolkitSlug: string) => {
-    // Auto-send a continuation message when a Composio toolkit connects
-    const name = composioDisplayNames[toolkitSlug] || toolkitSlug;
-    handlePromptSubmitRef.current?.({
-      text: `${name} connected successfully.`,
-      files: [],
-    });
-  }, []);
-
   // Deep research action handlers — read/write per-tab research state
   const handleCopyResearch = useCallback(async () => {
     const tabId = activeChatTabIdRef.current;
@@ -5506,21 +5495,6 @@ function App() {
           />
         );
       }
-      const composioConnectData = getComposioConnectCardData(item);
-      if (composioConnectData) {
-        // Skip rendering if this is a duplicate "already connected" card
-        if (composioConnectData.hidden) return null;
-        return (
-          <ComposioConnectCard
-            key={item.id}
-            toolkitSlug={composioConnectData.toolkitSlug}
-            toolkitDisplayName={composioConnectData.toolkitDisplayName}
-            status={item.status}
-            alreadyConnected={composioConnectData.alreadyConnected}
-            onConnected={handleComposioConnected}
-          />
-        );
-      }
       if (item.name === "deep-research") {
         const result = item.result as any;
         const session = result?.session ?? null;
@@ -6825,7 +6799,6 @@ function App() {
                 ttsMode={ttsMode}
                 onToggleTts={handleToggleTts}
                 onTtsModeChange={handleTtsModeChange}
-                onComposioConnected={handleComposioConnected}
                 cavemanEnabled={
                   cavemanByTabRef.current.get(activeChatTabId) ?? false
                 }

@@ -1,11 +1,9 @@
-import { skillCatalog, buildSkillCatalog, buildContextualSkillCatalog } from "./skills/index.js";
+import { skillCatalog, buildContextualSkillCatalog } from "./skills/index.js";
 import { buildCapabilityIndex } from "./modules/capabilities.js";
 import {
   getRuntimeContext,
   getRuntimeContextPrompt,
 } from "./runtime-context.js";
-import { composioAccountsRepo } from "../../composio/repo.js";
-import { isConfigured as isComposioConfigured } from "../../composio/client.js";
 import { getMergedTasks } from "../../calendar/frontmatter-scanner.js";
 import { KnowledgeGraph } from "../../knowledge/graph/graph.js";
 import {
@@ -15,38 +13,7 @@ import {
 
 const runtimeContextPrompt = getRuntimeContextPrompt(getRuntimeContext());
 
-/**
- * Generate dynamic instructions section for Composio integrations.
- * Lists connected toolkits and explains the meta-tool discovery flow.
- */
-async function getComposioToolsPrompt(): Promise<string> {
-  if (!(await isComposioConfigured())) {
-    return "";
-  }
-
-  const connectedToolkits = composioAccountsRepo.getConnectedToolkits();
-  const connectedSection =
-    connectedToolkits.length > 0
-      ? `**Currently connected:** ${connectedToolkits.join(", ")}`
-      : `**No services connected yet.** Load the \`composio-integration\` skill to help the user connect one.`;
-
-  return `
-## Composio Integrations
-
-${connectedSection}
-
-Load the \`composio-integration\` skill when the user asks to interact with any third-party service. NEVER say "I can't access [service]" without loading the skill and trying Composio first.
-`;
-}
-
-function buildStaticInstructions(
-  composioEnabled: boolean,
-  catalog: string,
-): string {
-  const toolPriority = composioEnabled
-    ? `For third-party services (GitHub, Gmail, Slack, etc.), load the \`composio-integration\` skill. For capabilities Composio doesn't cover (file scraping, audio), use MCP tools via the \`mcp-integration\` skill.`
-    : `For capabilities like file scraping and audio, use MCP tools via the \`mcp-integration\` skill.`;
-
+function buildStaticInstructions(catalog: string): string {
   return `You are ScholarOS Copilot - an AI academic assistant that helps students master complex subjects through intelligent learning systems. You help with anything academic: ingesting course materials, building concept wikis, tracking assignments, and answering questions — with a knowledge base that compounds from PDFs, lectures, and your own notes. Everything runs locally. Your role is to be their personal tutor and study companion.
 
 You're an encouraging, patient assistant who combines clear explanation with genuine enthusiasm for learning and strategic study advice.
@@ -126,7 +93,7 @@ ${buildCapabilityIndex()}
 
 ## Tool Priority
 
-${toolPriority}
+For capabilities like file scraping and audio, use MCP tools via the \`mcp-integration\` skill.
 
 ## Execution Reminders
 - Explore existing files and structure before creating new assets.
@@ -143,7 +110,7 @@ ${runtimeContextPrompt}
 - Load the \`organize-files\` skill for guidance on file organization tasks.
 
 ## Builtin Tools Quick Reference
-Builtin tools available without approval: workspace-readFile, workspace-writeFile, workspace-edit, workspace-remove, workspace-readdir, workspace-exists, workspace-stat, workspace-glob, workspace-grep, workspace-mkdir, workspace-rename, workspace-copy, parseFile, classifyFiles, LLMParse, analyzeAgent, addMcpServer, listMcpServers, listMcpTools, executeMcpTool, loadSkill, loadCapability, web-search, app-navigation, browser-control, save-to-memory${composioEnabled ? ", composio-list-toolkits, composio-search-tools, composio-execute-tool, composio-connect-toolkit, slack-checkConnection, slack-listAvailableTools, slack-executeAction" : ""}.
+Builtin tools available without approval: workspace-readFile, workspace-writeFile, workspace-edit, workspace-remove, workspace-readdir, workspace-exists, workspace-stat, workspace-glob, workspace-grep, workspace-mkdir, workspace-rename, workspace-copy, parseFile, classifyFiles, LLMParse, analyzeAgent, addMcpServer, listMcpServers, listMcpTools, executeMcpTool, loadSkill, loadCapability, web-search, app-navigation, browser-control, save-to-memory.
 
 For the full builtin tools reference with descriptions and shell command rules, call loadCapability("builtin-tools-reference"). For file path formatting rules (filepath code blocks), call loadCapability("file-path-formatting").
 
@@ -214,17 +181,10 @@ Use \`tasks-list\` for the full list. Use \`tasks-create\` to add tasks, \`tasks
 }
 
 /** Keep backward-compatible export for any external consumers */
-export const CopilotInstructions = buildStaticInstructions(true, skillCatalog);
+export const CopilotInstructions = buildStaticInstructions(skillCatalog);
 
-/**
- * Cached stable prefix. Invalidated by calling invalidateCopilotInstructionsCache().
- */
 let cachedStablePrefix: string | null = null;
 
-/**
- * Invalidate the cached stable prefix so the next buildStableInstructions() call
- * regenerates the Composio section. Call this after connecting/disconnecting a toolkit.
- */
 export function invalidateCopilotInstructionsCache(): void {
   cachedStablePrefix = null;
 }
@@ -245,34 +205,20 @@ async function getWarmProfilePrompt(): Promise<string> {
   }
 }
 
-/**
- * Build the stable (cacheable) instruction prefix.
- * This contains the always-on instructions + skill catalog + runtime context + Composio.
- * It changes only when the user connects/disconnects Composio.
- */
 export async function buildStableInstructions(context?: {
   hasFileAttachment?: boolean;
   attachedMimeTypes?: string[];
   recentMessageKeywords?: string[];
 }): Promise<string> {
   if (cachedStablePrefix !== null) return cachedStablePrefix;
-  const composioEnabled = await isComposioConfigured();
   const catalog = context
     ? buildContextualSkillCatalog(context)
-    : composioEnabled
-      ? skillCatalog
-      : buildSkillCatalog({ excludeIds: ["composio-integration"] });
-  const baseInstructions = buildStaticInstructions(composioEnabled, catalog);
-  const composioPrompt = await getComposioToolsPrompt();
-  return composioPrompt
-    ? baseInstructions + "\n" + composioPrompt
-    : baseInstructions;
+    : skillCatalog;
+  const baseInstructions = buildStaticInstructions(catalog);
+  cachedStablePrefix = baseInstructions;
+  return baseInstructions;
 }
 
-/**
- * Build the volatile (non-cacheable) instruction suffix for a single turn.
- * Contains calendar, warm profile, and any other turn-specific context.
- */
 export async function buildVolatileInstructions(): Promise<string> {
   const parts: string[] = [];
   const calendarPrompt = await getCalendarContextPrompt();
@@ -283,8 +229,6 @@ export async function buildVolatileInstructions(): Promise<string> {
 }
 
 /**
- * Build full copilot instructions with dynamic Composio tools section.
- * Results are cached and reused until invalidated via invalidateCopilotInstructionsCache().
  * @deprecated Use buildStableInstructions() + buildVolatileInstructions() instead.
  */
 export async function buildCopilotInstructions(): Promise<string> {
@@ -296,23 +240,14 @@ export async function buildCopilotInstructions(): Promise<string> {
     if (warmProfilePrompt) result += "\n" + warmProfilePrompt;
     return result;
   }
-  const composioEnabled = await isComposioConfigured();
-  const catalog = composioEnabled
-    ? skillCatalog
-    : buildSkillCatalog({ excludeIds: ["composio-integration"] });
-  const baseInstructions = buildStaticInstructions(composioEnabled, catalog);
-  const composioPrompt = await getComposioToolsPrompt();
+  const baseInstructions = buildStaticInstructions(skillCatalog);
   const calendarPrompt = await getCalendarContextPrompt();
   const warmProfilePrompt = await getWarmProfilePrompt();
 
-  let result = composioPrompt
-    ? baseInstructions + "\n" + composioPrompt
-    : baseInstructions;
+  let result = baseInstructions;
   if (calendarPrompt) result += "\n" + calendarPrompt;
   if (warmProfilePrompt) result += "\n" + warmProfilePrompt;
 
-  cachedStablePrefix = composioPrompt
-    ? baseInstructions + "\n" + composioPrompt
-    : baseInstructions;
+  cachedStablePrefix = baseInstructions;
   return result;
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { Loader2, Mic, Mail, CheckCircle2, ArrowLeft, MessageSquare } from "lucide-react"
+import { Loader2, CheckCircle2, ArrowLeft } from "lucide-react"
 
 import {
   Dialog,
@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -22,10 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { GoogleClientIdModal } from "@/components/google-client-id-modal"
-import { setGoogleCredentials } from "@/lib/google-credentials-store"
 import { toast } from "sonner"
-import { ComposioApiKeyModal } from "@/components/composio-api-key-modal"
 
 interface ProviderState {
   isConnected: boolean
@@ -78,29 +74,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   const [providers, setProviders] = useState<string[]>([])
   const [providersLoading, setProvidersLoading] = useState(true)
   const [providerStates, setProviderStates] = useState<Record<string, ProviderState>>({})
-  const [googleClientIdOpen, setGoogleClientIdOpen] = useState(false)
-
   const [showMoreProviders, setShowMoreProviders] = useState(false)
-
-  // Composio API key state
-  const [composioApiKeyOpen, setComposioApiKeyOpen] = useState(false)
-  const [, setComposioApiKeyTarget] = useState<'slack' | 'gmail'>('gmail')
-
-  // Slack state (agent-slack CLI)
-  const [slackEnabled, setSlackEnabled] = useState(false)
-  const [slackLoading, setSlackLoading] = useState(true)
-  const [slackWorkspaces, setSlackWorkspaces] = useState<Array<{ url: string; name: string }>>([])
-  const [slackAvailableWorkspaces, setSlackAvailableWorkspaces] = useState<Array<{ url: string; name: string }>>([])
-  const [slackSelectedUrls, setSlackSelectedUrls] = useState<Set<string>>(new Set())
-  const [slackPickerOpen, setSlackPickerOpen] = useState(false)
-  const [slackDiscovering, setSlackDiscovering] = useState(false)
-  const [slackDiscoverError, setSlackDiscoverError] = useState<string | null>(null)
-
-  // Composio/Gmail state
-  const [useComposioForGoogle, setUseComposioForGoogle] = useState(false)
-  const [gmailConnected, setGmailConnected] = useState(false)
-  const [gmailLoading, setGmailLoading] = useState(true)
-  const [gmailConnecting, setGmailConnecting] = useState(false)
 
   const updateProviderConfig = useCallback(
     (provider: LlmProviderFlavor, updates: Partial<{ apiKey: string; baseURL: string; model: string; knowledgeGraphModel: string; meetingNotesModel: string; trackBlockModel: string }>) => {
@@ -129,7 +103,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     .filter(([, state]) => state.isConnected)
     .map(([provider]) => provider)
 
-  // Load available providers and composio-for-google flag on mount
+  // Load available providers
   useEffect(() => {
     if (!open) return
 
@@ -145,16 +119,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
         setProvidersLoading(false)
       }
     }
-    async function loadComposioForGoogleFlag() {
-      try {
-        const result = await window.ipc.invoke('composio:use-composio-for-google', null)
-        setUseComposioForGoogle(result.enabled)
-      } catch (error) {
-        console.error('Failed to check composio-for-google flag:', error)
-      }
-    }
     loadProviders()
-    loadComposioForGoogleFlag()
   }, [open])
 
   // Load LLM models catalog on open
@@ -248,134 +213,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     })
   }, [modelsCatalog])
 
-  // Load Slack config
-  const refreshSlackConfig = useCallback(async () => {
-    try {
-      setSlackLoading(true)
-      const result = await window.ipc.invoke('slack:getConfig', null)
-      setSlackEnabled(result.enabled)
-      setSlackWorkspaces(result.workspaces || [])
-    } catch (error) {
-      console.error('Failed to load Slack config:', error)
-      setSlackEnabled(false)
-      setSlackWorkspaces([])
-    } finally {
-      setSlackLoading(false)
-    }
-  }, [])
 
-  // Enable Slack: discover workspaces
-  const handleSlackEnable = useCallback(async () => {
-    setSlackDiscovering(true)
-    setSlackDiscoverError(null)
-    try {
-      const result = await window.ipc.invoke('slack:listWorkspaces', null)
-      if (result.error || result.workspaces.length === 0) {
-        setSlackDiscoverError(result.error || 'No Slack workspaces found. Set up with: agent-slack auth import-desktop')
-        setSlackAvailableWorkspaces([])
-        setSlackPickerOpen(true)
-      } else {
-        setSlackAvailableWorkspaces(result.workspaces)
-        setSlackSelectedUrls(new Set(result.workspaces.map((w: { url: string }) => w.url)))
-        setSlackPickerOpen(true)
-      }
-    } catch (error) {
-      console.error('Failed to discover Slack workspaces:', error)
-      setSlackDiscoverError('Failed to discover Slack workspaces')
-      setSlackPickerOpen(true)
-    } finally {
-      setSlackDiscovering(false)
-    }
-  }, [])
-
-  // Load Gmail connection status
-  const refreshGmailStatus = useCallback(async () => {
-    try {
-      setGmailLoading(true)
-      const result = await window.ipc.invoke('composio:get-connection-status', { toolkitSlug: 'gmail' })
-      setGmailConnected(result.isConnected)
-    } catch (error) {
-      console.error('Failed to load Gmail status:', error)
-      setGmailConnected(false)
-    } finally {
-      setGmailLoading(false)
-    }
-  }, [])
-
-  // Connect to Gmail via Composio
-  const startGmailConnect = useCallback(async () => {
-    try {
-      setGmailConnecting(true)
-      const result = await window.ipc.invoke('composio:initiate-connection', { toolkitSlug: 'gmail' })
-      if (!result.success) {
-        toast.error(result.error || 'Failed to connect to Gmail')
-        setGmailConnecting(false)
-      }
-    } catch (error) {
-      console.error('Failed to connect to Gmail:', error)
-      toast.error('Failed to connect to Gmail')
-      setGmailConnecting(false)
-    }
-  }, [])
-
-  // Handle Gmail connect button click
-  const handleConnectGmail = useCallback(async () => {
-    const configResult = await window.ipc.invoke('composio:is-configured', null)
-    if (!configResult.configured) {
-      setComposioApiKeyTarget('gmail')
-      setComposioApiKeyOpen(true)
-      return
-    }
-    await startGmailConnect()
-  }, [startGmailConnect])
-
-  // Handle Composio API key submission
-  const handleComposioApiKeySubmit = useCallback(async (apiKey: string) => {
-    try {
-      await window.ipc.invoke('composio:set-api-key', { apiKey })
-      setComposioApiKeyOpen(false)
-      toast.success('Composio API key saved')
-      await startGmailConnect()
-    } catch (error) {
-      console.error('Failed to save Composio API key:', error)
-      toast.error('Failed to save API key')
-    }
-  }, [startGmailConnect])
-
-  // Save selected Slack workspaces
-  const handleSlackSaveWorkspaces = useCallback(async () => {
-    const selected = slackAvailableWorkspaces.filter(w => slackSelectedUrls.has(w.url))
-    try {
-      setSlackLoading(true)
-      await window.ipc.invoke('slack:setConfig', { enabled: true, workspaces: selected })
-      setSlackEnabled(true)
-      setSlackWorkspaces(selected)
-      setSlackPickerOpen(false)
-      toast.success('Slack enabled')
-    } catch (error) {
-      console.error('Failed to save Slack config:', error)
-      toast.error('Failed to save Slack settings')
-    } finally {
-      setSlackLoading(false)
-    }
-  }, [slackAvailableWorkspaces, slackSelectedUrls])
-
-  // Disable Slack
-  const handleSlackDisable = useCallback(async () => {
-    try {
-      setSlackLoading(true)
-      await window.ipc.invoke('slack:setConfig', { enabled: false, workspaces: [] })
-      setSlackEnabled(false)
-      setSlackWorkspaces([])
-      setSlackPickerOpen(false)
-      toast.success('Slack disabled')
-    } catch (error) {
-      console.error('Failed to update Slack config:', error)
-      toast.error('Failed to update Slack settings')
-    } finally {
-      setSlackLoading(false)
-    }
-  }, [])
 
   const handleNext = () => {
     if (currentStep < 4) {
@@ -445,15 +283,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
   // Check connection status for all providers
   const refreshAllStatuses = useCallback(async () => {
-    // Refresh Slack config
-    refreshSlackConfig()
-
-    // Refresh Gmail Composio status if enabled
-    if (useComposioForGoogle) {
-      refreshGmailStatus()
-    }
-
-    // Refresh OAuth providers
     if (providers.length === 0) return
 
     const newStates: Record<string, ProviderState> = {}
@@ -480,7 +309,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     }
 
     setProviderStates(newStates)
-  }, [providers, refreshSlackConfig, refreshGmailStatus, useComposioForGoogle])
+  }, [providers])
 
   // Refresh statuses when modal opens or providers list changes
   useEffect(() => {
@@ -520,22 +349,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     return cleanup
   }, [onboardingPath, currentStep])
 
-  // Listen for Composio connection events (state updates only — toasts handled by ConnectorsPopover)
-  useEffect(() => {
-    const cleanup = window.ipc.on('composio:didConnect', (event) => {
-      const { toolkitSlug, success } = event
-
-      if (toolkitSlug === 'gmail') {
-        setGmailConnected(success)
-        setGmailConnecting(false)
-      }
-
-    })
-
-    return cleanup
-  }, [])
-
-
   const startConnect = useCallback(async (provider: string, credentials?: { clientId: string; clientSecret: string }) => {
     setProviderStates(prev => ({
       ...prev,
@@ -561,22 +374,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
       }))
     }
   }, [])
-
-  // Connect to a provider
-  const handleConnect = useCallback(async (provider: string) => {
-    if (provider === 'google') {
-      setGoogleClientIdOpen(true)
-      return
-    }
-
-    await startConnect(provider)
-  }, [startConnect])
-
-  const handleGoogleClientIdSubmit = useCallback((clientId: string, clientSecret: string) => {
-    setGoogleCredentials(clientId, clientSecret)
-    setGoogleClientIdOpen(false)
-    startConnect('google', { clientId, clientSecret })
-  }, [startConnect])
 
   // Step indicator - dynamic based on path
   const renderStepIndicator = () => {
@@ -604,183 +401,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   }
 
   // Helper to render an OAuth provider row
-  const renderOAuthProvider = (provider: string, displayName: string, icon: React.ReactNode, description: string) => {
-    const state = providerStates[provider] || {
-      isConnected: false,
-      isLoading: true,
-      isConnecting: false,
-    }
-
-    return (
-      <div
-        key={provider}
-        className="flex items-center justify-between gap-3 rounded-md px-3 py-3 hover:bg-accent"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex size-10 items-center justify-center rounded-md bg-muted">
-            {icon}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium truncate">{displayName}</span>
-            {state.isLoading ? (
-              <span className="text-xs text-muted-foreground">Checking...</span>
-            ) : (
-              <span className="text-xs text-muted-foreground truncate">{description}</span>
-            )}
-          </div>
-        </div>
-        <div className="shrink-0">
-          {state.isLoading ? (
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          ) : state.isConnected ? (
-            <div className="flex items-center gap-1.5 text-sm text-green-600">
-              <CheckCircle2 className="size-4" />
-              <span>Connected</span>
-            </div>
-          ) : (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => handleConnect(provider)}
-              disabled={state.isConnecting}
-            >
-              {state.isConnecting ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                "Connect"
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Render Gmail Composio row
-  const renderGmailRow = () => (
-    <div className="flex items-center justify-between gap-3 rounded-md px-3 py-3 hover:bg-accent">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="flex size-10 items-center justify-center rounded-md bg-muted">
-          <Mail className="size-5" />
-        </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm font-medium truncate">Gmail</span>
-          {gmailLoading ? (
-            <span className="text-xs text-muted-foreground">Checking...</span>
-          ) : (
-            <span className="text-xs text-muted-foreground truncate">
-              Sync emails
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="shrink-0">
-        {gmailLoading ? (
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
-        ) : gmailConnected ? (
-          <div className="flex items-center gap-1.5 text-sm text-green-600">
-            <CheckCircle2 className="size-4" />
-            <span>Connected</span>
-          </div>
-        ) : (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleConnectGmail}
-            disabled={gmailConnecting}
-          >
-            {gmailConnecting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              "Connect"
-            )}
-          </Button>
-        )}
-      </div>
-    </div>
-  )
-
-  // Render Slack row
-  const renderSlackRow = () => (
-    <div className="rounded-md px-3 py-3 hover:bg-accent">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex size-10 items-center justify-center rounded-md bg-muted">
-            <MessageSquare className="size-5" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium truncate">Slack</span>
-            {slackEnabled && slackWorkspaces.length > 0 ? (
-              <span className="text-xs text-muted-foreground truncate">
-                {slackWorkspaces.map(w => w.name).join(', ')}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground truncate">
-                Send messages and view channels
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="shrink-0 flex items-center gap-2">
-          {(slackLoading || slackDiscovering) && (
-            <Loader2 className="size-3 animate-spin" />
-          )}
-          {slackEnabled ? (
-            <Switch
-              checked={true}
-              onCheckedChange={() => handleSlackDisable()}
-              disabled={slackLoading}
-            />
-          ) : (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleSlackEnable}
-              disabled={slackLoading || slackDiscovering}
-            >
-              Enable
-            </Button>
-          )}
-        </div>
-      </div>
-      {slackPickerOpen && (
-        <div className="mt-2 ml-13 space-y-2">
-          {slackDiscoverError ? (
-            <p className="text-xs text-muted-foreground">{slackDiscoverError}</p>
-          ) : (
-            <>
-              {slackAvailableWorkspaces.map(w => (
-                <label key={w.url} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={slackSelectedUrls.has(w.url)}
-                    onChange={(e) => {
-                      setSlackSelectedUrls(prev => {
-                        const next = new Set(prev)
-                        if (e.target.checked) next.add(w.url)
-                        else next.delete(w.url)
-                        return next
-                      })
-                    }}
-                    className="rounded border-border"
-                  />
-                  <span className="truncate">{w.name}</span>
-                </label>
-              ))}
-              <Button
-                size="sm"
-                onClick={handleSlackSaveWorkspaces}
-                disabled={slackSelectedUrls.size === 0 || slackLoading}
-              >
-                Save
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-
   // Step 0: Sign in to ScholarOS (with BYOK option)
   const renderSignInStep = () => {
     const scholarosState = providerStates['scholaros'] || { isConnected: false, isLoading: false, isConnecting: false }
@@ -1178,36 +798,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
           </div>
         ) : (
           <>
-            {/* Email & Calendar Section */}
-            {(useComposioForGoogle || providers.includes('google')) && (
-              <div className="space-y-2">
-                <div className="px-3">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Email & Calendar
-                  </span>
-                </div>
-                {useComposioForGoogle
-                  ? renderGmailRow()
-                  : renderOAuthProvider('google', 'Google', <Mail className="size-5" />, 'Sync emails and calendar events')
-                }
-              </div>
-            )}
 
-            {/* Meeting Notes Section */}
-            <div className="space-y-2">
-              <div className="px-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Meeting Notes</span>
-              </div>
-              {providers.includes('fireflies-ai') && renderOAuthProvider('fireflies-ai', 'Fireflies', <Mic className="size-5" />, 'AI meeting transcripts')}
-            </div>
-
-            {/* Team Communication Section */}
-            <div className="space-y-2">
-              <div className="px-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Team Communication</span>
-              </div>
-              {renderSlackRow()}
-            </div>
           </>
         )}
       </div>
@@ -1231,7 +822,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
   // Step 4: Completion
   const renderCompletionStep = () => {
-    const hasConnections = connectedProviders.length > 0 || slackEnabled || gmailConnected
+    const hasConnections = connectedProviders.length > 0
 
     return (
       <div className="flex flex-col items-center text-center">
@@ -1253,32 +844,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
           <div className="mt-6 w-full max-w-sm">
             <div className="rounded-lg border bg-muted/50 p-4">
               <p className="text-sm font-medium mb-2">Connected accounts:</p>
-              <div className="space-y-1">
-                {gmailConnected && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="size-4 text-green-600" />
-                    <span>Gmail (Email)</span>
-                  </div>
-                )}
-                {connectedProviders.includes('google') && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="size-4 text-green-600" />
-                    <span>Google (Email)</span>
-                  </div>
-                )}
-                {connectedProviders.includes('fireflies-ai') && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="size-4 text-green-600" />
-                    <span>Fireflies (Meeting transcripts)</span>
-                  </div>
-                )}
-                {slackEnabled && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="size-4 text-green-600" />
-                    <span>Slack (Team communication)</span>
-                  </div>
-                )}
-              </div>
+              <div className="space-y-1" />
             </div>
           </div>
         )}
@@ -1292,18 +858,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
   return (
     <>
-    <GoogleClientIdModal
-      open={googleClientIdOpen}
-      onOpenChange={setGoogleClientIdOpen}
-      onSubmit={handleGoogleClientIdSubmit}
-      isSubmitting={providerStates.google?.isConnecting ?? false}
-    />
-    <ComposioApiKeyModal
-      open={composioApiKeyOpen}
-      onOpenChange={setComposioApiKeyOpen}
-      onSubmit={handleComposioApiKeySubmit}
-      isSubmitting={gmailConnecting}
-    />
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
         className="w-[60vw] max-w-3xl max-h-[80vh] overflow-y-auto"

@@ -61,10 +61,6 @@ import { compactSkillResults, compactConversationHistory } from "./history-compa
 import { getCacheControlProviderOptions } from "../models/cache-control.js";
 import { enforceBudget } from "./budget.js";
 
-function loadAgentNotesContext(): string | null {
-  return null;
-}
-
 export interface IAgentRuntime {
   trigger(runId: string): Promise<void>;
 }
@@ -1085,10 +1081,7 @@ export async function* streamAgent({
     // Inject Agent Notes context for copilot
     if (state.agentName === "copilot" || state.agentName === "scholaros") {
       const volatileTurnParts: string[] = [];
-      const agentNotesContext = loadAgentNotesContext();
-      if (agentNotesContext) {
-        volatileTurnParts.push(`\n\n${agentNotesContext}`);
-      }
+
       // Lazy Middle-Pane: inject compact header; auto-expand full content only when
       // the user's latest message contains referential language (2.1).
       // This saves ~10K+ tokens/turn for unrelated questions while keeping full context

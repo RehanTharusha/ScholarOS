@@ -45,7 +45,6 @@ import {
   resetOnboarding,
   shouldShowOnboardingOverride,
 } from "@scholaros/core/dist/config/config.js";
-import * as composioHandler from "./composio-handler.js";
 import { search } from "@scholaros/core/dist/search/search.js";
 import { ResearchHandler } from "@scholaros/core/dist/research/research-handler.js";
 import { versionHistory, voice } from "@scholaros/core";
@@ -875,38 +874,6 @@ export function setupIpcHandlers() {
     "onboarding:reset": async () => {
       resetOnboarding();
       return { success: true };
-    },
-    // Composio integration handlers
-    "composio:is-configured": async () => {
-      return composioHandler.isConfigured();
-    },
-    "composio:set-api-key": async (_event, args) => {
-      return composioHandler.setApiKey(args.apiKey);
-    },
-    "composio:initiate-connection": async (_event, args) => {
-      return composioHandler.initiateConnection(args.toolkitSlug);
-    },
-    "composio:get-connection-status": async (_event, args) => {
-      return composioHandler.getConnectionStatus(args.toolkitSlug);
-    },
-    "composio:sync-connection": async (_event, args) => {
-      return composioHandler.syncConnection(
-        args.toolkitSlug,
-        args.connectedAccountId,
-      );
-    },
-    "composio:disconnect": async (_event, args) => {
-      return composioHandler.disconnect(args.toolkitSlug);
-    },
-    "composio:list-connected": async () => {
-      return composioHandler.listConnected();
-    },
-    // Composio Tools Library handlers
-    "composio:list-toolkits": async () => {
-      return composioHandler.listToolkits();
-    },
-    "composio:use-composio-for-google": async () => {
-      return composioHandler.useComposioForGoogle();
     },
     // Shell integration handlers
     "shell:openPath": async (_event, args) => {

@@ -8,7 +8,7 @@ import organizeFilesSkill from "./organize-files/skill.js";
 
 import appNavigationSkill from "./app-navigation/skill.js";
 import browserControlSkill from "./browser-control/skill.js";
-import composioIntegrationSkill from "./composio-integration/skill.js";
+
 import { skill as cavemanSkill } from "./caveman/skill.js";
 import { skill as revisionGuideSkill } from "./revision-guide/skill.js";
 import { skill as youtubeVideoWorkflowSkill } from "./youtube-video-workflow/skill.js";
@@ -73,13 +73,6 @@ const definitions: SkillDefinition[] = [
     summary:
       "Discovering, executing, and integrating MCP tools. Use this to check what external capabilities are available and execute MCP tools on behalf of users.",
     content: mcpIntegrationSkill,
-  },
-  {
-    id: "composio-integration",
-    title: "Composio Integration",
-    summary:
-      "Interact with third-party services (Gmail, GitHub, Slack, LinkedIn, Notion, Jira, Google Sheets, etc.) via Composio. Search, connect, and execute tools.",
-    content: composioIntegrationSkill,
   },
   {
     id: "deletion-guardrails",

@@ -40,7 +40,6 @@ import {
   ToolTabbedContent,
 } from "@/components/ai-elements/tool";
 import { WebSearchResult } from "@/components/ai-elements/web-search-result";
-import { ComposioConnectCard } from "@/components/ai-elements/composio-connect-card";
 import { PermissionRequest } from "@/components/ai-elements/permission-request";
 import { AskHumanRequest } from "@/components/ai-elements/ask-human-request";
 import { Suggestions } from "@/components/ai-elements/suggestions";
@@ -72,7 +71,6 @@ import {
   type PermissionResponse,
   createEmptyChatTabViewState,
   getWebSearchCardData,
-  getComposioConnectCardData,
   getToolDisplayName,
   isChatMessage,
   isErrorMessage,
@@ -259,7 +257,6 @@ interface ChatSidebarProps {
   ttsMode?: "summary" | "full";
   onToggleTts?: () => void;
   onTtsModeChange?: (mode: "summary" | "full") => void;
-  onComposioConnected?: (toolkitSlug: string) => void;
   cavemanEnabled?: boolean;
   onToggleCaveman?: () => void;
   researchAvailable?: boolean;
@@ -322,7 +319,6 @@ export function ChatSidebar({
   ttsMode,
   onToggleTts,
   onTtsModeChange,
-  onComposioConnected,
   cavemanEnabled = false,
   onToggleCaveman,
   researchAvailable = true,
@@ -542,20 +538,6 @@ export function ChatSidebar({
             results={webSearchData.results}
             status={item.status}
             title={webSearchData.title}
-          />
-        );
-      }
-      const composioConnectData = getComposioConnectCardData(item);
-      if (composioConnectData) {
-        if (composioConnectData.hidden) return null;
-        return (
-          <ComposioConnectCard
-            key={item.id}
-            toolkitSlug={composioConnectData.toolkitSlug}
-            toolkitDisplayName={composioConnectData.toolkitDisplayName}
-            status={item.status}
-            alreadyConnected={composioConnectData.alreadyConnected}
-            onConnected={onComposioConnected}
           />
         );
       }

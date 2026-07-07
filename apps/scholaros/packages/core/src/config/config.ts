@@ -13,12 +13,9 @@ export const SCHOLAROS_INTERNAL_TOP_LEVEL_NAMES = new Set([
   "logs",
   "runs",
   "sites",
-  "agent-notes",
-  "gmail_sync",
   ".knowledge-graph",
   ".knowledge-history",
   ".trash",
-  "agent_notes_state.json",
 ]);
 
 export function getScholarOSDir(): string {

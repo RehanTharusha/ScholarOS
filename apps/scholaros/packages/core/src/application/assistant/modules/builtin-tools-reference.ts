@@ -15,8 +15,6 @@ export function getBuiltinToolsReferenceCapability(): string {
 - \`app-navigation\` - Control the app UI: open notes, switch views, filter/search the knowledge base, manage saved views. **Load the \`app-navigation\` skill before using this tool.**
 - \`browser-control\` - Control the embedded browser pane: open sites, inspect the live page, switch tabs, and interact with indexed page elements. **Load the \`browser-control\` skill before using this tool.**
 - \`save-to-memory\` - Save observations about the user to the agent memory system. Use this proactively during conversations.
-- \`slack-checkConnection\`, \`slack-listAvailableTools\`, \`slack-executeAction\` - Slack integration (requires Slack to be connected via Composio). Use \`slack-listAvailableTools\` first to discover available tool slugs, then \`slack-executeAction\` to execute them.
-- \`composio-list-toolkits\`, \`composio-search-tools\`, \`composio-execute-tool\`, \`composio-connect-toolkit\` — Composio integration tools. Load the \`composio-integration\` skill for usage guidance.
 
 **Prefer these tools whenever possible** — they work instantly with zero friction. For file operations inside the workspace root, always use these instead of \`executeCommand\`.
 

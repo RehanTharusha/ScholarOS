@@ -1,11 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Mic, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { GoogleClientIdModal } from "@/components/google-client-id-modal";
-import { ComposioApiKeyModal } from "@/components/composio-api-key-modal";
 import { useConnectors } from "@/hooks/useConnectors";
 
 interface ConnectedAccountsSettingsProps {
@@ -61,16 +58,7 @@ export function ConnectedAccountsSettings({
             <Button
               variant="default"
               size="sm"
-              onClick={() => {
-                if (provider === "google") {
-                  c.setGoogleClientIdDescription(
-                    "To keep your Google account connected, please re-enter your client ID. You only need to do this once.",
-                  );
-                  c.setGoogleClientIdOpen(true);
-                  return;
-                }
-                c.startConnect(provider);
-              }}
+              onClick={() => c.startConnect(provider)}
               className="h-7 px-3 text-xs"
             >
               Reconnect
@@ -113,65 +101,15 @@ export function ConnectedAccountsSettings({
   }
 
   return (
-    <>
-      <GoogleClientIdModal
-        open={c.googleClientIdOpen}
-        onOpenChange={(nextOpen) => {
-          c.setGoogleClientIdOpen(nextOpen);
-          if (!nextOpen) {
-            c.setGoogleClientIdDescription(undefined);
-          }
-        }}
-        onSubmit={c.handleGoogleClientIdSubmit}
-        isSubmitting={c.providerStates.google?.isConnecting ?? false}
-        description={c.googleClientIdDescription}
-      />
-      <ComposioApiKeyModal
-        open={c.composioApiKeyOpen}
-        onOpenChange={c.setComposioApiKeyOpen}
-        onSubmit={c.handleComposioApiKeySubmit}
-        isSubmitting={c.providerStates.google?.isConnecting ?? false}
-      />
-
-      <div className="space-y-1">
-        {/* Email & Calendar Section */}
-        {c.providers.includes("google") && (
-          <>
-            <div className="px-4 py-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Email & Calendar
-              </span>
-            </div>
-            {renderOAuthProvider(
-              "google",
-              "Google",
-              <Mail className="size-4" />,
-              "Sync emails and calendar",
-            )}
-
-            <Separator className="my-3" />
-          </>
-        )}
-
-        {/* Meeting Notes Section */}
-        {c.providers.includes("fireflies-ai") && (
-          <>
-            <div className="px-4 py-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Meeting Notes
-              </span>
-            </div>
-
-            {/* Fireflies */}
-            {renderOAuthProvider(
-              "fireflies-ai",
-              "Fireflies",
-              <Mic className="size-4" />,
-              "AI meeting transcripts",
-            )}
-          </>
-        )}
-      </div>
-    </>
+    <div className="space-y-1">
+      {c.providers.map((provider) =>
+        renderOAuthProvider(
+          provider,
+          provider.charAt(0).toUpperCase() + provider.slice(1),
+          <Loader2 className="size-4" />,
+          "Manage connection",
+        ),
+      )}
+    </div>
   );
 }

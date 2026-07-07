@@ -16,8 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { GoogleClientIdModal } from "@/components/google-client-id-modal";
-import { ComposioApiKeyModal } from "@/components/composio-api-key-modal";
+
 import { useConnectors } from "@/hooks/useConnectors";
 
 interface ConnectorsPopoverProps {
@@ -98,13 +97,6 @@ export function ConnectorsPopover({
               variant="default"
               size="sm"
               onClick={() => {
-                if (provider === "google") {
-                  c.setGoogleClientIdDescription(
-                    "To keep your Google account connected, please re-enter your client ID. You only need to do this once.",
-                  );
-                  c.setGoogleClientIdOpen(true);
-                  return;
-                }
                 c.startConnect(provider);
               }}
               className="h-7 px-2 text-xs"
@@ -153,18 +145,6 @@ export function ConnectorsPopover({
 
   return (
     <>
-      <GoogleClientIdModal
-        open={c.googleClientIdOpen}
-        onOpenChange={(nextOpen) => {
-          c.setGoogleClientIdOpen(nextOpen);
-          if (!nextOpen) {
-            c.setGoogleClientIdDescription(undefined);
-          }
-        }}
-        onSubmit={c.handleGoogleClientIdSubmit}
-        isSubmitting={c.providerStates.google?.isConnecting ?? false}
-        description={c.googleClientIdDescription}
-      />
       <Popover open={open} onOpenChange={setOpen}>
         {tooltip ? (
           <Tooltip open={open ? false : undefined}>
@@ -242,12 +222,6 @@ export function ConnectorsPopover({
           </div>
         </PopoverContent>
       </Popover>
-      <ComposioApiKeyModal
-        open={c.composioApiKeyOpen}
-        onOpenChange={c.setComposioApiKeyOpen}
-        onSubmit={c.handleComposioApiKeySubmit}
-        isSubmitting={c.providerStates.google?.isConnecting ?? false}
-      />
     </>
   );
 }
