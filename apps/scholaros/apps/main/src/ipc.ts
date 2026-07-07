@@ -32,6 +32,7 @@ import { KnowledgeGraphService } from "@scholaros/core/dist/knowledge/graph/serv
 import type { KnowledgeGraph } from "@scholaros/core/dist/knowledge/graph/graph.js";
 import { ReviewStore } from "@scholaros/core/dist/knowledge/review-store.js";
 import { listOnboardingModels } from "@scholaros/core/dist/models/models-dev.js";
+import { listOpenRouterModels } from "@scholaros/core/dist/models/openrouter-models.js";
 import { testModelConnection, listOpenCodeModels } from "@scholaros/core/dist/models/models.js";
 import { isSignedIn } from "@scholaros/core/dist/account/account.js";
 import { listGatewayModels } from "@scholaros/core/dist/models/gateway.js";
@@ -782,6 +783,9 @@ export function setupIpcHandlers() {
       const repo = container.resolve<IModelConfigRepo>("modelConfigRepo");
       await repo.setConfig(args);
       return { success: true };
+    },
+    "models:list-openrouter": async () => {
+      return await listOpenRouterModels();
     },
     "models:list-opencode": async (_event, args) => {
       return await listOpenCodeModels(args.flavor, args.apiKey);

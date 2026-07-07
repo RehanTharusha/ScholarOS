@@ -367,6 +367,17 @@ const ipcSchemas = {
       success: z.literal(true),
     }),
   },
+  "models:list-openrouter": {
+    req: z.null(),
+    res: z.object({
+      models: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string().optional(),
+        }),
+      ),
+    }),
+  },
   "models:list-opencode": {
     req: z.object({
       flavor: z.enum(["opencode-zen", "opencode-go"]),

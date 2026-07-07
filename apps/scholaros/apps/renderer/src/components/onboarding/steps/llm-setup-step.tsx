@@ -27,16 +27,16 @@ interface LlmSetupStepProps {
 }
 
 const primaryProviders: Array<{ id: LlmProviderFlavor; name: string; description: string; color: string; icon: React.ReactNode }> = [
+  { id: "openrouter", name: "OpenRouter", description: "Access hundreds of models", color: "bg-pink-500/10 text-pink-600 dark:text-pink-400", icon: <OpenRouterIcon /> },
+  { id: "opencode-zen", name: "OpenCode Zen", description: "Curated premium models", color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400", icon: <OpenCodeIcon /> },
+  { id: "opencode-go", name: "OpenCode Go", description: "Open models subscription", color: "bg-teal-500/10 text-teal-600 dark:text-teal-400", icon: <OpenCodeIcon /> },
   { id: "openai", name: "OpenAI", description: "GPT models", color: "bg-green-500/10 text-green-600 dark:text-green-400", icon: <OpenAIIcon /> },
   { id: "anthropic", name: "Anthropic", description: "Claude models", color: "bg-orange-500/10 text-orange-600 dark:text-orange-400", icon: <AnthropicIcon /> },
   { id: "google", name: "Gemini", description: "Google AI Studio", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400", icon: <GoogleIcon /> },
-  { id: "opencode-zen", name: "OpenCode Zen", description: "Curated premium models", color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400", icon: <OpenCodeIcon /> },
-  { id: "opencode-go", name: "OpenCode Go", description: "Open models subscription", color: "bg-teal-500/10 text-teal-600 dark:text-teal-400", icon: <OpenCodeIcon /> },
   { id: "ollama", name: "Ollama", description: "Local models", color: "bg-purple-500/10 text-purple-600 dark:text-purple-400", icon: <OllamaIcon /> },
 ]
 
 const moreProviders: Array<{ id: LlmProviderFlavor; name: string; description: string; color: string; icon: React.ReactNode }> = [
-  { id: "openrouter", name: "OpenRouter", description: "Multiple models, one key", color: "bg-pink-500/10 text-pink-600 dark:text-pink-400", icon: <OpenRouterIcon /> },
   { id: "aigateway", name: "AI Gateway", description: "Vercel AI Gateway", color: "bg-sky-500/10 text-sky-600 dark:text-sky-400", icon: <VercelIcon /> },
   { id: "openai-compatible", name: "OpenAI-Compatible", description: "Custom endpoint", color: "bg-gray-500/10 text-gray-600 dark:text-gray-400", icon: <GenericApiIcon /> },
 ]

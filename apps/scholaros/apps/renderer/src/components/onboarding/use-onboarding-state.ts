@@ -231,6 +231,38 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
     return () => { cancelled = true; };
   }, [open, llmProvider, currentOpenCodeApiKey]);
 
+  // Fetch OpenRouter models when OpenRouter is the selected provider
+  useEffect(() => {
+    if (!open) return;
+    if (llmProvider !== "openrouter") return;
+
+    let cancelled = false;
+
+    async function fetchModels() {
+      try {
+        setModelsLoading(true);
+        const result = await window.ipc.invoke("models:list-openrouter", null);
+        if (cancelled) return;
+        if (result?.models?.length) {
+          setModelsCatalog((prev) => ({
+            ...prev,
+            openrouter: result.models,
+          }));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to fetch OpenRouter models:", err);
+          setModelsError("Failed to load OpenRouter models");
+        }
+      } finally {
+        if (!cancelled) setModelsLoading(false);
+      }
+    }
+
+    fetchModels();
+    return () => { cancelled = true; };
+  }, [open, llmProvider]);
+
   const checkExistingConfig = useCallback(async () => {
     try {
       const result = await window.ipc.invoke("models:getConfig", null);

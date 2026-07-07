@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Server,
   Key,
@@ -22,6 +22,8 @@ import {
   Plug,
   Type,
   TextSelect,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -306,12 +308,13 @@ const primaryProviders: Array<{
   name: string;
   description: string;
 }> = [
+  { id: "openrouter", name: "OpenRouter", description: "Access hundreds of models" },
+  { id: "opencode-zen", name: "OpenCode Zen", description: "Curated premium models" },
+  { id: "opencode-go", name: "OpenCode Go", description: "Open models subscription" },
   { id: "openai", name: "OpenAI", description: "GPT models" },
   { id: "anthropic", name: "Anthropic", description: "Claude models" },
   { id: "google", name: "Gemini", description: "Google AI Studio" },
   { id: "ollama", name: "Ollama (Local)", description: "Run models locally" },
-  { id: "opencode-zen", name: "OpenCode Zen", description: "Curated premium models" },
-  { id: "opencode-go", name: "OpenCode Go", description: "Open models subscription" },
 ];
 
 const moreProviders: Array<{
@@ -319,11 +322,6 @@ const moreProviders: Array<{
   name: string;
   description: string;
 }> = [
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    description: "Multiple models, one key",
-  },
   {
     id: "aigateway",
     name: "AI Gateway (Vercel)",
@@ -347,6 +345,120 @@ const defaultBaseURLs: Partial<Record<LlmProviderFlavor, string>> = {
   "opencode-zen": "https://opencode.ai/zen/v1",
   "opencode-go": "https://opencode.ai/zen/go/v1",
 };
+
+function ModelCommandSelect({
+  value,
+  onValueChange,
+  models,
+  placeholder,
+  sameAsAssistant,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  models: LlmModelOption[];
+  placeholder?: string;
+  sameAsAssistant?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return models;
+    const q = search.toLowerCase();
+    return models.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) ||
+        (m.name && m.name.toLowerCase().includes(q)),
+    );
+  }, [models, search]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick, true);
+    return () => document.removeEventListener("mousedown", handleClick, true);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Button
+        variant="outline"
+        onClick={() => {
+          setOpen((v) => !v);
+          if (open) setSearch("");
+        }}
+        className="w-full justify-between font-normal"
+      >
+        {value
+          ? models.find((m) => m.id === value)?.name || value
+          : placeholder || "Select a model"}
+        <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+      </Button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover text-popover-foreground rounded-md border shadow-lg">
+          <div className="flex items-center border-b px-3">
+            <Search className="size-4 shrink-0 opacity-50" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search models..."
+              autoFocus
+              className="placeholder:text-muted-foreground flex h-9 w-full rounded-md bg-transparent py-2 text-sm outline-none"
+            />
+          </div>
+          <div className="max-h-[300px] overflow-y-auto py-1">
+            {sameAsAssistant && (
+              <div
+                className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent"
+                onMouseDown={() => {
+                  onValueChange("");
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "size-4 shrink-0",
+                    !value ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                Same as assistant
+              </div>
+            )}
+            {filtered.length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No model found.
+              </div>
+            )}
+            {filtered.map((model) => (
+              <div
+                key={model.id}
+                className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent"
+                onMouseDown={() => {
+                  onValueChange(model.id);
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "size-4 shrink-0",
+                    value === model.id ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <span className="truncate">{model.name || model.id}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
   const [provider, setProvider] = useState<LlmProviderFlavor>("openai");
@@ -681,6 +793,38 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
     return () => { cancelled = true; };
   }, [dialogOpen, provider, currentOpenCodeApiKey]);
 
+  // Fetch OpenRouter models when OpenRouter is the selected provider
+  useEffect(() => {
+    if (!dialogOpen) return;
+    if (provider !== "openrouter") return;
+
+    let cancelled = false;
+
+    async function fetchModels() {
+      try {
+        setModelsLoading(true);
+        const result = await window.ipc.invoke("models:list-openrouter", null);
+        if (cancelled) return;
+        if (result?.models?.length) {
+          setModelsCatalog((prev) => ({
+            ...prev,
+            openrouter: result.models,
+          }));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to fetch OpenRouter models:", err);
+          setModelsError("Failed to load OpenRouter models");
+        }
+      } finally {
+        if (!cancelled) setModelsLoading(false);
+      }
+    }
+
+    fetchModels();
+    return () => { cancelled = true; };
+  }, [dialogOpen, provider]);
+
   // Set default models from catalog when catalog loads
   useEffect(() => {
     if (Object.keys(modelsCatalog).length === 0) return;
@@ -949,23 +1093,14 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
                       placeholder="Enter model"
                     />
                   ) : (
-                    <Select
+                    <ModelCommandSelect
                       value={model}
                       onValueChange={(value) =>
                         updateModelAt(provider, index, value)
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {modelsForProvider.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.name || m.id}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      models={modelsForProvider}
+                      placeholder="Select a model"
+                    />
                   )}
                   {activeConfig.models.length > 1 && (
                     <button
@@ -1010,26 +1145,15 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
               placeholder={primaryModel || "Enter model"}
             />
           ) : (
-            <Select
-              value={activeConfig.knowledgeGraphModel || "__same__"}
+            <ModelCommandSelect
+              value={activeConfig.knowledgeGraphModel}
               onValueChange={(value) =>
-                updateConfig(provider, {
-                  knowledgeGraphModel: value === "__same__" ? "" : value,
-                })
+                updateConfig(provider, { knowledgeGraphModel: value })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__same__">Same as assistant</SelectItem>
-                {modelsForProvider.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name || m.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              models={modelsForProvider}
+              placeholder="Same as assistant"
+              sameAsAssistant
+            />
           )}
         </div>
 
@@ -1052,26 +1176,15 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
               placeholder={primaryModel || "Enter model"}
             />
           ) : (
-            <Select
-              value={activeConfig.meetingNotesModel || "__same__"}
+            <ModelCommandSelect
+              value={activeConfig.meetingNotesModel}
               onValueChange={(value) =>
-                updateConfig(provider, {
-                  meetingNotesModel: value === "__same__" ? "" : value,
-                })
+                updateConfig(provider, { meetingNotesModel: value })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__same__">Same as assistant</SelectItem>
-                {modelsForProvider.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name || m.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              models={modelsForProvider}
+              placeholder="Same as assistant"
+              sameAsAssistant
+            />
           )}
         </div>
 
@@ -1094,26 +1207,15 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
               placeholder={primaryModel || "Enter model"}
             />
           ) : (
-            <Select
-              value={activeConfig.trackBlockModel || "__same__"}
+            <ModelCommandSelect
+              value={activeConfig.trackBlockModel}
               onValueChange={(value) =>
-                updateConfig(provider, {
-                  trackBlockModel: value === "__same__" ? "" : value,
-                })
+                updateConfig(provider, { trackBlockModel: value })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__same__">Same as assistant</SelectItem>
-                {modelsForProvider.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name || m.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              models={modelsForProvider}
+              placeholder="Same as assistant"
+              sameAsAssistant
+            />
           )}
         </div>
       </div>
