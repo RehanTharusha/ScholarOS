@@ -1463,7 +1463,7 @@ function Tree({
             >
               <SidebarMenuButton onClick={() => onSelect(item.path, item.kind)}>
                 <Folder className="size-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{displayName}</span>
+                <span className="min-w-0 flex-1 whitespace-nowrap truncate">{displayName}</span>
               </SidebarMenuButton>
               {onToggleFolder && (item.children?.length ?? 0) > 0 && (
                 <SidebarMenuAction
@@ -1530,7 +1530,7 @@ function Tree({
               }}
             >
               <div className="flex w-full items-center gap-1 min-w-0">
-                <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                <span className="min-w-0 flex-1 whitespace-nowrap truncate">{item.name}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -1552,7 +1552,7 @@ function Tree({
             <CollapsibleTrigger asChild>
               <SidebarMenuButton>
                 <ChevronRight className="transition-transform size-4" />
-                <span className="min-w-0 flex-1 truncate">{displayName}</span>
+                <span className="min-w-0 flex-1 whitespace-nowrap truncate">{displayName}</span>
               </SidebarMenuButton>
             </CollapsibleTrigger>
             <CollapsibleContent>
