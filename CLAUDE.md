@@ -101,10 +101,10 @@ Long-form docs for specific features. Read the relevant file before making chang
 
 ## Design Contract
 
-Before designing or implementing any new feature UI in `apps/scholaros/apps/renderer/src/`, read [design.md](design.md). Treat it as the source of truth for layout, spacing, component choice, colors, empty states, and interaction patterns.
+Before designing or implementing any new feature UI in `apps/scholaros/apps/renderer/src/`, read [_docs/design/design.md](_docs/design/design.md). Treat it as the source of truth for layout, spacing, component choice, colors, empty states, and interaction patterns.
 
 - Start from the shared shell and primitives described there instead of inventing a new visual language.
-- If a new feature needs a reusable visual pattern that is not already documented, add it to [design.md](design.md) before or alongside the implementation.
+- If a new feature needs a reusable visual pattern that is not already documented, add it to [_docs/design/design.md](_docs/design/design.md) before or alongside the implementation.
 - If a screen looks meaningfully different from the rest of the app, assume the design contract was missed and fix the shared pattern instead of patching the screen in isolation.
 - Prefer `AcademicPageShell`, `AcademicPageHeader`, `AcademicCard`, and the shared UI primitives when building study-mode surfaces.
 
