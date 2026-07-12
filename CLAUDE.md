@@ -79,8 +79,8 @@ pnpm uses symlinks for workspace packages. Electron Forge's dependency walker ca
 
 ## Key Files Reference
 
-| Purpose                  | File                                  |
-| ------------------------ | ------------------------------------- |
+| Purpose                  | File                                          |
+| ------------------------ | --------------------------------------------- |
 | Electron main entry      | `apps/scholaros/apps/main/src/main.ts`        |
 | React app entry          | `apps/scholaros/apps/renderer/src/main.tsx`   |
 | Forge config (packaging) | `apps/scholaros/apps/main/forge.config.cjs`   |
@@ -95,16 +95,16 @@ pnpm uses symlinks for workspace packages. Electron Forge's dependency walker ca
 
 Long-form docs for specific features. Read the relevant file before making changes in that area — it has the full product flow, technical flows, and (where applicable) a catalog of the LLM prompts involved with exact file:line pointers.
 
-| Feature                                                                                                       | Doc                |
-| ------------------------------------------------------------------------------------------------------------- | ------------------ |
+| Feature                                                                                                       | Doc                        |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------- |
 | Track Blocks — auto-updating note content (scheduled / event-driven / manual), Copilot skill, prompts catalog | `apps/scholaros/TRACKS.md` |
 
 ## Design Contract
 
-Before designing or implementing any new feature UI in `apps/scholaros/apps/renderer/src/`, read [_docs/design/design.md](_docs/design/design.md). Treat it as the source of truth for layout, spacing, component choice, colors, empty states, and interaction patterns.
+Before designing or implementing any new feature UI in `apps/scholaros/apps/renderer/src/`, read [\_docs/design/design.md](_docs/design/design.md). Treat it as the source of truth for layout, spacing, component choice, colors, empty states, and interaction patterns.
 
 - Start from the shared shell and primitives described there instead of inventing a new visual language.
-- If a new feature needs a reusable visual pattern that is not already documented, add it to [_docs/design/design.md](_docs/design/design.md) before or alongside the implementation.
+- If a new feature needs a reusable visual pattern that is not already documented, add it to [\_docs/design/design.md](_docs/design/design.md) before or alongside the implementation.
 - If a screen looks meaningfully different from the rest of the app, assume the design contract was missed and fix the shared pattern instead of patching the screen in isolation.
 - Prefer `AcademicPageShell`, `AcademicPageHeader`, `AcademicCard`, and the shared UI primitives when building study-mode surfaces.
 
@@ -173,6 +173,7 @@ const appPage = pages.find((p) => p.url().includes("localhost:5173"));
 ### Agent workflow
 
 If an agent needs to test/interact with the app via Playwright, tell it to:
+
 1. Start Vite renderer + Electron with `--remote-debugging-port=9222`
 2. Write a `.mjs` script using `chromium.connectOverCDP("http://127.0.0.1:9222")`
 3. Run the script with `node` (Playwright must be installed first)

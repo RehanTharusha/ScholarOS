@@ -72,12 +72,7 @@ import {
   ReasoningContent,
 } from "@/components/ai-elements/reasoning";
 import { useSmoothedText } from "./hooks/useSmoothedText";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolTabbedContent,
-} from "@/components/ai-elements/tool";
+import { ToolCallGroupView } from "@/components/ai-elements/tool-group";
 import { WebSearchResult } from "@/components/ai-elements/web-search-result";
 import { AppActionCard } from "@/components/ai-elements/app-action-card";
 
@@ -140,15 +135,13 @@ import {
   createEmptyChatTabViewState,
   getWebSearchCardData,
   getAppActionCardData,
-  getToolDisplayName,
+  groupConversationItems,
   inferRunTitleFromMessage,
   isChatMessage,
   isErrorMessage,
   isToolCall,
   normalizeToolInput,
-  normalizeToolOutput,
   parseAttachedFiles,
-  toToolState,
 } from "@/lib/chat-conversation";
 import { toast } from "sonner";
 import { useVoiceMode } from "@/hooks/useVoiceMode";
@@ -5533,30 +5526,9 @@ function App() {
         );
       }
 
-      const toolTitle = getToolDisplayName(item);
-      const errorText = item.status === "error" ? "Tool error" : "";
-      const output = normalizeToolOutput(item.result, item.status);
-      const input = normalizeToolInput(item.input);
-      return (
-        <Tool
-          key={item.id}
-          open={isToolOpenForTab(tabId, item.id)}
-          onOpenChange={(open) => setToolOpenForTab(tabId, item.id, open)}
-        >
-          <ToolHeader
-            title={toolTitle}
-            type={`tool-${item.name}`}
-            state={toToolState(item.status)}
-          />
-          <ToolContent>
-            <ToolTabbedContent
-              input={input}
-              output={output}
-              errorText={errorText}
-            />
-          </ToolContent>
-        </Tool>
-      );
+      // Generic tool calls are now rendered via ToolCallGroupView
+      // in the grouped conversation iteration.
+      return null;
     }
 
     if (isErrorMessage(item)) {
@@ -6464,94 +6436,173 @@ function App() {
                                     <StudyDashboard onStartReview={() => setIsReviewOpen(true)} />
                                   ) : (
                                     <>
-                                      {tabState.conversation.map((item) => {
-                                        const rendered = renderConversationItem(
-                                          item,
-                                          tab.id,
-                                        );
-                                        if (isToolCall(item)) {
-                                          const permRequest =
-                                            tabState.allPermissionRequests.get(
-                                              item.id,
-                                            );
-                                          if (permRequest) {
-                                            const response =
-                                              tabState.permissionResponses.get(
-                                                item.id,
-                                              ) || null;
-                                            return (
-                                              <React.Fragment key={item.id}>
+                                      {(() => {
+                                        const nodes: React.ReactNode[] = [];
+                                        let idx = 0;
+                                        for (const groupItem of groupConversationItems(
+                                          tabState.conversation,
+                                        )) {
+                                          idx++;
+                                          if (
+                                            groupItem.kind === "tool-group"
+                                          ) {
+                                            const permEntries = groupItem.items
+                                              .map((toolItem) => {
+                                                const req =
+                                                  tabState.allPermissionRequests.get(
+                                                    toolItem.id,
+                                                  );
+                                                return req
+                                                  ? {
+                                                      item: toolItem,
+                                                      request: req,
+                                                      response:
+                                                        tabState.permissionResponses.get(
+                                                          toolItem.id,
+                                                        ) || null,
+                                                    }
+                                                  : null;
+                                              })
+                                              .filter(Boolean) as Array<{
+                                              item: ToolCall;
+                                              request: NonNullable<
+                                                ReturnType<
+                                                  typeof tabState.allPermissionRequests.get
+                                                >
+                                              >;
+                                              response:
+                                                | "approve"
+                                                | "deny"
+                                                | null;
+                                            }>;
+
+                                            nodes.push(
+                                              <React.Fragment
+                                                key={`g-${idx}`}
+                                              >
                                                 <motion.div
-                                                  initial={{ opacity: 0, y: 6 }}
-                                                  animate={{ opacity: 1, y: 0 }}
+                                                  initial={{
+                                                    opacity: 0,
+                                                    y: 6,
+                                                  }}
+                                                  animate={{
+                                                    opacity: 1,
+                                                    y: 0,
+                                                  }}
                                                   transition={{
                                                     duration: 0.25,
                                                     ease: [0.16, 1, 0.3, 1],
                                                   }}
                                                 >
-                                                  {rendered}
+                                                  <ToolCallGroupView
+                                                    group={groupItem}
+                                                  />
                                                 </motion.div>
-                                                <PermissionRequest
-                                                  toolCall={
-                                                    permRequest.toolCall
-                                                  }
-                                                  onApprove={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "approve",
-                                                    )
-                                                  }
-                                                  onApproveSession={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "approve",
-                                                      "session",
-                                                    )
-                                                  }
-                                                  onApproveAlways={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "approve",
-                                                      "always",
-                                                    )
-                                                  }
-                                                  onDeny={() =>
-                                                    handlePermissionResponse(
-                                                      permRequest.toolCall
-                                                        .toolCallId,
-                                                      permRequest.subflow,
-                                                      "deny",
-                                                    )
-                                                  }
-                                                  isProcessing={
-                                                    isActive && isProcessing
-                                                  }
-                                                  response={response}
-                                                />
-                                              </React.Fragment>
+                                                {permEntries.map(
+                                                  ({
+                                                    item,
+                                                    request,
+                                                    response,
+                                                  }) => (
+                                                    <motion.div
+                                                      key={`gp-${item.id}`}
+                                                      initial={{
+                                                        opacity: 0,
+                                                        y: 6,
+                                                      }}
+                                                      animate={{
+                                                        opacity: 1,
+                                                        y: 0,
+                                                      }}
+                                                      transition={{
+                                                        duration: 0.25,
+                                                        ease: [
+                                                          0.16, 1, 0.3, 1,
+                                                        ],
+                                                      }}
+                                                    >
+                                                      <PermissionRequest
+                                                        toolCall={
+                                                          request.toolCall
+                                                        }
+                                                        onApprove={() =>
+                                                          handlePermissionResponse(
+                                                            request
+                                                              .toolCall
+                                                              .toolCallId,
+                                                            request.subflow,
+                                                            "approve",
+                                                          )
+                                                        }
+                                                        onApproveSession={() =>
+                                                          handlePermissionResponse(
+                                                            request
+                                                              .toolCall
+                                                              .toolCallId,
+                                                            request.subflow,
+                                                            "approve",
+                                                            "session",
+                                                          )
+                                                        }
+                                                        onApproveAlways={() =>
+                                                          handlePermissionResponse(
+                                                            request
+                                                              .toolCall
+                                                              .toolCallId,
+                                                            request.subflow,
+                                                            "approve",
+                                                            "always",
+                                                          )
+                                                        }
+                                                        onDeny={() =>
+                                                          handlePermissionResponse(
+                                                            request
+                                                              .toolCall
+                                                              .toolCallId,
+                                                            request.subflow,
+                                                            "deny",
+                                                          )
+                                                        }
+                                                        isProcessing={
+                                                          isActive &&
+                                                          isProcessing
+                                                        }
+                                                        response={response}
+                                                      />
+                                                    </motion.div>
+                                                  ),
+                                                )}
+                                              </React.Fragment>,
+                                            );
+                                          } else {
+                                            const rendered =
+                                              renderConversationItem(
+                                                groupItem,
+                                                tab.id,
+                                              );
+                                            nodes.push(
+                                              <motion.div
+                                                key={`s-${idx}`}
+                                                initial={{
+                                                  opacity: 0,
+                                                  y: 6,
+                                                }}
+                                                animate={{
+                                                  opacity: 1,
+                                                  y: 0,
+                                                }}
+                                                transition={{
+                                                  duration: 0.25,
+                                                  ease: [0.16, 1, 0.3, 1],
+                                                }}
+                                              >
+                                                {rendered}
+                                              </motion.div>,
                                             );
                                           }
                                         }
-                                        return (
-                                          <motion.div
-                                            key={item.id}
-                                            initial={{ opacity: 0, y: 6 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{
-                                              duration: 0.25,
-                                              ease: [0.16, 1, 0.3, 1],
-                                            }}
-                                          >
-                                            {rendered}
-                                          </motion.div>
-                                        );
-                                      })}
+                                        return nodes;
+                                      })()}
 
                                       {Array.from(
                                         tabState.pendingAskHumanRequests.values(),

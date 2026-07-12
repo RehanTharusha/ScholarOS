@@ -614,6 +614,77 @@ export const getToolDisplayName = (tool: ToolCall): string => {
   return TOOL_DISPLAY_NAMES[tool.name] || tool.name;
 };
 
+/**
+ * A group of consecutive tool calls, optionally interleaved with
+ * reasoning-only assistant messages.
+ */
+export interface ToolCallGroup {
+  kind: "tool-group";
+  groupId: string;
+  label: string;
+  items: ToolCall[];
+  reasoningItems: ChatMessage[];
+}
+
+/**
+ * Check if an assistant message is reasoning-only (has reasoning but no
+ * meaningful content). These messages break tool call groups if standalone
+ * but should be absorbed into the surrounding group.
+ */
+const isReasoningOnlyMessage = (item: ConversationItem): boolean =>
+  isChatMessage(item) &&
+  item.role === "assistant" &&
+  !!item.reasoning &&
+  !item.content?.trim();
+
+/**
+ * Iterate over conversation items and group consecutive tool calls
+ * into a single group. Reasoning-only assistant messages between tool
+ * calls are absorbed into the group. Non-tool items pass through unchanged.
+ */
+export function* groupConversationItems(
+  items: ConversationItem[],
+): Generator<ConversationItem | ToolCallGroup> {
+  let i = 0;
+  while (i < items.length) {
+    const item = items[i];
+    if (!isToolCall(item)) {
+      yield item;
+      i++;
+      continue;
+    }
+
+    // Collect tool calls and interleaved reasoning-only messages
+    const groupItems: ToolCall[] = [];
+    const reasoningItems: ChatMessage[] = [];
+
+    while (i < items.length) {
+      if (isToolCall(items[i])) {
+        groupItems.push(items[i]);
+        i++;
+      } else if (isReasoningOnlyMessage(items[i])) {
+        reasoningItems.push(items[i] as ChatMessage);
+        i++;
+      } else {
+        break;
+      }
+    }
+
+    // Derive label: if all same display name, use it; otherwise "Operations"
+    const names = groupItems.map(getToolDisplayName);
+    const allSame = names.every((n) => n === names[0]);
+    const label = allSame ? names[0] : "Operations";
+
+    yield {
+      kind: "tool-group",
+      groupId: groupItems[0].id,
+      label,
+      items: groupItems,
+      reasoningItems,
+    };
+  }
+}
+
 export const inferRunTitleFromMessage = (
   content: string,
 ): string | undefined => {
