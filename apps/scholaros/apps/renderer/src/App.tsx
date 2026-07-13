@@ -79,9 +79,10 @@ import { AppActionCard } from "@/components/ai-elements/app-action-card";
 import { PermissionRequest } from "@/components/ai-elements/permission-request";
 import { AskHumanRequest } from "@/components/ai-elements/ask-human-request";
 import { Suggestions } from "@/components/ai-elements/suggestions";
-import { StudyDashboard } from "@/components/study-dashboard";
+
 import { VaultPickerDashboard } from "@/components/vault-picker-dashboard";
 import { ReviewSession } from "@/components/review-session";
+import { Greeting } from "@/components/greeting";
 import {
   ToolPermissionRequestEvent,
   AskHumanRequestEvent,
@@ -6433,7 +6434,7 @@ function App() {
                                   className={tabConversationContentClassName}
                                 >
                                   {!tabHasConversation ? (
-                                    <StudyDashboard onStartReview={() => setIsReviewOpen(true)} />
+                                    <Greeting />
                                   ) : (
                                     <>
                                       {(() => {

@@ -1,6 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, useCallback } from 'react'
 import mermaid from 'mermaid'
 import { useTheme } from '@/contexts/theme-context'
+import { DownloadIcon } from 'lucide-react'
+import { toast } from 'sonner'
 
 let lastTheme: string | null = null
 
@@ -19,12 +21,24 @@ interface MermaidRendererProps {
   className?: string
 }
 
+function extractTopic(source: string): string {
+  const firstLine = source.trim().split('\n')[0] || 'diagram'
+  const cleaned = firstLine
+    .replace(/^(mindmap\s+)?root\(\(/, '')
+    .replace(/\)\)$/, '')
+    .replace(/^root\[/, '')
+    .replace(/\]$/, '')
+    .trim()
+  return cleaned || 'diagram'
+}
+
 export function MermaidRenderer({ source, className }: MermaidRendererProps) {
   const { resolvedTheme } = useTheme()
   const id = useId().replace(/:/g, '-')
   const containerRef = useRef<HTMLDivElement>(null)
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!source.trim()) {
@@ -57,6 +71,50 @@ export function MermaidRenderer({ source, className }: MermaidRendererProps) {
     }
   }, [source, resolvedTheme, id])
 
+  const handleSave = useCallback(async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const topic = extractTopic(source)
+      const safeName = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'diagram'
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mind Map — ${topic}</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: "${resolvedTheme === 'dark' ? 'dark' : 'default'}", securityLevel: "loose" });</script>
+  <style>
+    body { background: #fff; margin: 0; padding: 1rem; font-family: sans-serif; }
+    .mermaid-container { max-width: 1000px; margin: 0 auto; }
+    .mermaid-container svg { max-width: 100%; height: auto !important; display: block !important; }
+  </style>
+</head>
+<body>
+  <div class="mermaid-container">
+    <pre class="mermaid">
+${source.trim()}
+    </pre>
+  </div>
+</body>
+</html>`
+
+      const path = `mindmaps/${safeName}.html`
+      await window.ipc.invoke('workspace:writeFile', {
+        path,
+        data: html,
+        opts: { mkdirp: true },
+      })
+      toast(`Saved to ${path}`)
+    } catch {
+      toast('Failed to save mind map')
+    } finally {
+      setSaving(false)
+    }
+  }, [source, resolvedTheme, saving])
+
   if (error) {
     return (
       <div className={className}>
@@ -79,11 +137,21 @@ export function MermaidRenderer({ source, className }: MermaidRendererProps) {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={className}
-      dangerouslySetInnerHTML={{ __html: svg }}
-      style={{ lineHeight: 0 }}
-    />
+    <div className="group relative">
+      <div
+        ref={containerRef}
+        className={className}
+        dangerouslySetInnerHTML={{ __html: svg }}
+        style={{ lineHeight: 0 }}
+      />
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="absolute bottom-2 right-2 size-7 rounded-md bg-background/80 p-1.5 opacity-0 backdrop-blur-sm transition-opacity hover:bg-background group-hover:opacity-100 disabled:opacity-40 border border-border"
+        title="Save as HTML — open in browser to view, right-click diagram to save as image"
+      >
+        <DownloadIcon className="size-full" />
+      </button>
+    </div>
   )
 }

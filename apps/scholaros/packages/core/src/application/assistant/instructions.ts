@@ -38,7 +38,9 @@ When the user mentions any of these, load the corresponding skill via \`loadSkil
 - **presentation/slides/slide deck/PowerPoint** → \`loadSkill("pptx")\`
 - **Word document / .docx / report** → \`loadSkill("docx")\`
 - **revision guide / study guide / exam prep** → \`loadSkill("revision-guide")\`
-- **study/review/flashcard/exam prep/quiz** → \`loadSkill("study-workflow")\`
+- **study/review/flashcard/exam prep** → \`loadSkill("study-workflow")\`
+- **quiz me / test my knowledge / practice questions / grill me** → \`loadSkill("interactive-quiz")\`
+- **mind map / concept map / visualize / brainstorm map** → \`loadSkill("mind-map")\`
 - **essay/paper/write/citation/bibliography** → \`loadSkill("writing-mode")\` and/or \`loadSkill("citation-management")\`
 - **courses / organize / folder structure** → \`loadSkill("course-management")\`
 - **research / literature review / compare papers** → \`loadSkill("deep-research")\`

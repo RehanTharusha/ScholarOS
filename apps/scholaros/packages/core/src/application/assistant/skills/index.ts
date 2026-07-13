@@ -26,6 +26,8 @@ import { skill as studyWorkflowSkill } from "./study-workflow/skill.js";
 import { skill as writingModeSkill } from "./writing-mode/skill.js";
 import { skill as citationManagementSkill } from "./citation-management/skill.js";
 import { skill as courseManagementSkill } from "./course-management/skill.js";
+import { skill as interactiveQuizSkill } from "./interactive-quiz/skill.js";
+import { skill as mindMapSkill } from "./mind-map/skill.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_PREFIX = "src/application/assistant/skills";
@@ -200,6 +202,20 @@ const definitions: SkillDefinition[] = [
       "Organize academic content by courses, add new courses, switch between course/file views, and manage course folder structures.",
     content: courseManagementSkill,
   },
+  {
+    id: "interactive-quiz",
+    title: "Interactive Quiz Mode",
+    summary:
+      "Agent-led active recall sessions — one question at a time with detailed feedback, adaptive difficulty, and end-of-session summary with weak-topic analysis.",
+    content: interactiveQuizSkill,
+  },
+  {
+    id: "mind-map",
+    title: "Mind Map Generator",
+    summary:
+      "Create visual mind maps from course content — hierarchical diagrams for revision, big-picture understanding, and concept relationships using Mermaid mindmap syntax.",
+    content: mindMapSkill,
+  },
 ];
 
 const skillEntries = definitions.map((definition) => ({
@@ -345,6 +361,8 @@ export function buildContextualSkillCatalog(context: {
     relevantIds.add("auto-flashcards");
     relevantIds.add("anki-flashcards");
     relevantIds.add("revision-guide");
+    relevantIds.add("interactive-quiz");
+    relevantIds.add("mind-map");
     relevantIds.add("app-navigation");
   }
 
