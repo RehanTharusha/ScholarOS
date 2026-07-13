@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { isKnowledgeRelPath } from "@/lib/wiki-links";
 import {
   BookOpen,
@@ -351,6 +352,54 @@ export function SidebarContentPanel({
     ? vaultPath.split(/[\\/]/).pop() || vaultPath
     : "Select Vault";
 
+  const swipeAccumRef = useRef(0);
+  const swipeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Trackpad horizontal swipe → switch section
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      const absDx = Math.abs(e.deltaX);
+      const absDy = Math.abs(e.deltaY);
+      if (absDx < 1 || absDy > absDx * 1.5) return;
+
+      swipeAccumRef.current += e.deltaX;
+
+      clearTimeout(swipeTimerRef.current);
+      swipeTimerRef.current = setTimeout(() => {
+        swipeAccumRef.current = 0;
+      }, 250);
+
+      if (Math.abs(swipeAccumRef.current) > 80) {
+        setActiveSection(swipeAccumRef.current > 0 ? "tasks" : "knowledge");
+        swipeAccumRef.current = 0;
+      }
+    },
+    [setActiveSection],
+  );
+
+  // Touch swipe for touchscreen / iPad
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (!touchStartRef.current) return;
+      const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+      const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+      touchStartRef.current = null;
+
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        setActiveSection(dx > 0 ? "tasks" : "knowledge");
+      }
+    },
+    [setActiveSection],
+  );
+
   useEffect(() => {
     let mounted = true;
 
@@ -390,7 +439,13 @@ export function SidebarContentPanel({
   }, []);
 
   return (
-    <Sidebar className="border-r-0" {...props}>
+    <Sidebar
+      className="border-r-0"
+      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      {...props}
+    >
       <SidebarHeader className="titlebar-drag-region">
         {/* Top spacer to clear the traffic lights + fixed toggle row */}
         <div className="h-8" />
@@ -539,29 +594,36 @@ export function SidebarContentPanel({
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        {activeSection === "knowledge" && (
-          <KnowledgeSection
-            tree={tree}
-            selectedPath={selectedPath}
-            expandedPaths={expandedPaths}
-            onSelectFile={onSelectFile}
-            onToggleFolder={onToggleFolder}
-            actions={knowledgeActions}
-            onOpenSearch={onOpenSearch}
-            onVoiceNoteCreated={onVoiceNoteCreated}
-            sidebarView={sidebarView}
-            setSidebarView={setSidebarView}
-          />
-        )}
-        {activeSection === "tasks" && (
-          <TasksSection
-            runs={runs}
-            currentRunId={currentRunId}
-            processingRunIds={processingRunIds}
-            actions={tasksActions}
-          />
-        )}
+      <SidebarContent className="overflow-hidden">
+        <motion.div
+          className="flex h-full"
+          animate={{ x: activeSection === "knowledge" ? "0%" : "-50%" }}
+          transition={{ type: "spring", stiffness: 350, damping: 35 }}
+          style={{ width: "200%" }}
+        >
+          <div className="h-full min-w-0 w-1/2">
+            <KnowledgeSection
+              tree={tree}
+              selectedPath={selectedPath}
+              expandedPaths={expandedPaths}
+              onSelectFile={onSelectFile}
+              onToggleFolder={onToggleFolder}
+              actions={knowledgeActions}
+              onOpenSearch={onOpenSearch}
+              onVoiceNoteCreated={onVoiceNoteCreated}
+              sidebarView={sidebarView}
+              setSidebarView={setSidebarView}
+            />
+          </div>
+          <div className="h-full min-w-0 w-1/2">
+            <TasksSection
+              runs={runs}
+              currentRunId={currentRunId}
+              processingRunIds={processingRunIds}
+              actions={tasksActions}
+            />
+          </div>
+        </motion.div>
       </SidebarContent>
       {/* Billing / upgrade CTA or Log in CTA */}
       {isScholarOSConnected && billing ? (
