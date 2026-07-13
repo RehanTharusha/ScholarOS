@@ -56,27 +56,36 @@ const DEFAULT_NOTE_TYPE_DEFINITIONS: NoteTypeDefinition[] = [
     folder: "lectures",
     template: `# {Lecture Title}
 
-## Meta
+## Meta (Before Lecture)
 **Course:** [[courses/{Course Name}/index.md|{Course Name}]]
 **Date:** {YYYY-MM-DD}
 **Instructor:** {Instructor Name}
 **Status:** {unprocessed|partial|complete|reviewed}
+**Terms to listen for:** {3 terms you expect}
+**Question to answer:** {1 question for the lecture}
 
-## Topics Covered
-- {Topic 1}
-- {Topic 2}
+## Cue Column (Within 24h — Write questions, not keywords)
+- {Question 1 — that the notes column answers}
+- {Question 2}
+- {Question 3}
 
-## Notes
-{Free-form lecture notes. Use headers and lists as needed.}
+## Notes Column (During Lecture — Paraphrase, don't transcribe)
+{Free-form capture. Use bullets, arrows (→), abbreviations.
+ Mark exam signals with ★.
+ Leave gaps (___) for anything you miss.}
+
+## Summary (Within 24h — 2-4 sentences)
+{Main argument of the lecture. How this connects to previous material. What is still unclear.}
 
 ## Key Takeaways
-- {Important insight or main point}
+- {Main insight — what to remember 6 months from now}
 
 ## Action Items
-- [ ] {Review this concept}
-- [ ] {Do the reading}
+- [ ] Review cue column (Day 1 / Day 7 / Day 30 / Day 90)
+- [ ] Convert missed cues to flashcards
+- [ ] Do the reading / problems
 
-## Questions
+## Questions for Next Time
 - {Concept you didn't understand}
 
 ## References
@@ -85,7 +94,7 @@ const DEFAULT_NOTE_TYPE_DEFINITIONS: NoteTypeDefinition[] = [
 ## Created
 {YYYY-MM-DD}`,
     extractionGuide:
-      "Look for: lecture title, course, date, instructor, topics covered, key points, action items",
+      "Look for: lecture title, course, date, instructor, cue questions, notes column, summary, key takeaways, action items, questions",
   },
   {
     type: "Assignment",

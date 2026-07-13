@@ -27,6 +27,7 @@ import { skill as writingModeSkill } from "./writing-mode/skill.js";
 import { skill as citationManagementSkill } from "./citation-management/skill.js";
 import { skill as courseManagementSkill } from "./course-management/skill.js";
 import { skill as interactiveQuizSkill } from "./interactive-quiz/skill.js";
+import { skill as lectureNotesSkill } from "./lecture-notes/skill.js";
 import { skill as mindMapSkill } from "./mind-map/skill.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -210,6 +211,13 @@ const definitions: SkillDefinition[] = [
     content: interactiveQuizSkill,
   },
   {
+    id: "lecture-notes",
+    title: "Lecture Notes (Cornell Method)",
+    summary:
+      "Create, process, and review lecture notes using the research-backed Cornell method. Covers before-lecture prep, during-lecture capture, within-24h processing, spaced review (1/7/30/90), and exam synthesis.",
+    content: lectureNotesSkill,
+  },
+  {
     id: "mind-map",
     title: "Mind Map Generator",
     summary:
@@ -363,6 +371,15 @@ export function buildContextualSkillCatalog(context: {
     relevantIds.add("revision-guide");
     relevantIds.add("interactive-quiz");
     relevantIds.add("mind-map");
+    relevantIds.add("app-navigation");
+  }
+
+  // Lecture / note-taking signals
+  const lectureSignals = ["lecture", "note", "notes", "note-taking", "notetaking", "cornell", "transcript", "class", "course material", "slides", "recording"];
+  if (keywords.some((k) => lectureSignals.some((s) => k.includes(s)))) {
+    relevantIds.add("lecture-notes");
+    relevantIds.add("course-management");
+    relevantIds.add("auto-flashcards");
     relevantIds.add("app-navigation");
   }
 
