@@ -69,8 +69,6 @@ export class FSRunsRepo implements IRunsRepo {
     idGenerator: IMonotonicallyIncreasingIdGenerator;
   }) {
     this.idGenerator = idGenerator;
-    // ensure runs directory exists
-    fsp.mkdir(getScholarOSPath("runs"), { recursive: true });
   }
 
   private extractTitle(events: z.infer<typeof RunEvent>[]): string | undefined {
@@ -195,6 +193,7 @@ export class FSRunsRepo implements IRunsRepo {
     runId: string,
     events: z.infer<typeof RunEvent>[],
   ): Promise<void> {
+    await fsp.mkdir(getScholarOSPath("runs"), { recursive: true });
     await fsp.appendFile(
       path.join(getScholarOSPath("runs"), `${runId}.jsonl`),
       events.map((event) => JSON.stringify(event)).join("\n") + "\n",
