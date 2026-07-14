@@ -86,7 +86,8 @@ export function compactSkillResults(messages: z.infer<typeof Message>[]): void {
 }
 
 const MIN_TURNS_BEFORE_SUMMARY = 12;
-const KEEP_VERBATIM_TURNS = 6;
+const MIN_TURNS_BEFORE_SUMMARY_TIGHT = 8;
+const KEEP_VERBATIM_TURNS = 8;
 
 /**
  * Extract salient keywords from a message for summary construction.
@@ -122,6 +123,7 @@ function buildHeuristicSummary(
   const topics = new Set<string>();
   const toolsUsed = new Set<string>();
   const questionTypes = new Set<string>();
+  const decisions = new Set<string>();
 
   for (let i = 0; i < endIndex; i++) {
     const msg = messages[i];
@@ -153,29 +155,43 @@ function buildHeuristicSummary(
       }
     }
 
+    if (msg.role === "assistant" && typeof msg.content === "string") {
+      const text = msg.content.toLowerCase();
+      if (text.includes("created") || text.includes("saved") || text.includes("wrote")) {
+        decisions.add("created/modified content");
+      }
+      if (text.includes("approved") || text.includes("confirmed")) {
+        decisions.add("approved/confirmed");
+      }
+    }
+
     if (msg.role === "tool" && msg.toolName === "loadSkill") {
       toolsUsed.add(`skill:${msg.toolName}`);
     }
   }
 
-  const parts: string[] = ["Earlier in this conversation:"];
+  const lines: string[] = ["[Summary of earlier conversation]"];
+
   if (topics.size > 0) {
-    parts.push(`the user asked about ${Array.from(topics).join(", ")}`);
+    lines.push(`Topics: ${Array.from(topics).join(", ")}`);
   }
   if (questionTypes.size > 0) {
-    parts.push(`asked ${Array.from(questionTypes).join(", ")}`);
+    lines.push(`Questions: ${Array.from(questionTypes).join(", ")}`);
+  }
+  if (decisions.size > 0) {
+    lines.push(`Decisions: ${Array.from(decisions).join(", ")}`);
   }
   if (toolsUsed.size > 0) {
     const toolList = Array.from(toolsUsed)
       .filter((t) => t !== "ask-human" && t !== "loadCapability")
       .slice(0, 5);
     if (toolList.length > 0) {
-      parts.push(`used tools: ${toolList.join(", ")}`);
+      lines.push(`Tools used: ${toolList.join(", ")}`);
     }
   }
-  parts.push("The conversation continues below.");
+  lines.push("The conversation continues below.");
 
-  return `[Summary of earlier conversation: ${parts.join("; ")}]`;
+  return lines.join("\n");
 }
 
 /**
@@ -187,8 +203,10 @@ function buildHeuristicSummary(
  */
 export function compactConversationHistory(
   messages: z.infer<typeof Message>[],
+  tight?: boolean,
 ): void {
-  if (messages.length < MIN_TURNS_BEFORE_SUMMARY) return;
+  const threshold = tight ? MIN_TURNS_BEFORE_SUMMARY_TIGHT : MIN_TURNS_BEFORE_SUMMARY;
+  if (messages.length < threshold) return;
 
   let turnCount = 0;
   let splitIndex = -1;

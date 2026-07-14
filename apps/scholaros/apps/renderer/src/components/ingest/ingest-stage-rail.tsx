@@ -61,18 +61,27 @@ export function IngestStageRail({
   const [watchingRaw, setWatchingRaw] = useState(false);
   const [isPickingFolder, setIsPickingFolder] = useState(false);
 
-  // Load existing courses on mount
+  // Load existing courses from quick-access.json on mount
   useEffect(() => {
     const loadCourses = async () => {
       try {
         const raw = await window.ipc.invoke("workspace:readFile", {
-          path: ".scholar/courses.json",
+          path: ".scholar/quick-access.json",
           encoding: "utf-8",
         });
         if (raw?.content) {
           const parsed = JSON.parse(raw.content);
-          if (Array.isArray(parsed.courses)) {
-            setCourses(parsed.courses);
+          if (Array.isArray(parsed.items)) {
+            setCourses(
+              parsed.items
+                .filter((i: { type: string }) => i.type === "course")
+                .map((i: { id: string; name: string; color: string; createdAt: string }) => ({
+                  id: i.id,
+                  name: i.name,
+                  color: i.color || "#3B82F6",
+                  createdAt: i.createdAt,
+                })),
+            );
           }
         }
       } catch {
@@ -108,9 +117,37 @@ export function IngestStageRail({
     };
     const updated = [...courses, newCourse];
     try {
+      // Read existing quick-access items, append as a course type
+      let items: Record<string, unknown>[] = [];
+      try {
+        const raw = await window.ipc.invoke("workspace:readFile", {
+          path: ".scholar/quick-access.json",
+          encoding: "utf-8",
+        });
+        if (raw?.content) {
+          const parsed = JSON.parse(raw.content);
+          if (Array.isArray(parsed.items)) items = parsed.items;
+        }
+      } catch {
+        // File doesn't exist yet
+      }
+      const nextOrder =
+        items.length > 0
+          ? Math.max(...items.map((i: { order?: number }) => i.order ?? 0)) + 1
+          : 0;
+      items.push({
+        id: newCourse.id,
+        type: "course",
+        name: newCourse.name,
+        path: `courses/${newCourse.name}`,
+        customName: null,
+        color: newCourse.color,
+        createdAt: newCourse.createdAt,
+        order: nextOrder,
+      });
       await window.ipc.invoke("workspace:writeFile", {
-        path: ".scholar/courses.json",
-        data: JSON.stringify({ courses: updated }, null, 2),
+        path: ".scholar/quick-access.json",
+        data: JSON.stringify({ items }, null, 2),
       });
       setCourses(updated);
       setSelectedCourseId(newCourse.id);

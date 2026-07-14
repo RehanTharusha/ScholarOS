@@ -75,9 +75,19 @@ export function useOnboardingState(open: boolean, onComplete: () => void) {
         path: ".scholar",
         recursive: true,
       });
+      const items = courses.map((c, i) => ({
+        id: c.id,
+        type: "course" as const,
+        name: c.name,
+        path: `courses/${c.name}`,
+        customName: null,
+        color: c.color,
+        createdAt: c.createdAt,
+        order: i,
+      }));
       await window.ipc.invoke("workspace:writeFile", {
-        path: ".scholar/courses.json",
-        data: JSON.stringify({ courses }, null, 2),
+        path: ".scholar/quick-access.json",
+        data: JSON.stringify({ items }, null, 2),
       });
       return true;
     } catch (error) {

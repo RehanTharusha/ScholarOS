@@ -79,16 +79,17 @@ export function IngestEmptyState({ onOpenFilePicker }: IngestEmptyStateProps) {
 
     async function checkFirstRun() {
       try {
-        const coursesRaw = await window.ipc.invoke("workspace:readFile", {
-          path: ".scholar/courses.json",
+        const qaRaw = await window.ipc.invoke("workspace:readFile", {
+          path: ".scholar/quick-access.json",
         });
         if (cancelled) return;
-        if (coursesRaw?.content) {
-          const parsed = JSON.parse(coursesRaw.content);
-          const hasCourses =
-            Array.isArray(parsed.courses) && parsed.courses.length > 0;
-          setIsFirstRun(!hasCourses);
-          if (hasCourses) setShowOnboarding(false);
+        if (qaRaw?.content) {
+          const parsed = JSON.parse(qaRaw.content);
+          const hasCourseItems =
+            Array.isArray(parsed.items) &&
+            parsed.items.some((i: { type: string }) => i.type === "course");
+          setIsFirstRun(!hasCourseItems);
+          if (hasCourseItems) setShowOnboarding(false);
           setHasChecked(true);
         } else {
           setIsFirstRun(true);

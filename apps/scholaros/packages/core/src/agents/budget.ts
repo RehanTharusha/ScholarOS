@@ -20,18 +20,17 @@ export interface BudgetReport {
   note: string;
 }
 
+// Use 80% of context window as the budget to leave headroom
+// for the model's output tokens and large tool results.
+// The remaining 20% acts as a buffer against context_limit_exceeded errors.
+const HEADROOM_RATIO = 0.8;
+
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 
-export const DEFAULT_BUDGET: TokenBudget = {
-  total: DEFAULT_CONTEXT_WINDOW,
-  system: Math.floor(DEFAULT_CONTEXT_WINDOW * 0.15),
-  context: Math.floor(DEFAULT_CONTEXT_WINDOW * 0.25),
-  history: Math.floor(DEFAULT_CONTEXT_WINDOW * 0.50),
-  skills: Math.floor(DEFAULT_CONTEXT_WINDOW * 0.10),
-};
+export const DEFAULT_BUDGET: TokenBudget = createBudget(DEFAULT_CONTEXT_WINDOW);
 
 export function createBudget(contextWindow?: number): TokenBudget {
-  const total = contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+  const total = Math.floor((contextWindow ?? DEFAULT_CONTEXT_WINDOW) * HEADROOM_RATIO);
   return {
     total,
     system: Math.floor(total * 0.15),
@@ -77,8 +76,23 @@ export function enforceBudget(
   messages: z.infer<typeof Message>[],
   instructions: string,
   budget?: TokenBudget,
+): { messages: z.infer<typeof Message>[]; report: BudgetReport }
+export function enforceBudget(
+  messages: z.infer<typeof Message>[],
+  instructions: string,
+  contextWindow?: number,
+): { messages: z.infer<typeof Message>[]; report: BudgetReport }
+export function enforceBudget(
+  messages: z.infer<typeof Message>[],
+  instructions: string,
+  budgetOrContextWindow?: TokenBudget | number,
 ): { messages: z.infer<typeof Message>[]; report: BudgetReport } {
-  const b = budget ?? DEFAULT_BUDGET;
+  const b: TokenBudget =
+    budgetOrContextWindow === undefined
+      ? createBudget()
+      : typeof budgetOrContextWindow === "number"
+        ? createBudget(budgetOrContextWindow)
+        : budgetOrContextWindow;
   const estimatedSystem = estimateTokens(instructions);
   const estimatedHistory = countHistoryTokens(messages);
   const estimatedSkills = countSkillTokens(messages);

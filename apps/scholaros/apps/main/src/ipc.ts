@@ -32,6 +32,8 @@ import { KnowledgeGraphService } from "@scholaros/core/dist/knowledge/graph/serv
 import type { KnowledgeGraph } from "@scholaros/core/dist/knowledge/graph/graph.js";
 import { ReviewStore } from "@scholaros/core/dist/knowledge/review-store.js";
 import { listOnboardingModels } from "@scholaros/core/dist/models/models-dev.js";
+import { getContextWindow, loadDevModelContextWindows } from "@scholaros/core/dist/models/context-window.js";
+void loadDevModelContextWindows(); // pre-load models.dev context windows
 import { listOpenRouterModels } from "@scholaros/core/dist/models/openrouter-models.js";
 import { testModelConnection, listOpenCodeModels } from "@scholaros/core/dist/models/models.js";
 import { isSignedIn } from "@scholaros/core/dist/account/account.js";
@@ -768,6 +770,9 @@ export function setupIpcHandlers() {
     "runs:deleteAll": async () => {
       await runsCore.deleteAllRuns();
       return { success: true };
+    },
+    "models:context-window": async (_event, args) => {
+      return getContextWindow(args.model);
     },
     "models:list": async () => {
       if (await isSignedIn()) {

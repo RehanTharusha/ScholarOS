@@ -148,6 +148,7 @@ interface ChatInputInnerProps {
   isStopping?: boolean;
   isActive: boolean;
   presetMessage?: string;
+  contextTrigger?: React.ReactNode;
   onPresetMessageConsumed?: () => void;
   runId?: string | null;
   initialDraft?: string;
@@ -198,6 +199,7 @@ function ChatInputInner({
   cavemanEnabled = false,
   onToggleCaveman,
   researchAvailable = true,
+  contextTrigger,
 }: ChatInputInnerProps) {
   const controller = usePromptInputController();
   const message = controller.textInput.value;
@@ -719,6 +721,7 @@ function ChatInputInner({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
+            {contextTrigger}
             {onToggleTts && ttsAvailable && (
               <div className="flex shrink-0 items-center">
                 <Tooltip>
@@ -890,6 +893,7 @@ export interface ChatInputWithMentionsProps {
   cavemanEnabled?: boolean;
   onToggleCaveman?: () => void;
   researchAvailable?: boolean;
+  contextTrigger?: React.ReactNode;
 }
 
 export function ChatInputWithMentions({
@@ -922,6 +926,7 @@ export function ChatInputWithMentions({
   cavemanEnabled = false,
   onToggleCaveman,
   researchAvailable = true,
+  contextTrigger,
 }: ChatInputWithMentionsProps) {
   return (
     <PromptInputProvider
@@ -956,6 +961,7 @@ export function ChatInputWithMentions({
         cavemanEnabled={cavemanEnabled}
         onToggleCaveman={onToggleCaveman}
         researchAvailable={researchAvailable}
+        contextTrigger={contextTrigger}
       />
     </PromptInputProvider>
   );

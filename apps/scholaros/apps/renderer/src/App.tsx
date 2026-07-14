@@ -29,6 +29,15 @@ import {
   type StagedAttachment,
 } from "./components/chat-input-with-mentions";
 import { ChatMessageAttachments } from "@/components/chat-message-attachments";
+import {
+  Context,
+  ContextTrigger,
+  ContextContent,
+  ContextContentHeader,
+  ContextContentBody,
+  ContextInputUsage,
+  ContextOutputUsage,
+} from "@/components/ai-elements/context";
 import { type GraphEdge, type GraphNode } from "@/components/graph-view";
 import { CalendarView } from "@/components/calendar-view";
 import {
@@ -810,7 +819,9 @@ function App() {
   const [currentReasoningMessage, setCurrentReasoningMessage] =
     useState<string>("");
   const reasoningBufferRef = useRef("");
-  const [, setModelUsage] = useState<LanguageModelUsage | null>(null);
+  const [modelUsage, setModelUsage] = useState<LanguageModelUsage | null>(null);
+  const [maxContextTokens, setMaxContextTokens] = useState(128_000);
+  const [currentModelId, setCurrentModelId] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const runIdRef = useRef<string | null>(null);
   const loadRunRequestIdRef = useRef(0);
@@ -1998,6 +2009,13 @@ function App() {
       const run = await window.ipc.invoke("runs:fetch", { runId: id });
       if (loadRunRequestIdRef.current !== requestId) return;
 
+      if (run.model) {
+        setCurrentModelId(run.model);
+        window.ipc.invoke("models:context-window", { model: run.model }).then((cw) => {
+          if (typeof cw === "number") setMaxContextTokens(cw);
+        }).catch(() => {});
+      }
+
       // Parse the log events into conversation items
       const items: ConversationItem[] = [];
       const toolCallMap = new Map<string, ToolCall>();
@@ -2926,6 +2944,12 @@ function App() {
         newRunCreatedAt = run.createdAt;
         setRunId(currentRunId);
         analytics.chatSessionCreated(currentRunId);
+        if (run.model) {
+          setCurrentModelId(run.model);
+          window.ipc.invoke("models:context-window", { model: run.model }).then((cw) => {
+            if (typeof cw === "number") setMaxContextTokens(cw);
+          }).catch(() => {});
+        }
         // Update active chat tab's runId to the new run
         setChatTabs((prev) =>
           prev.map((tab) =>
@@ -5686,6 +5710,17 @@ function App() {
                   return next;
                 });
               }}
+              onEnsureFolderExpanded={(path) => {
+                setExpandedPaths((prev) => {
+                  const next = new Set(prev);
+                  // Add the target path and all ancestor directories
+                  const parts = path.split("/");
+                  for (let i = 1; i <= parts.length; i++) {
+                    next.add(parts.slice(0, i).join("/"));
+                  }
+                  return next;
+                });
+              }}
               knowledgeActions={knowledgeActions}
               onVoiceNoteCreated={handleVoiceNoteCreated}
               runs={runs}
@@ -6681,6 +6716,12 @@ function App() {
                         })}
                       </div>
 
+                      <Context
+                        usedTokens={modelUsage?.inputTokens ?? 0}
+                        maxTokens={maxContextTokens}
+                        usage={modelUsage ?? undefined}
+                        modelId={currentModelId ?? undefined}
+                      >
                       <div className="sticky bottom-0 z-10 bg-background pb-12 pt-0 shadow-lg">
                         <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-t from-background to-transparent" />
                         <div className="mx-auto w-full max-w-4xl px-4">
@@ -6730,6 +6771,10 @@ function App() {
                                         tab.id,
                                         m,
                                       );
+                                      setCurrentModelId(m.model);
+                                      window.ipc.invoke("models:context-window", { model: m.model }).then((cw) => {
+                                        if (typeof cw === "number") setMaxContextTokens(cw);
+                                      }).catch(() => {});
                                     } else {
                                       selectedModelByTabRef.current.delete(
                                         tab.id,
@@ -6775,12 +6820,14 @@ function App() {
                                     isActive ? handleTtsModeChange : undefined
                                   }
                                   researchAvailable={true}
+                                  contextTrigger={<ContextTrigger />}
                                 />
                               </div>
                             );
                           })}
                         </div>
                       </div>
+                      </Context>
                     </div>
                   </FileCardProvider>
                 )}

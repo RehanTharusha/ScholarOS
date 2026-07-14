@@ -60,6 +60,10 @@ import { shouldDisableTools } from "../config/config.js";
 import { compactSkillResults, compactConversationHistory } from "./history-compaction.js";
 import { getCacheControlProviderOptions } from "../models/cache-control.js";
 import { enforceBudget } from "./budget.js";
+import { getContextWindow, loadDevModelContextWindows } from "../models/context-window.js";
+
+// Pre-load models.dev context windows at module init (non-blocking)
+loadDevModelContextWindows().catch(() => {});
 
 export interface IAgentRuntime {
   trigger(runId: string): Promise<void>;
@@ -470,16 +474,24 @@ function formatBytes(bytes: number): string {
 export function convertFromMessages(
   messages: z.infer<typeof Message>[],
   instructions?: string,
+  contextWindow?: number,
 ): ModelMessage[] {
   // Compact old loadSkill results to avoid bloat from skill text in history
   compactSkillResults(messages);
 
+  // Estimate how full the context is to decide compaction aggressiveness
+  let tight = false;
+  if (contextWindow && instructions) {
+    const roughTotal = instructions.length / 4 + messages.reduce((s, m) => s + (typeof m.content === "string" ? m.content.length : 0) / 4, 0);
+    if (roughTotal > contextWindow * 0.6) tight = true;
+  }
+
   // Summarize old conversation turns when history grows long (Phase 4.3)
-  compactConversationHistory(messages);
+  compactConversationHistory(messages, tight);
 
   // Enforce per-turn token budget (Phase 4.1)
   if (instructions) {
-    const { messages: trimmed, report } = enforceBudget(messages, instructions);
+    const { messages: trimmed, report } = enforceBudget(messages, instructions, contextWindow);
     if (report.trimmedTurns > 0) {
       console.log(
         `[Budget] ${report.note} (est: ${report.estimatedTotal}/${report.totalBudget})`,
@@ -1183,6 +1195,7 @@ export async function* streamAgent({
       loopLogger.log("search enabled, injecting search prompt");
       instructionsWithDateTime += `\n\n# Search\nThe user has enabled search for this message. Call the \`web-search\` tool once with their query. The tool handles all browser interaction internally — navigate, read page, extract content. Do NOT narrate the process. Do NOT say "let me open the browser" or "I'll search now" — just call the tool silently. Wait for the results, then answer the question naturally.`;
     }
+    const contextWindow = getContextWindow(modelId);
     let streamError: string | null = null;
     for await (const event of streamLlm(
       model,
@@ -1191,6 +1204,7 @@ export async function* streamAgent({
       tools,
       state.runProvider,
       signal,
+      contextWindow,
     )) {
       messageBuilder.ingest(event);
       yield* processEvent({
@@ -1306,8 +1320,9 @@ async function* streamLlm(
   tools: ToolSet,
   providerName: string,
   signal?: AbortSignal,
+  contextWindow?: number,
 ): AsyncGenerator<z.infer<typeof LlmStepStreamEvent>, void, unknown> {
-  const converted = convertFromMessages(messages, instructions);
+  const converted = convertFromMessages(messages, instructions, contextWindow);
 
   // Pass the system prompt appropriately for the provider. The previous
   // implementation always unshifted a `{ role: "system" }` message into the

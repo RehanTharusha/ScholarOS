@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { isKnowledgeRelPath } from "@/lib/wiki-links";
 import {
   BookOpen,
@@ -84,7 +84,9 @@ import {
   useSidebarSection,
 } from "@/contexts/sidebar-context";
 import { SettingsDialog } from "@/components/settings-dialog";
-import { CourseSidebar } from "@/components/course-sidebar";
+import { QuickAccessSidebar } from "@/components/quick-access-sidebar";
+import { useQuickAccess } from "@/hooks/useQuickAccess";
+import type { QuickAccessItem } from "@/hooks/useQuickAccess";
 import { toast } from "sonner";
 import { useBilling } from "@/hooks/useBilling";
 
@@ -148,6 +150,8 @@ type SidebarContentPanelProps = {
   expandedPaths: Set<string>;
   onSelectFile: (path: string, kind: "file" | "dir") => void;
   onToggleFolder?: (path: string) => void;
+  /** Expand a folder path and all its ancestor directories in the file tree */
+  onEnsureFolderExpanded?: (path: string) => void;
   knowledgeActions: KnowledgeActions;
   onVoiceNoteCreated?: (path: string) => void;
   onOpenSearch?: () => void;
@@ -197,6 +201,7 @@ export function SidebarContentPanel({
   expandedPaths,
   onSelectFile,
   onToggleFolder,
+  onEnsureFolderExpanded,
   knowledgeActions,
   onVoiceNoteCreated,
   runs = [],
@@ -234,7 +239,15 @@ export function SidebarContentPanel({
   type VaultInfo = { id: string; name: string; path: string };
   const [vaultList, setVaultList] = useState<VaultInfo[]>([]);
   const [activeVaultId, setActiveVaultId] = useState<string | null>(null);
-  const [sidebarView, setSidebarView] = useState<"courses" | "files">("files");
+  const {
+    items: quickAccessItems,
+    addItem: addQuickAccess,
+    removeItem: removeQuickAccess,
+    renameItem: renameQuickAccess,
+    reorderItems: reorderQuickAccess,
+    isInQuickAccess,
+    ensureItem,
+  } = useQuickAccess();
   const vaultMenuRef = useRef<HTMLDivElement>(null);
   const vaultTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -280,18 +293,6 @@ export function SidebarContentPanel({
     document.addEventListener("mousedown", handleClick, true);
     return () => document.removeEventListener("mousedown", handleClick, true);
   }, [vaultMenuOpen, vaultMenuAnim, closeVaultMenu]);
-
-  // Check if courses.json exists to set default sidebar view
-  useEffect(() => {
-    ipc
-      .invoke("workspace:exists", { path: ".scholarOS/courses.json" })
-      .then((result: { exists: boolean }) => {
-        if (result.exists) {
-          setSidebarView("courses");
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   // Load saved vault path and vault list on mount
   useEffect(() => {
@@ -446,7 +447,7 @@ export function SidebarContentPanel({
       onTouchEnd={handleTouchEnd}
       {...props}
     >
-      <SidebarHeader className="titlebar-drag-region">
+      <SidebarHeader className="titlebar-drag-region !pb-0">
         {/* Top spacer to clear the traffic lights + fixed toggle row */}
         <div className="h-8" />
         {/* Tab switcher - centered below the traffic lights row */}
@@ -468,7 +469,7 @@ export function SidebarContentPanel({
             ))}
           </div>
         </div>
-        <div className="titlebar-no-drag flex flex-col gap-0 px-2 pt-0 pb-1">
+        <div className="titlebar-no-drag flex flex-col gap-0 px-2 pt-0">
           {onNewChat && (
             <button
               type="button"
@@ -497,6 +498,16 @@ export function SidebarContentPanel({
             >
               <LayoutGrid className="size-4" />
               <span>Canvases</span>
+            </button>
+          )}
+          {showKnowledgeNewChat && onOpenIngestWindow && (
+            <button
+              type="button"
+              onClick={onOpenIngestWindow}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <Inbox className="size-4" />
+              <span>Ingest materials</span>
             </button>
           )}
           <div
@@ -530,7 +541,7 @@ export function SidebarContentPanel({
                 tabIndex={showChatQuickActions ? 0 : -1}
               >
                 <Globe className="size-4" />
-                <span>Run browser task</span>
+                <span>Browser</span>
               </button>
             )}
             {onOpenSuggestedTopics && (
@@ -550,30 +561,7 @@ export function SidebarContentPanel({
                 <span>Suggested Topics</span>
               </button>
             )}
-            {onOpenIngestWindow && (
-              <button
-                type="button"
-                onClick={onOpenIngestWindow}
-                className="sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                style={{ "--stagger": "120ms" } as React.CSSProperties}
-                tabIndex={showChatQuickActions ? 0 : -1}
-              >
-                <Inbox className="size-4" />
-                <span>Ingest materials</span>
-              </button>
-            )}
-            {onOpenArtifacts && (
-              <button
-                type="button"
-                onClick={onOpenArtifacts}
-                className="sidebar-quick-action flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                style={{ "--stagger": "160ms" } as React.CSSProperties}
-                tabIndex={showChatQuickActions ? 0 : -1}
-              >
-                <Library className="size-4" />
-                <span>Artifacts</span>
-              </button>
-            )}
+
             {onOpenCalendar && (
               <button
                 type="button"
@@ -595,35 +583,44 @@ export function SidebarContentPanel({
         </div>
       </SidebarHeader>
       <SidebarContent className="overflow-hidden">
-        <motion.div
-          className="flex h-full"
-          animate={{ x: activeSection === "knowledge" ? "0%" : "-50%" }}
-          transition={{ type: "spring", stiffness: 350, damping: 35 }}
-          style={{ width: "200%" }}
-        >
-          <div className="h-full min-w-0 w-1/2">
-            <KnowledgeSection
-              tree={tree}
-              selectedPath={selectedPath}
-              expandedPaths={expandedPaths}
-              onSelectFile={onSelectFile}
-              onToggleFolder={onToggleFolder}
-              actions={knowledgeActions}
-              onOpenSearch={onOpenSearch}
-              onVoiceNoteCreated={onVoiceNoteCreated}
-              sidebarView={sidebarView}
-              setSidebarView={setSidebarView}
-            />
-          </div>
-          <div className="h-full min-w-0 w-1/2">
-            <TasksSection
-              runs={runs}
-              currentRunId={currentRunId}
-              processingRunIds={processingRunIds}
-              actions={tasksActions}
-            />
-          </div>
-        </motion.div>
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.div
+            key={activeSection}
+            initial={{ x: activeSection === "knowledge" ? -36 : 36, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: activeSection === "knowledge" ? 36 : -36, opacity: 0 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+            className="h-full overflow-y-auto"
+          >
+            {activeSection === "knowledge" ? (
+              <KnowledgeSection
+                tree={tree}
+                selectedPath={selectedPath}
+                expandedPaths={expandedPaths}
+                onSelectFile={onSelectFile}
+                onToggleFolder={onToggleFolder}
+                onEnsureFolderExpanded={onEnsureFolderExpanded}
+                actions={knowledgeActions}
+                onOpenSearch={onOpenSearch}
+                onVoiceNoteCreated={onVoiceNoteCreated}
+                quickAccessItems={quickAccessItems}
+                onQuickAccessRemove={removeQuickAccess}
+                onQuickAccessRename={renameQuickAccess}
+                onQuickAccessReorder={reorderQuickAccess}
+                isInQuickAccess={isInQuickAccess}
+                onQuickAccessAdd={addQuickAccess}
+                onQuickAccessValidate={ensureItem}
+              />
+            ) : (
+              <TasksSection
+                runs={runs}
+                currentRunId={currentRunId}
+                processingRunIds={processingRunIds}
+                actions={tasksActions}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </SidebarContent>
       {/* Billing / upgrade CTA or Log in CTA */}
       {isScholarOSConnected && billing ? (
@@ -1151,22 +1148,34 @@ function KnowledgeSection({
   expandedPaths,
   onSelectFile,
   onToggleFolder,
+  onEnsureFolderExpanded,
   actions,
   onOpenSearch,
   onVoiceNoteCreated,
-  sidebarView,
-  setSidebarView,
+  quickAccessItems,
+  onQuickAccessRemove,
+  onQuickAccessRename,
+  onQuickAccessReorder,
+  isInQuickAccess,
+  onQuickAccessAdd,
+  onQuickAccessValidate,
 }: {
   tree: TreeNode[];
   selectedPath: string | null;
   expandedPaths: Set<string>;
   onSelectFile: (path: string, kind: "file" | "dir") => void;
   onToggleFolder?: (path: string) => void;
+  onEnsureFolderExpanded?: (path: string) => void;
   actions: KnowledgeActions;
   onOpenSearch?: () => void;
   onVoiceNoteCreated?: (path: string) => void;
-  sidebarView: "courses" | "files";
-  setSidebarView: (view: "courses" | "files") => void;
+  quickAccessItems: QuickAccessItem[];
+  onQuickAccessRemove: (id: string) => Promise<void>;
+  onQuickAccessRename: (id: string, customName: string | null) => Promise<void>;
+  onQuickAccessReorder: (items: QuickAccessItem[]) => Promise<void>;
+  isInQuickAccess: (path: string) => boolean;
+  onQuickAccessAdd: (path: string) => Promise<void>;
+  onQuickAccessValidate?: (item: QuickAccessItem) => Promise<boolean>;
 }) {
   const isExpanded = expandedPaths.size > 0;
   const treeContainerRef = React.useRef<HTMLDivElement | null>(null);
@@ -1216,6 +1225,23 @@ function KnowledgeSection({
     { icon: Table2, label: "Bases", action: () => actions.openBases() },
   ];
 
+  const removeByPath = useCallback(
+    async (path: string) => {
+      const item = quickAccessItems.find(
+        (i) => i.path.toLowerCase() === path.toLowerCase(),
+      );
+      if (item) await onQuickAccessRemove(item.id);
+    },
+    [quickAccessItems, onQuickAccessRemove],
+  );
+
+  const quickAccessHandlers = {
+    isInQuickAccess,
+    onQuickAccessAdd,
+    onQuickAccessRemove: removeByPath,
+    items: quickAccessItems,
+  };
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -1253,66 +1279,39 @@ function KnowledgeSection({
               </TooltipContent>
             </Tooltip>
           </div>
-          {/* View toggle: Courses / Files */}
-          <div className="flex items-center px-3 py-1 border-b border-sidebar-border bg-sidebar">
-            <div className="flex w-full rounded-md bg-sidebar-accent/50 p-0.5">
-              <button
-                type="button"
-                onClick={() => setSidebarView("courses")}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
-                  sidebarView === "courses"
-                    ? "bg-sidebar-accent text-sidebar-foreground shadow-sm"
-                    : "text-sidebar-foreground/50 hover:text-sidebar-foreground",
-                )}
-              >
-                <BookOpen className="size-3.5" />
-                Courses
-              </button>
-              <button
-                type="button"
-                onClick={() => setSidebarView("files")}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
-                  sidebarView === "files"
-                    ? "bg-sidebar-accent text-sidebar-foreground shadow-sm"
-                    : "text-sidebar-foreground/50 hover:text-sidebar-foreground",
-                )}
-              >
-                <Folder className="size-3.5" />
-                Files
-              </button>
-            </div>
-          </div>
-          {sidebarView === "courses" ? (
-            <CourseSidebar
-              tree={tree}
-              selectedPath={selectedPath}
+          {quickAccessItems.length > 0 && (
+            <QuickAccessSidebar
+              items={quickAccessItems}
               expandedPaths={expandedPaths}
               onSelectFile={onSelectFile}
+              onEnsureFolderExpanded={
+                onEnsureFolderExpanded || ((path: string) => {})
+              }
               onToggleFolder={onToggleFolder}
-              actions={actions}
-              onSwitchToFiles={() => setSidebarView("files")}
+              onRemove={onQuickAccessRemove}
+              onRename={onQuickAccessRename}
+              onReorder={onQuickAccessReorder}
+              onValidateItem={onQuickAccessValidate}
             />
-          ) : (
-            <SidebarGroupContent className="flex-1 overflow-y-auto">
-              <div ref={treeContainerRef}>
-                <SidebarMenu>
-                  {tree.map((item, index) => (
-                    <Tree
-                      key={index}
-                      item={item}
-                      selectedPath={selectedPath}
-                      expandedPaths={expandedPaths}
-                      onSelect={onSelectFile}
-                      onToggleFolder={onToggleFolder}
-                      actions={actions}
-                    />
-                  ))}
-                </SidebarMenu>
-              </div>
-            </SidebarGroupContent>
           )}
+          <SidebarGroupContent className="flex-1 overflow-y-auto">
+            <div ref={treeContainerRef}>
+              <SidebarMenu>
+                {tree.map((item, index) => (
+                  <Tree
+                    key={index}
+                    item={item}
+                    selectedPath={selectedPath}
+                    expandedPaths={expandedPaths}
+                    onSelect={onSelectFile}
+                    onToggleFolder={onToggleFolder}
+                    actions={actions}
+                    quickAccess={quickAccessHandlers}
+                  />
+                ))}
+              </SidebarMenu>
+            </div>
+          </SidebarGroupContent>
         </SidebarGroup>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
@@ -1344,6 +1343,7 @@ function Tree({
   onSelect,
   onToggleFolder,
   actions,
+  quickAccess,
 }: {
   item: TreeNode;
   selectedPath: string | null;
@@ -1351,6 +1351,12 @@ function Tree({
   onSelect: (path: string, kind: "file" | "dir") => void;
   onToggleFolder?: (path: string) => void;
   actions: KnowledgeActions;
+  quickAccess?: {
+    isInQuickAccess: (path: string) => boolean;
+    onQuickAccessAdd: (path: string) => Promise<void>;
+    onQuickAccessRemove: (path: string) => Promise<void>;
+    items: QuickAccessItem[];
+  };
 }) {
   const isDir = item.kind === "dir";
   const isExpanded = expandedPaths.has(item.path);
@@ -1460,6 +1466,23 @@ function Tree({
         Duplicate
       </ContextMenuItem>
       <ContextMenuSeparator />
+      {quickAccess && (
+        quickAccess.isInQuickAccess(item.path) ? (
+          <ContextMenuItem
+            variant="destructive"
+            onClick={() => void quickAccess.onQuickAccessRemove(item.path)}
+          >
+            <Trash2 className="mr-2 size-4" />
+            Remove from Quick Access
+          </ContextMenuItem>
+        ) : (
+          <ContextMenuItem onClick={() => void quickAccess.onQuickAccessAdd(item.path)}>
+            <BookOpen className="mr-2 size-4" />
+            Add to Quick Access
+          </ContextMenuItem>
+        )
+      )}
+      <ContextMenuSeparator />
       <ContextMenuItem
         onClick={() => {
           setNewName(baseName);
@@ -1555,6 +1578,7 @@ function Tree({
                       onSelect={onSelect}
                       onToggleFolder={onToggleFolder}
                       actions={actions}
+                      quickAccess={quickAccess}
                     />
                   ))}
                 </SidebarMenuSub>
@@ -1628,6 +1652,7 @@ function Tree({
                     onSelect={onSelect}
                     onToggleFolder={onToggleFolder}
                     actions={actions}
+                    quickAccess={quickAccess}
                   />
                 ))}
               </SidebarMenuSub>

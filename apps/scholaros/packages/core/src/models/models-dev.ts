@@ -127,7 +127,7 @@ function isCacheFresh(fetchedAt: string): boolean {
   return age < CACHE_TTL_MS;
 }
 
-async function getModelsDevData(): Promise<{ data: z.infer<typeof ModelsDevResponse>; fetchedAt?: string }> {
+export async function getModelsDevData(): Promise<{ data: z.infer<typeof ModelsDevResponse>; fetchedAt?: string }> {
   const cached = await readCache();
   if (cached?.fetchedAt && isCacheFresh(cached.fetchedAt)) {
     const parsed = ModelsDevResponse.safeParse(cached.data);

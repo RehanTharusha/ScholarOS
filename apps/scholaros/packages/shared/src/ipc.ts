@@ -397,6 +397,12 @@ const ipcSchemas = {
       ),
     }),
   },
+  "models:context-window": {
+    req: z.object({
+      model: z.string(),
+    }),
+    res: z.number(),
+  },
   "oauth:connect": {
     req: z.object({
       provider: z.string(),
