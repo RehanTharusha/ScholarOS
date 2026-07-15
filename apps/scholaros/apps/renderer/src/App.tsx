@@ -1046,6 +1046,8 @@ function App() {
   >({});
   const activeChatTabIdRef = useRef(activeChatTabId);
   activeChatTabIdRef.current = activeChatTabId;
+  const chatTabsRef = useRef(chatTabs);
+  chatTabsRef.current = chatTabs;
   const navigateToFileRef = useRef<(path: string) => void>(() => {});
   const loadDirectoryRef = useRef<() => Promise<any>>(async () => {});
   const setChatDraftForTab = useCallback((tabId: string, text: string) => {
@@ -3438,8 +3440,13 @@ function App() {
 
   const closeChatTab = useCallback(
     (tabId: string) => {
-      if (chatTabs.length <= 1) {
+      const tabs = chatTabsRef.current;
+      const activeId = activeChatTabIdRef.current;
+      if (tabs.length <= 1) {
         handleNewChat();
+        setChatTabs((prev) =>
+          prev.map((t) => (t.id === tabId ? { ...t, runId: null } : t)),
+        );
         chatDraftsRef.current.delete(tabId);
         selectedModelByTabRef.current.delete(tabId);
         chatScrollTopByTabRef.current.delete(tabId);
@@ -3457,10 +3464,10 @@ function App() {
         }));
         return;
       }
-      const idx = chatTabs.findIndex((t) => t.id === tabId);
+      const idx = tabs.findIndex((t) => t.id === tabId);
       if (idx === -1) return;
       saveChatScrollForTab(tabId);
-      const nextTabs = chatTabs.filter((t) => t.id !== tabId);
+      const nextTabs = tabs.filter((t) => t.id !== tabId);
       setChatTabs(nextTabs);
       setChatViewStateByTab((prev) => {
         if (!(tabId in prev)) return prev;
@@ -3478,7 +3485,7 @@ function App() {
         return next;
       });
 
-      if (tabId === activeChatTabId && nextTabs.length > 0) {
+      if (tabId === activeId && nextTabs.length > 0) {
         const newIdx = Math.min(idx, nextTabs.length - 1);
         const newActiveTab = nextTabs[newIdx];
         // Cancel stale in-flight loads from the closing tab.
@@ -3499,8 +3506,6 @@ function App() {
       }
     },
     [
-      chatTabs,
-      activeChatTabId,
       applyChatTab,
       loadRun,
       restoreChatTabState,
