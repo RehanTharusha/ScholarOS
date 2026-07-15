@@ -1493,7 +1493,13 @@ function App() {
   // Listen to workspace change events
   useEffect(() => {
     const cleanup = window.ipc.on("workspace:didChange", async (event) => {
-      loadDirectory().then(setTree);
+      // Only reload tree for events that actually change the tree structure:
+      // file content changes (type: "changed") don't affect the directory listing.
+      const needsTreeReload =
+        event.type !== "changed";
+      if (needsTreeReload) {
+        loadDirectory().then(setTree);
+      }
 
       const changedPath = event.type === "changed" ? event.path : null;
       const changedPaths =

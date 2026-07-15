@@ -556,8 +556,13 @@ export function setupIpcHandlers() {
     "workspace:mkdir": async (_event, args) => {
       return workspace.mkdir(args.path, args.recursive);
     },
-    "workspace:rename": async (_event, args) => {
-      return workspace.rename(args.from, args.to, args.overwrite);
+    "workspace:rename": async (event, args) => {
+      const result = await workspace.rename(args.from, args.to, args.overwrite);
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (win) {
+        win.webContents.send("workspace:renamed", { from: args.from, to: args.to });
+      }
+      return result;
     },
     "workspace:copy": async (_event, args) => {
       return workspace.copy(args.from, args.to, args.overwrite);

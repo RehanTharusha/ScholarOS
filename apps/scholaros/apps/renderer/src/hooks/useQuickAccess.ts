@@ -130,6 +130,28 @@ export function useQuickAccess() {
 
       // Detect marker-verified course folders
       const markerFolders = await findCourseFoldersByMarkers();
+      const markerPathSet = new Set(
+        markerFolders.map((mf) => mf.path.toLowerCase()),
+      );
+
+      // Reconcile stale paths from renames: if an existing item's path no longer
+      // exists as a marker folder, try to find it by name under the same parent.
+      for (const item of loaded) {
+        const lowerPath = item.path.toLowerCase();
+        if (markerPathSet.has(lowerPath)) continue;
+        const itemName = item.path.split("/").pop()?.toLowerCase();
+        const parentDir = item.path.split("/").slice(0, -1).join("/").toLowerCase();
+        const match = markerFolders.find((mf) => {
+          if (mf.path.toLowerCase() === lowerPath) return false;
+          const mfName = mf.path.split("/").pop()?.toLowerCase();
+          const mfParent = mf.path.split("/").slice(0, -1).join("/").toLowerCase();
+          return mfName === itemName && mfParent === parentDir;
+        });
+        if (match) {
+          item.path = match.path;
+          item.name = match.name;
+        }
+      }
 
       // Merge: add any missing detected courses (skip dismissed paths)
       for (const mf of markerFolders) {
@@ -157,7 +179,6 @@ export function useQuickAccess() {
       }
 
       // Prune dismissed paths that no longer correspond to any marker folder
-      const markerPathSet = new Set(markerFolders.map((mf) => mf.path.toLowerCase()));
       dismissedRef.current = new Set(
         Array.from(dismissedRef.current).filter((p) => markerPathSet.has(p)),
       );
@@ -293,6 +314,31 @@ export function useQuickAccess() {
     });
     return cleanup;
   }, [loadItems]);
+
+  // Update items on file/folder rename
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  useEffect(() => {
+    const ipc = getIpc();
+    if (!ipc) return;
+    const cleanup = ipc.on("workspace:renamed", async ({ from, to }: { from: string; to: string }) => {
+      let changed = false;
+      const current = itemsRef.current;
+      const next = current.map((i) => {
+        if (i.path === from || i.path.startsWith(from + "/")) {
+          changed = true;
+          const suffix = i.path === from ? "" : i.path.slice(from.length);
+          return { ...i, path: to + suffix, name: i.path === from ? to.split("/").pop() || i.name : i.name };
+        }
+        return i;
+      });
+      if (changed) {
+        setItems(normalize(next));
+        await persist(next);
+      }
+    });
+    return cleanup;
+  }, [normalize, persist]);
 
   return {
     items,
