@@ -27,7 +27,7 @@ import {
   Info,
   Sparkles,
 } from "lucide-react";
-import { SkillsPopover, SkillsPopoverContent } from "@/components/skills-popover";
+import { SkillsPopover, SkillsSlashPopover } from "@/components/skills-popover";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -221,7 +221,8 @@ function ChatInputInner({
   const [searchAvailable, setSearchAvailable] = useState(false);
   const [researchEnabled, setResearchEnabled] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
-  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [skillsPillOpen, setSkillsPillOpen] = useState(false);
+  const [skillsSlashOpen, setSkillsSlashOpen] = useState(false);
 
   // When a run exists, freeze the dropdown to the run's resolved model+provider.
   useEffect(() => {
@@ -435,6 +436,8 @@ function ChatInputInner({
       const suffix = current && !current.endsWith(" ") ? " " : "";
       controller.textInput.setInput(`${current}${suffix}/${skillId} `);
       setFocusNonce((v) => v + 1);
+      setSkillsSlashOpen(false);
+      setSkillsPillOpen(false);
     },
     [controller.textInput],
   );
@@ -447,7 +450,7 @@ function ChatInputInner({
       }
       if (e.key === "/" && !message) {
         e.preventDefault();
-        setSkillsOpen(true);
+        setSkillsSlashOpen(true);
       }
     },
     [handleSubmit, message],
@@ -588,14 +591,13 @@ function ChatInputInner({
       ) : (
         /* ── Normal input ── */
         <>
-          <div className="px-4 pt-4 pb-2">
-            <SkillsPopover
-              open={skillsOpen}
-              onOpenChange={setSkillsOpen}
-              anchorRef={textareaAnchorRef}
-            >
-              <SkillsPopoverContent onSelectSkill={handleSkillSelect} />
-            </SkillsPopover>
+          <SkillsSlashPopover
+            open={skillsSlashOpen}
+            onOpenChange={setSkillsSlashOpen}
+            onSelectSkill={handleSkillSelect}
+            inputRef={textareaAnchorRef}
+          />
+          <div ref={textareaAnchorRef as React.RefObject<HTMLDivElement>} className="px-4 pt-4 pb-2">
             <PromptInputTextarea
               placeholder="Type your message..."
               onKeyDown={handleKeyDown}
@@ -697,15 +699,22 @@ function ChatInputInner({
                   <BookOpen className="h-4 w-4" />
                 </button>
               ))}
-            <button
-              type="button"
-              onClick={() => setSkillsOpen(true)}
-              className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Skills"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span className="text-xs font-medium">Skills</span>
-            </button>
+            <SkillsPopover
+              open={skillsPillOpen}
+              onOpenChange={setSkillsPillOpen}
+              onSelectSkill={handleSkillSelect}
+              trigger={
+                <button
+                  type="button"
+                  onClick={() => setSkillsPillOpen(true)}
+                  className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Skills"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium">Skills</span>
+                </button>
+              }
+            />
             <div className="flex-1" />
             {lockedModel ? (
               <span
