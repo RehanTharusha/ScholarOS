@@ -7,7 +7,6 @@ import container from "../di/container.js";
 const SIGNED_IN_DEFAULT_MODEL = "deepseek/deepseek-v4-flash:free";
 const SIGNED_IN_DEFAULT_PROVIDER = "scholaros";
 const SIGNED_IN_KG_MODEL = "deepseek/deepseek-v4-flash:free";
-const SIGNED_IN_TRACK_BLOCK_MODEL = "deepseek/deepseek-v4-flash:free";
 
 /**
  * The single source of truth for "what model+provider should we use when
@@ -79,19 +78,6 @@ export async function getKgModel(): Promise<string> {
     .resolve<IModelConfigRepo>("modelConfigRepo")
     .getConfig();
   return cfg.knowledgeGraphModel ?? cfg.model;
-}
-
-/**
- * Model used by track-block runner + routing classifier.
- * Signed-in: curated default. BYOK: user override (`trackBlockModel`) or
- * assistant model.
- */
-export async function getTrackBlockModel(): Promise<string> {
-  if (await isSignedIn()) return SIGNED_IN_TRACK_BLOCK_MODEL;
-  const cfg = await container
-    .resolve<IModelConfigRepo>("modelConfigRepo")
-    .getConfig();
-  return cfg.trackBlockModel ?? cfg.model;
 }
 
 /**

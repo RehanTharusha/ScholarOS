@@ -38,6 +38,16 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/theme-context";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AccountSettings } from "@/components/settings/account-settings";
 import { ConnectedAccountsSettings } from "@/components/settings/connected-accounts-settings";
 
@@ -465,7 +475,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
         models: string[];
         knowledgeGraphModel: string;
         meetingNotesModel: string;
-        trackBlockModel: string;
       }
     >
   >({
@@ -475,7 +484,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     anthropic: {
       apiKey: "",
@@ -483,7 +491,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     google: {
       apiKey: "",
@@ -491,7 +498,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     openrouter: {
       apiKey: "",
@@ -499,7 +505,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     aigateway: {
       apiKey: "",
@@ -507,7 +512,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     ollama: {
       apiKey: "",
@@ -515,7 +519,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     "openai-compatible": {
       apiKey: "",
@@ -523,7 +526,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     "opencode-zen": {
       apiKey: "",
@@ -531,7 +533,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
     "opencode-go": {
       apiKey: "",
@@ -539,7 +540,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
       models: [""],
       knowledgeGraphModel: "",
       meetingNotesModel: "",
-      trackBlockModel: "",
     },
   });
   const [modelsCatalog, setModelsCatalog] = useState<
@@ -600,7 +600,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
         models: string[];
         knowledgeGraphModel: string;
         meetingNotesModel: string;
-        trackBlockModel: string;
       }>,
     ) => {
       setProviderConfigs((prev) => ({
@@ -679,7 +678,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
                     models: savedModels,
                     knowledgeGraphModel: e.knowledgeGraphModel || "",
                     meetingNotesModel: e.meetingNotesModel || "",
-                    trackBlockModel: e.trackBlockModel || "",
                   };
                 }
               }
@@ -704,7 +702,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
                 models: activeModels.length > 0 ? activeModels : [""],
                 knowledgeGraphModel: parsed.knowledgeGraphModel || "",
                 meetingNotesModel: parsed.meetingNotesModel || "",
-                trackBlockModel: parsed.trackBlockModel || "",
               };
             }
             return next;
@@ -859,7 +856,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
         knowledgeGraphModel:
           activeConfig.knowledgeGraphModel.trim() || undefined,
         meetingNotesModel: activeConfig.meetingNotesModel.trim() || undefined,
-        trackBlockModel: activeConfig.trackBlockModel.trim() || undefined,
       };
       const result = await window.ipc.invoke("models:test", providerConfig);
       if (result.success) {
@@ -894,7 +890,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
           models: allModels,
           knowledgeGraphModel: config.knowledgeGraphModel.trim() || undefined,
           meetingNotesModel: config.meetingNotesModel.trim() || undefined,
-          trackBlockModel: config.trackBlockModel.trim() || undefined,
         });
         setDefaultProvider(prov);
         window.dispatchEvent(new Event("models-config-changed"));
@@ -938,8 +933,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
             defConfig.knowledgeGraphModel.trim() || undefined;
           parsed.meetingNotesModel =
             defConfig.meetingNotesModel.trim() || undefined;
-          parsed.trackBlockModel =
-            defConfig.trackBlockModel.trim() || undefined;
         }
         await window.ipc.invoke("workspace:writeFile", {
           path: "config/models.json",
@@ -953,7 +946,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
             models: [""],
             knowledgeGraphModel: "",
             meetingNotesModel: "",
-            trackBlockModel: "",
           },
         }));
         setTestState({ status: "idle" });
@@ -1180,36 +1172,6 @@ function ModelSettings({ dialogOpen }: { dialogOpen: boolean }) {
           )}
         </div>
 
-        {/* Track block model */}
-        <div className="space-y-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Track block model
-          </span>
-          {modelsLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </div>
-          ) : showModelInput ? (
-            <Input
-              value={activeConfig.trackBlockModel}
-              onChange={(e) =>
-                updateConfig(provider, { trackBlockModel: e.target.value })
-              }
-              placeholder={primaryModel || "Enter model"}
-            />
-          ) : (
-            <ModelCommandSelect
-              value={activeConfig.trackBlockModel}
-              onValueChange={(value) =>
-                updateConfig(provider, { trackBlockModel: value })
-              }
-              models={modelsForProvider}
-              placeholder="Same as assistant"
-              sameAsAssistant
-            />
-          )}
-        </div>
       </div>
 
       {/* API Key */}
@@ -1520,11 +1482,14 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     }
   }, [open, activeTab, isJsonTab, loadConfig]);
 
+  const [pendingTab, setPendingTab] = useState<ConfigTab | null>(null);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+
   const handleTabChange = (tab: ConfigTab) => {
     if (isJsonTab && hasChanges) {
-      if (!confirm("You have unsaved changes. Discard them?")) {
-        return;
-      }
+      setPendingTab(tab);
+      setShowDiscardDialog(true);
+      return;
     }
     setActiveTab(tab);
   };
@@ -1533,6 +1498,22 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-[900px]! w-[900px] h-[600px] p-0 gap-0 overflow-hidden">
+        <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes. Discard them?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingTab(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { if (pendingTab) setActiveTab(pendingTab); setPendingTab(null); }}>
+                Discard
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div className="flex h-full overflow-hidden">
           {/* Sidebar */}
           <div className="w-48 border-r bg-muted/30 p-2 flex flex-col">

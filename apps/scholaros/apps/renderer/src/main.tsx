@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import { PostHogProvider } from "posthog-js/react";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { IngestWindow } from "@/components/ingest-window";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const isIngestWindow =
   new URLSearchParams(window.location.search).get("mode") === "ingest";
@@ -18,9 +19,11 @@ const options = {
 } as const;
 
 const inner = (
-  <ThemeProvider defaultTheme="paper">
-    {isIngestWindow ? <IngestWindow /> : <App />}
-  </ThemeProvider>
+  <ErrorBoundary>
+    <ThemeProvider defaultTheme="paper">
+      {isIngestWindow ? <IngestWindow /> : <App />}
+    </ThemeProvider>
+  </ErrorBoundary>
 );
 
 createRoot(document.getElementById("root")!).render(

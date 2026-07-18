@@ -22,7 +22,6 @@ export const LlmModelConfig = z.object({
   // the curated gateway defaults). Read by helpers in core/models/defaults.ts.
   knowledgeGraphModel: z.string().optional(),
   meetingNotesModel: z.string().optional(),
-  trackBlockModel: z.string().optional(),
   // Override the model's context window. If not set, ScholarOS auto-detects
   // from the model family (e.g. Claude = 200K, GPT-4o = 128K, Gemini = 1M).
   contextWindow: z.number().positive().optional(),

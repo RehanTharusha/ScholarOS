@@ -439,13 +439,6 @@ const buildSuggestedTopicExplorePrompt = ({
     `- Description: ${description}`,
     `- Target folder: ${folder}/`,
     "",
-    `Please start by telling me that you can set up a tracking note for "${title}" under ${folder}/.`,
-    "Then briefly explain what that tracking note would monitor or refresh and ask me if you should set it up.",
-    "Do not create or modify anything yet.",
-    "Treat a clear confirmation from me as explicit approval to proceed.",
-    "If I confirm later, load the `tracks` skill first, check whether a matching note already exists under the target folder, and update it instead of creating a duplicate.",
-    "If no matching note exists, create a new note under the target folder with an appropriate filename.",
-    "Use a track block in that note rather than only writing static content, and keep any surrounding note scaffolding short and useful.",
     "Do not ask me to choose a note path unless there is a real ambiguity you cannot resolve from the card.",
   ].join("\n");
 };

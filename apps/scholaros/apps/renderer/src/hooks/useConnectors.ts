@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 // Safe accessor for window.ipc — returns undefined when running outside Electron
 const getIpc = () =>
-  typeof window !== "undefined" ? (window as any).ipc : undefined;
+  typeof window !== "undefined" ? window.ipc : undefined;
 
 export interface ProviderState {
   isConnected: boolean;

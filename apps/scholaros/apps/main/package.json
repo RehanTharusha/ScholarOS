@@ -13,7 +13,6 @@
     "make": "electron-forge make"
   },
   "dependencies": {
-    "@thednp/dommatrix": "^3.0.4",
     "@scholaros/core": "workspace:*",
     "@scholaros/shared": "workspace:*",
     "chokidar": "^4.0.3",

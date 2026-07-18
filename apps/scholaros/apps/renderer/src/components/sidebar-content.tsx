@@ -77,6 +77,16 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -97,8 +107,8 @@ import { useBilling } from "@/hooks/useBilling";
  * and .on() so callers don't need individual null-checks.
  */
 const ipc =
-  typeof window !== "undefined" && (window as any).ipc
-    ? (window as any).ipc
+  typeof window !== "undefined" && window.ipc
+    ? window.ipc
     : ({
         invoke: async () => ({} as any),
         on: () => () => {},
@@ -334,7 +344,7 @@ export function SidebarContentPanel({
       }
     } catch (err) {
       console.error("Failed to switch vault:", err);
-      toast("Failed to switch vault", "error");
+      toast.error("Failed to switch vault");
     } finally {
       setVaultLoading(false);
     }
@@ -978,9 +988,9 @@ path: ${currentRelativePath}
           onNoteCreatedRef.current?.(currentNotePath);
 
           if (transcript) {
-            toast("Voice note transcribed", "success");
+            toast.success("Voice note transcribed");
           } else {
-            toast("Transcription failed", "error");
+            toast.error("Transcription failed");
           }
         }
       };
@@ -988,9 +998,9 @@ path: ${currentRelativePath}
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-      toast("Recording started", "success");
+      toast.success("Recording started");
     } catch {
-      toast("Could not access microphone", "error");
+      toast.error("Could not access microphone");
     }
   };
 
@@ -1047,7 +1057,7 @@ function VaultManagerDialog({
   const handleAdd = async () => {
     const result = await ipc.invoke("vault:add", null);
     if (result.success) {
-      toast("Vault added", "success");
+      toast.success("Vault added");
       await onRefresh();
     }
   };
@@ -1055,7 +1065,7 @@ function VaultManagerDialog({
   const handleCreate = async () => {
     const result = await ipc.invoke("vault:create", null);
     if (result.success) {
-      toast("Vault created", "success");
+      toast.success("Vault created");
       await onRefresh();
     }
   };
@@ -1066,9 +1076,9 @@ function VaultManagerDialog({
     const result = await ipc.invoke("vault:remove", { id });
     if (result.success) {
       if (wasLast) {
-        toast("No vault selected — add or create a vault to get started", "info");
+        toast.info("No vault selected — add or create a vault to get started");
       } else {
-        toast("Vault removed from list", "success");
+        toast.success("Vault removed from list");
       }
       await onRefresh();
     }
@@ -1297,18 +1307,30 @@ function KnowledgeSection({
           <SidebarGroupContent className="flex-1 overflow-y-auto">
             <div ref={treeContainerRef}>
               <SidebarMenu>
-                {tree.map((item, index) => (
-                  <Tree
-                    key={index}
-                    item={item}
-                    selectedPath={selectedPath}
-                    expandedPaths={expandedPaths}
-                    onSelect={onSelectFile}
-                    onToggleFolder={onToggleFolder}
-                    actions={actions}
-                    quickAccess={quickAccessHandlers}
-                  />
-                ))}
+                {tree.length === 0 ? (
+                  <div className="px-3 py-8 text-center">
+                    <p className="text-sm text-sidebar-foreground/50 mb-3">No notes yet</p>
+                    <button
+                      onClick={() => actions.createNote()}
+                      className="text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors underline underline-offset-2"
+                    >
+                      Create your first note
+                    </button>
+                  </div>
+                ) : (
+                  tree.map((item, index) => (
+                    <Tree
+                      key={index}
+                      item={item}
+                      selectedPath={selectedPath}
+                      expandedPaths={expandedPaths}
+                      onSelect={onSelectFile}
+                      onToggleFolder={onToggleFolder}
+                      actions={actions}
+                      quickAccess={quickAccessHandlers}
+                    />
+                  ))
+                )}
               </SidebarMenu>
             </div>
           </SidebarGroupContent>
@@ -1362,6 +1384,7 @@ function Tree({
   const isExpanded = expandedPaths.has(item.path);
   const isSelected = selectedPath === item.path;
   const [isRenaming, setIsRenaming] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const isSubmittingRef = React.useRef(false);
   const displayName = (isDir && FOLDER_DISPLAY_NAMES[item.name]) || item.name;
   const isMac =
@@ -1388,9 +1411,9 @@ function Tree({
     if (trimmedName && trimmedName !== baseName) {
       try {
         await actions.rename(item.path, trimmedName, isDir);
-        toast("Renamed successfully", "success");
+        toast.success("Renamed successfully");
       } catch {
-        toast("Failed to rename", "error");
+        toast.error("Failed to rename");
       }
     }
     setIsRenaming(false);
@@ -1403,15 +1426,15 @@ function Tree({
   const handleDelete = async () => {
     try {
       await actions.remove(item.path);
-      toast("Moved to trash", "success");
+      toast.success("Moved to trash");
     } catch {
-      toast("Failed to delete", "error");
+      toast.error("Failed to delete");
     }
   };
 
   const handleCopyPath = () => {
     actions.copyPath(item.path);
-    toast("Path copied", "success");
+    toast.success("Path copied");
   };
 
   const cancelRename = () => {
@@ -1493,7 +1516,7 @@ function Tree({
         <Pencil className="mr-2 size-4" />
         Rename
       </ContextMenuItem>
-      <ContextMenuItem variant="destructive" onClick={handleDelete}>
+      <ContextMenuItem variant="destructive" onClick={() => setShowDeleteDialog(true)}>
         <Trash2 className="mr-2 size-4" />
         Delete
       </ContextMenuItem>
@@ -1537,8 +1560,26 @@ function Tree({
   const isBasesFolder =
     isDir && parts.length === 1 && isKnowledgeRelPath(parts[0] + "/");
 
+  const deleteDialog = (
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Move to trash?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to move "{displayName}" to the trash? You can restore it later from your system trash.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete}>Move to Trash</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
   if (isBasesFolder) {
     return (
+      <>{deleteDialog}
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <SidebarMenuItem className="group/file-item">
@@ -1588,11 +1629,13 @@ function Tree({
         </ContextMenuTrigger>
         {contextMenuContent}
       </ContextMenu>
+      </>
     );
   }
 
   if (!isDir) {
     return (
+      <>{deleteDialog}
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <SidebarMenuItem
@@ -1623,10 +1666,12 @@ function Tree({
         </ContextMenuTrigger>
         {contextMenuContent}
       </ContextMenu>
+      </>
     );
   }
 
   return (
+    <>{deleteDialog}
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
@@ -1662,6 +1707,7 @@ function Tree({
       </ContextMenuTrigger>
       {contextMenuContent}
     </ContextMenu>
+    </>
   );
 }
 

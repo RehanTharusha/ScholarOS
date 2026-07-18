@@ -23,18 +23,12 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
-interface ProviderState {
-  isConnected: boolean
-  isLoading: boolean
-  isConnecting: boolean
-}
-
 interface OnboardingModalProps {
   open: boolean
   onComplete: () => void
 }
 
-type Step = 0 | 1 | 2 | 3 | 4
+type Step = 0 | 1 | 2 | 3
 
 type OnboardingPath = 'scholaros' | 'byok' | null
 
@@ -55,29 +49,25 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   const [modelsCatalog, setModelsCatalog] = useState<Record<string, LlmModelOption[]>>({})
   const [modelsLoading, setModelsLoading] = useState(false)
   const [modelsError, setModelsError] = useState<string | null>(null)
-  const [providerConfigs, setProviderConfigs] = useState<Record<LlmProviderFlavor, { apiKey: string; baseURL: string; model: string; knowledgeGraphModel: string; meetingNotesModel: string; trackBlockModel: string }>>({
-    openai: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    anthropic: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    google: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    opencode: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    "opencode-zen": { apiKey: "", baseURL: "https://opencode.ai/zen/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    "opencode-go": { apiKey: "", baseURL: "https://opencode.ai/zen/go/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    openrouter: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    aigateway: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    ollama: { apiKey: "", baseURL: "http://localhost:11434", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
-    "openai-compatible": { apiKey: "", baseURL: "http://localhost:1234/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "", trackBlockModel: "" },
+  const [providerConfigs, setProviderConfigs] = useState<Record<LlmProviderFlavor, { apiKey: string; baseURL: string; model: string; knowledgeGraphModel: string; meetingNotesModel: string }>>({
+    openai: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    anthropic: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    google: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    opencode: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    "opencode-zen": { apiKey: "", baseURL: "https://opencode.ai/zen/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    "opencode-go": { apiKey: "", baseURL: "https://opencode.ai/zen/go/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    openrouter: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    aigateway: { apiKey: "", baseURL: "", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    ollama: { apiKey: "", baseURL: "http://localhost:11434", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
+    "openai-compatible": { apiKey: "", baseURL: "http://localhost:1234/v1", model: "", knowledgeGraphModel: "", meetingNotesModel: "" },
   })
   const [testState, setTestState] = useState<{ status: "idle" | "testing" | "success" | "error"; error?: string }>({
     status: "idle",
   })
-  // OAuth provider states
-  const [providers, setProviders] = useState<string[]>([])
-  const [providersLoading, setProvidersLoading] = useState(true)
-  const [providerStates, setProviderStates] = useState<Record<string, ProviderState>>({})
   const [showMoreProviders, setShowMoreProviders] = useState(false)
 
   const updateProviderConfig = useCallback(
-    (provider: LlmProviderFlavor, updates: Partial<{ apiKey: string; baseURL: string; model: string; knowledgeGraphModel: string; meetingNotesModel: string; trackBlockModel: string }>) => {
+    (provider: LlmProviderFlavor, updates: Partial<{ apiKey: string; baseURL: string; model: string; knowledgeGraphModel: string; meetingNotesModel: string }>) => {
       setProviderConfigs(prev => ({
         ...prev,
         [provider]: { ...prev[provider], ...updates },
@@ -97,30 +87,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     activeConfig.model.trim().length > 0 &&
     (!requiresApiKey || activeConfig.apiKey.trim().length > 0) &&
     (!requiresBaseURL || activeConfig.baseURL.trim().length > 0)
-
-  // Track connected providers for the completion step
-  const connectedProviders = Object.entries(providerStates)
-    .filter(([, state]) => state.isConnected)
-    .map(([provider]) => provider)
-
-  // Load available providers
-  useEffect(() => {
-    if (!open) return
-
-    async function loadProviders() {
-      try {
-        setProvidersLoading(true)
-        const result = await window.ipc.invoke('oauth:list-providers', null)
-        setProviders(result.providers || [])
-      } catch (error) {
-        console.error('Failed to get available providers:', error)
-        setProviders([])
-      } finally {
-        setProvidersLoading(false)
-      }
-    }
-    loadProviders()
-  }, [open])
 
   // Load LLM models catalog on open
   useEffect(() => {
@@ -216,26 +182,17 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
 
   const handleNext = () => {
-    if (currentStep < 4) {
+    if (currentStep < 3) {
       setCurrentStep((prev) => (prev + 1) as Step)
     }
   }
 
   const handleBack = () => {
     if (currentStep === 1) {
-      // BYOK upsell → back to sign-in page
       setOnboardingPath(null)
       setCurrentStep(0 as Step)
     } else if (currentStep === 2) {
-      // LLM setup → back to BYOK upsell
       setCurrentStep(1 as Step)
-    } else if (currentStep === 3) {
-      // Connect accounts → back depends on path
-      if (onboardingPath === 'scholaros') {
-        setCurrentStep(0 as Step)
-      } else {
-        setCurrentStep(2 as Step)
-      }
     }
   }
 
@@ -252,7 +209,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
       const model = activeConfig.model.trim()
       const knowledgeGraphModel = activeConfig.knowledgeGraphModel.trim() || undefined
       const meetingNotesModel = activeConfig.meetingNotesModel.trim() || undefined
-      const trackBlockModel = activeConfig.trackBlockModel.trim() || undefined
       const providerConfig = {
         provider: {
           flavor: llmProvider,
@@ -262,7 +218,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
         model,
         knowledgeGraphModel,
         meetingNotesModel,
-        trackBlockModel,
       }
       const result = await window.ipc.invoke("models:test", providerConfig)
       if (result.success) {
@@ -281,61 +236,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     }
   }, [activeConfig.apiKey, activeConfig.baseURL, activeConfig.model, canTest, llmProvider, handleNext])
 
-  // Check connection status for all providers
-  const refreshAllStatuses = useCallback(async () => {
-    if (providers.length === 0) return
-
-    const newStates: Record<string, ProviderState> = {}
-
-    try {
-      const result = await window.ipc.invoke('oauth:getState', null)
-      const config = result.config || {}
-      for (const provider of providers) {
-        newStates[provider] = {
-          isConnected: config[provider]?.connected ?? false,
-          isLoading: false,
-          isConnecting: false,
-        }
-      }
-    } catch (error) {
-      console.error('Failed to check connection status for providers:', error)
-      for (const provider of providers) {
-        newStates[provider] = {
-          isConnected: false,
-          isLoading: false,
-          isConnecting: false,
-        }
-      }
-    }
-
-    setProviderStates(newStates)
-  }, [providers])
-
-  // Refresh statuses when modal opens or providers list changes
-  useEffect(() => {
-    if (open && providers.length > 0) {
-      refreshAllStatuses()
-    }
-  }, [open, providers, refreshAllStatuses])
-
-  // Listen for OAuth completion events (state updates only — toasts handled by ConnectorsPopover)
-  useEffect(() => {
-    const cleanup = window.ipc.on('oauth:didConnect', (event) => {
-      const { provider, success } = event
-
-      setProviderStates(prev => ({
-        ...prev,
-        [provider]: {
-          isConnected: success,
-          isLoading: false,
-          isConnecting: false,
-        }
-      }))
-    })
-
-    return cleanup
-  }, [])
-
   // Auto-advance from ScholarOS sign-in step when OAuth completes
   useEffect(() => {
     if (onboardingPath !== 'scholaros' || currentStep !== 0) return
@@ -349,39 +249,10 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     return cleanup
   }, [onboardingPath, currentStep])
 
-  const startConnect = useCallback(async (provider: string, credentials?: { clientId: string; clientSecret: string }) => {
-    setProviderStates(prev => ({
-      ...prev,
-      [provider]: { ...prev[provider], isConnecting: true }
-    }))
-
-    try {
-      const result = await window.ipc.invoke('oauth:connect', { provider, clientId: credentials?.clientId, clientSecret: credentials?.clientSecret })
-
-      if (!result.success) {
-        toast.error(result.error || `Failed to connect to ${provider}`)
-        setProviderStates(prev => ({
-          ...prev,
-          [provider]: { ...prev[provider], isConnecting: false }
-        }))
-      }
-    } catch (error) {
-      console.error('Failed to connect:', error)
-      toast.error(`Failed to connect to ${provider}`)
-      setProviderStates(prev => ({
-        ...prev,
-        [provider]: { ...prev[provider], isConnecting: false }
-      }))
-    }
-  }, [])
-
-  // Step indicator - dynamic based on path
+  // Step indicator
   const renderStepIndicator = () => {
-    // ScholarOS path: Sign In (0), Connect (3), Done (4) = 3 dots
-    // BYOK path: Sign In (0), Upsell (1), Model (2), Connect (3), Done (4) = 5 dots
-    // Before path is chosen: show 3 dots (minimal)
-    const scholarosSteps = [0, 3, 4]
-    const byokSteps = [0, 1, 2, 3, 4]
+    const scholarosSteps = [0, 3]
+    const byokSteps = [0, 1, 2, 3]
     const steps = onboardingPath === 'byok' ? byokSteps : scholarosSteps
     const currentIndex = steps.indexOf(currentStep)
 
@@ -400,10 +271,9 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     )
   }
 
-  // Helper to render an OAuth provider row
   // Step 0: Sign in to ScholarOS (with BYOK option)
   const renderSignInStep = () => {
-    const scholarosState = providerStates['scholaros'] || { isConnected: false, isLoading: false, isConnecting: false }
+    const [connecting, setConnecting] = useState(false)
 
     return (
       <div className="flex flex-col items-center text-center">
@@ -417,40 +287,38 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
           </DialogDescription>
         </DialogHeader>
 
-        {scholarosState.isConnected ? (
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle2 className="size-5" />
-              <span className="text-sm font-medium">Connected to ScholarOS</span>
-            </div>
-            <Button onClick={() => setCurrentStep(3 as Step)} size="lg" className="w-full max-w-xs">
-              Continue
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-            <Button
-              onClick={() => {
-                setOnboardingPath('scholaros')
-                startConnect('scholaros')
-              }}
-              size="lg"
-              className="w-full"
-              disabled={scholarosState.isConnecting}
-            >
-              {scholarosState.isConnecting ? (
-                <><Loader2 className="size-4 animate-spin mr-2" />Waiting for sign in...</>
-              ) : (
-                "Sign in with ScholarOS"
-              )}
-            </Button>
-            {scholarosState.isConnecting && (
-              <p className="text-xs text-muted-foreground">
-                Complete sign in in your browser, then return here.
-              </p>
+        <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+          <Button
+            onClick={async () => {
+              setOnboardingPath('scholaros')
+              setConnecting(true)
+              try {
+                const result = await window.ipc.invoke('oauth:connect', { provider: 'scholaros' })
+                if (!result.success) {
+                  toast.error(result.error || "Failed to connect to ScholarOS")
+                }
+              } catch {
+                toast.error("Failed to connect to ScholarOS")
+              } finally {
+                setConnecting(false)
+              }
+            }}
+            size="lg"
+            className="w-full"
+            disabled={connecting}
+          >
+            {connecting ? (
+              <><Loader2 className="size-4 animate-spin mr-2" />Waiting for sign in...</>
+            ) : (
+              "Sign in with ScholarOS"
             )}
-          </div>
-        )}
+          </Button>
+          {connecting && (
+            <p className="text-xs text-muted-foreground">
+              Complete sign in in your browser, then return here.
+            </p>
+          )}
+        </div>
 
         <div className="w-full flex justify-end mt-8">
           <button
@@ -689,38 +557,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
               )}
             </div>
 
-            <div className="space-y-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Track block model</span>
-              {modelsLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Loading...
-                </div>
-              ) : showModelInput ? (
-                <Input
-                  value={activeConfig.trackBlockModel}
-                  onChange={(e) => updateProviderConfig(llmProvider, { trackBlockModel: e.target.value })}
-                  placeholder={activeConfig.model || "Enter model"}
-                />
-              ) : (
-                <Select
-                  value={activeConfig.trackBlockModel || "__same__"}
-                  onValueChange={(value) => updateProviderConfig(llmProvider, { trackBlockModel: value === "__same__" ? "" : value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__same__">Same as assistant</SelectItem>
-                    {modelsForProvider.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.name || model.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
           </div>
 
           {showApiKey && (
@@ -781,80 +617,24 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     )
   }
 
-  // Step 3: Connect Accounts
-  const renderAccountConnectionStep = () => (
-    <div className="flex flex-col">
-      <DialogHeader className="text-center mb-6">
-        <DialogTitle className="text-2xl">Connect Your Accounts</DialogTitle>
-        <DialogDescription className="text-base">
-          Connect your accounts to start syncing your data locally. You can always add more later.
+  // Step 3: Completion
+  const renderCompletionStep = () => (
+    <div className="flex flex-col items-center text-center">
+      <div className="flex size-20 items-center justify-center rounded-full bg-green-100 mb-6">
+        <CheckCircle2 className="size-10 text-green-600" />
+      </div>
+      <DialogHeader className="space-y-3">
+        <DialogTitle className="text-2xl">You're All Set!</DialogTitle>
+        <DialogDescription className="text-base max-w-md mx-auto">
+          Your AI study assistant is ready. Start by creating a note or asking a question.
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-4">
-        {providersLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-
-          </>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-3 mt-8">
-        <Button onClick={handleNext} size="lg">
-          Continue
-        </Button>
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={handleBack} className="gap-1">
-            <ArrowLeft className="size-4" />
-            Back
-          </Button>
-          <Button variant="ghost" onClick={handleNext} className="text-muted-foreground">
-            Skip for now
-          </Button>
-        </div>
-      </div>
+      <Button onClick={handleComplete} size="lg" className="mt-8 w-full max-w-xs">
+        Start Using ScholarOS
+      </Button>
     </div>
   )
-
-  // Step 4: Completion
-  const renderCompletionStep = () => {
-    const hasConnections = connectedProviders.length > 0
-
-    return (
-      <div className="flex flex-col items-center text-center">
-        <div className="flex size-20 items-center justify-center rounded-full bg-green-100 mb-6">
-          <CheckCircle2 className="size-10 text-green-600" />
-        </div>
-        <DialogHeader className="space-y-3">
-          <DialogTitle className="text-2xl">You're All Set!</DialogTitle>
-          <DialogDescription className="text-base max-w-md mx-auto">
-            {hasConnections ? (
-              <>Give me 30 minutes to build your context graph.<br />I can still help with other things on your computer.</>
-            ) : (
-              <>You can connect your accounts anytime from the sidebar to start syncing data.</>
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        {hasConnections && (
-          <div className="mt-6 w-full max-w-sm">
-            <div className="rounded-lg border bg-muted/50 p-4">
-              <p className="text-sm font-medium mb-2">Connected accounts:</p>
-              <div className="space-y-1" />
-            </div>
-          </div>
-        )}
-
-        <Button onClick={handleComplete} size="lg" className="mt-8 w-full max-w-xs">
-          Start Using ScholarOS
-        </Button>
-      </div>
-    )
-  }
 
   return (
     <>
@@ -869,8 +649,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
         {currentStep === 0 && renderSignInStep()}
         {currentStep === 1 && renderByokUpsellStep()}
         {currentStep === 2 && renderLlmSetupStep()}
-        {currentStep === 3 && renderAccountConnectionStep()}
-        {currentStep === 4 && renderCompletionStep()}
+        {currentStep === 3 && renderCompletionStep()}
       </DialogContent>
     </Dialog>
     </>

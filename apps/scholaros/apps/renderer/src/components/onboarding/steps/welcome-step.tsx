@@ -2,6 +2,17 @@ import { MessageSquare, Network, FileSearch } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useState } from "react"
 import type { OnboardingState } from "../use-onboarding-state"
 
 interface WelcomeStepProps {
@@ -27,6 +38,8 @@ const features = [
 ]
 
 export function WelcomeStep({ state }: WelcomeStepProps) {
+  const [showSkipDialog, setShowSkipDialog] = useState(false)
+
   return (
     <div className="flex flex-col items-center text-center flex-1">
       {/* Logo with animated glow */}
@@ -121,15 +134,29 @@ export function WelcomeStep({ state }: WelcomeStepProps) {
         className="mt-6"
       >
         <button
-          onClick={() => {
-            toast.info("You can configure everything in Settings later")
-            state.handleComplete()
-          }}
+          onClick={() => setShowSkipDialog(true)}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground/50"
         >
           Skip onboarding
         </button>
       </motion.div>
+
+      <AlertDialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Skip onboarding?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You won't have an AI assistant configured. You can set everything up later in Settings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { state.handleComplete(); }}>
+              Skip
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

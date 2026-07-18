@@ -183,7 +183,7 @@ export class AgentRuntime implements IAgentRuntime {
       const errorEvent: z.infer<typeof RunEvent> = {
         runId,
         type: "error",
-        error: message,
+        error: userFacingError(message),
         subflow: [],
       };
       await this.runsRepo.appendEvents(runId, [errorEvent]);
@@ -372,6 +372,41 @@ function formatLlmStreamError(rawError: unknown): string {
   if (name) lines.push(`name: ${name}`);
   if (responseBody) lines.push(`responseBody: ${responseBody}`);
   return lines.length ? lines.join("\n") : "Model stream error";
+}
+
+function userFacingError(rawError: unknown): string {
+  const msg = typeof rawError === "string" ? rawError : rawError instanceof Error ? rawError.message : formatLlmStreamError(rawError);
+  const lower = msg.toLowerCase();
+
+  if (lower.includes("abort") || lower.includes("cancelled")) {
+    return "Request was cancelled.";
+  }
+  if (lower.includes("content filter") || lower.includes("content_filter")) {
+    return "The model's content filter blocked this response. Try rephrasing your question.";
+  }
+  if (lower.includes("rate limit") || lower.includes("rate_limit") || lower.includes("429")) {
+    return "This model is currently rate-limited. Wait a moment and try again.";
+  }
+  if (lower.includes("insufficient quota") || lower.includes("quota") || lower.includes("402")) {
+    return "Your API key has run out of credits. Top up your account or try a different model.";
+  }
+  if (lower.includes("auth") || lower.includes("unauthorized") || lower.includes("401") || lower.includes("api key")) {
+    return "Your API key appears to be invalid. Check your settings and try again.";
+  }
+  if (lower.includes("not found") || lower.includes("model not found") || lower.includes("404")) {
+    return "The selected model is not available. Try a different model.";
+  }
+  if (lower.includes("network") || lower.includes("fetch failed") || lower.includes("econnrefused") || lower.includes("econnreset") || lower.includes("enotfound")) {
+    return "Could not reach the AI provider. Check your internet connection.";
+  }
+  if (lower.includes("timeout") || lower.includes("deadline") || lower.includes("timed out")) {
+    return "The model took too long to respond. Try again or use a faster model.";
+  }
+  if (lower.includes("500") || lower.includes("502") || lower.includes("503") || lower.includes("server error")) {
+    return "The AI provider returned a server error. Try again later.";
+  }
+
+  return msg.split("\n")[0] || "Model error";
 }
 
 export async function loadAgent(id: string): Promise<z.infer<typeof Agent>> {
@@ -1377,9 +1412,9 @@ async function* streamLlm(
       case "error":
         yield {
           type: "error",
-          error: formatLlmStreamError(
+          error: userFacingError(formatLlmStreamError(
             (event as { error?: unknown }).error ?? event,
-          ),
+          )),
         };
         return;
       case "reasoning-start":

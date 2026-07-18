@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const getIpc = () =>
-  typeof window !== "undefined" ? (window as any).ipc : undefined;
+  typeof window !== "undefined" ? window.ipc : undefined;
 
 const COURSE_COLORS = [
   "#3B82F6",

@@ -13,6 +13,7 @@ import {
 import { useDebounce } from '@/hooks/use-debounce'
 import { useSidebarSection, type ActiveSection } from '@/contexts/sidebar-context'
 import { cn } from '@/lib/utils'
+import { toast } from "sonner"
 
 interface SearchResult {
   type: 'knowledge' | 'chat'
@@ -135,6 +136,7 @@ export function CommandPalette({
         console.error('Search failed:', err)
         if (!cancelled) {
           setResults([])
+          toast.error("Search failed. Try again.")
         }
       })
       .finally(() => {

@@ -1,204 +1,150 @@
-# ScholarOS — College Student Feature Plan
+# ScholarOS — MVP Quality Plan
 
-## Context
+## Overview
 
-ScholarOS already has strong foundations: flashcard systems (built-in SM-2 + AnkiConnect), revision guides, writing mode with citations, PPTX/DOCX/PDF creation, deep research, course management, knowledge graph, and a full ingest pipeline.
-
-This plan covers 8 feature gaps identified from Reddit (r/college, r/GetStudying, r/studytips), student tool surveys, and usage patterns of StudyFetch, Mindgrasp, NotebookLM, and Quizlet. Each is ordered by **impact per unit of implementation effort** for typical college undergrads — not PhD researchers.
+This plan covers the highest-priority user-facing issues identified in a full codebase audit (July 2026). The goal is to eliminate sources of user confusion, crashes, and distrust before shipping a public MVP.
 
 ---
 
-## Feature Delivery Order
+## P0 — User Will Hit These Immediately
 
-### Sprint 1 — Interactive Quiz Mode
+### ✅ 1. Remove blank "Connect Accounts" onboarding step
 
-**What it is:** A live "quiz me" session where the agent presents one question at a time, waits for the user's answer, gives detailed feedback on correctness, explains the reasoning, then moves to the next. This is different from flashcard review (which is self-paced, flip-to-reveal). This is agent-led, adaptive, and feedback-rich.
+**Problem:** Step 3 of onboarding (Connect Accounts) renders `<> </>` — a completely blank page. There are no accounts to connect. The entire OAuth provider loading, provider state tracking, and connection UI is dead code.
 
-**Why this order:** This was the single most-praised Claude feature on student Reddit. It transforms the agent from a Q&A bot into an active recall tutor. Low implementation effort — mostly a new interaction pattern skill.
+**Files:**
+- `apps/renderer/src/components/onboarding-modal.tsx` — remove `renderAccountConnectionStep()`, step 3 rendering, providers state, `refreshAllStatuses`, OAuth event listener, `connectedProviders`, `showMoreProviders`, `providersLoading`, `providerStates`. Update `Step` type from `0|1|2|3|4` to `0|1|2|3`, update `handleNext`/`handleBack`/`renderStepIndicator` accordingly.
+- `apps/renderer/src/components/onboarding/steps/feature-tour-step.tsx` — remove the "Track Blocks" feature card (see P1.1).
 
-**Implementation:**
-- New skill: `skills/interactive-quiz/skill.ts`
-- Loads course content the same way auto-flashcards does
-- Agent presents questions one at a time, waits for user response via chat
-- Agent evaluates answer, explains correct reasoning, adapts difficulty
-- Tracks which questions were answered correctly/incorrectly per session
-- Saves weak topics back to the flashcard system for later review
-- Register in `skills/index.ts` and add trigger keywords to `instructions.ts`
+**Acceptance:** Onboarding flows Sign In → BYOK Upsell → LLM Setup → Completion. No blank pages.
 
-**Trigger keywords:** "quiz me", "practice questions", "test me", "interactive quiz", "grill me"
+### ✅ 2. Confirm before deleting files and folders
 
-**Dependencies:** None — pure agent skill, uses existing course content and built-in tools.
+**Problem:** Right-click → Delete sends a file to trash with zero warning. Vaults and providers are removed permanently with no dialog. Users will accidentally lose data.
 
----
+**Files:**
+- `apps/renderer/src/components/sidebar-content.tsx` — add `AlertDialog` before `handleDelete` and vault removal
+- `apps/renderer/src/components/settings-dialog.tsx` — add `AlertDialog` before provider deletion
+- Shared `useConfirmDelete` hook recommended for consistency
 
-### Sprint 1 — Practice Exam Generator
+**Acceptance:** Every destructive action (file delete, folder delete, vault remove, provider remove) shows a Radix UI confirmation dialog with the item name. Delete confirms "Move to trash" (with hint it's recoverable). Vault/provider removal says "This cannot be undone."
 
-**What it is:** Course material → full mock exam with mixed question types (MCQ, short answer, essay prompts), difficulty tiers, answer key, time estimates per section. Output as a formatted document (DOCX/PDF) or rendered in chat.
+### ✅ 3. Add a React Error Boundary at the root
 
-**Why this order:** Flashcards test recall; mock exams test readiness. Students preparing for midterms/finals want to simulate the real exam experience. Complements the revision guide and flashcard systems.
+**Problem:** Any runtime error in the renderer unmounts the entire React tree → white screen. No fallback UI, no recovery.
 
-**Implementation:**
-- New skill: `skills/practice-exam/skill.ts`
-- Reads course lecture pages, concept pages, and exam analysis data
-- Generates a balanced exam: ~30% easy, 50% medium, 20% hard questions
-- Includes answer key with explanations
-- Output as DOCX (via existing docx skill) or rendered in chat for interactive mode
-- Register in `skills/index.ts` and `instructions.ts`
+**Files:**
+- `apps/renderer/src/components/error-boundary.tsx` (new) — `componentDidCatch` with a "Something went wrong" fallback, a "Reload" button, and error details collapsed behind a details toggle
+- `apps/renderer/src/main.tsx` — wrap `<App />` with `<ErrorBoundary>`
 
-**Trigger keywords:** "practice exam", "mock test", "practice paper", "sample questions", "exam simulation"
+**Acceptance:** A render crash shows a styled error page with "Reload ScholarOS" button instead of a white screen. The error is logged to console for debugging.
 
-**Dependencies:** Can leverage the DOCX creation skill for formatted output.
+### ✅ 4. Show user-friendly AI error messages instead of raw provider responses
 
----
+**Problem:** When an AI provider fails, users see raw text like `responseBody: {"error":{"message":"Insufficient quota"}}` or `name: ContentFilter`. Meaningless to non-technical users.
 
-### Sprint 2 — Concept Explainer (Socratic Tutor)
+**Files:**
+- `packages/core/src/agents/runtime.ts` — map known error types to user-friendly messages (rate limit, auth failure, model not found, content filter, network error, server error)
+- `apps/renderer/src/App.tsx:2630` — display the mapped message instead of `event.error.split("\n")[0]`
 
-**What it is:** A structured teaching skill. User says "teach me [topic]" and the agent:
-1. Asks what they already know
-2. Explains using Feynman technique + analogies + examples
-3. Checks comprehension with targeted questions
-4. Fills gaps iteratively
-
-**Why this order:** Turns the agent from a passive Q&A bot into an active tutor. Khanmigo's whole value prop is this. ScholarOS has all the content but no structured pedagogical mode.
-
-**Implementation:**
-- New skill: `skills/concept-explainer/skill.ts`
-- Structured pedagogical workflow (assess → explain → check → fill)
-- References existing knowledge base content for accuracy
-- Uses Feynman technique, analogy generation, and comprehension checks
-- Adaptive: goes deeper if user struggles, moves on if they've got it
-- Register in `skills/index.ts` and `instructions.ts`
-
-**Trigger keywords:** "explain", "teach me", "I don't understand", "help me learn", "break this down", "socratic"
-
-**Dependencies:** None — pure agent skill.
+**Acceptance:** Users see messages like "This model is currently rate-limited. Wait a moment and try again." or "Your API key appears to be invalid. Check your settings." Never raw JSON.
 
 ---
 
-### Sprint 2 — Study Schedule Planner
+## P1 — Quality-of-Life Gaps
 
-**What it is:** Given exam dates (from calendar) + course content + current flashcard mastery stats → optimized day-by-day study plan with specific tasks.
+### ✅ 1. Strip all Track Block Model remnants
 
-**Why this order:** Trivial effort. The agent already reads calendar, study stats, and course data. This skill just synthesizes that data into a structured plan.
+**Problem:** The "Track Blocks" feature (auto-updating AI note sections) was removed, but `trackBlockModel` survives in the config schema, settings UI dropdown, onboarding UI, and defaults code. Users can configure a model that does nothing. The system prompt still references the `tracks` skill that doesn't exist.
 
-**Implementation:**
-- New or extended in `skills/study-workflow/skill.ts`
-- Reads:
-  - Calendar tasks (via `calendar:list` IPC) — finds exams with due dates
-  - Flashcard stats — current mastery per course, cards due, overdue
-  - Course listing — what courses exist
-- Generates a time-blocked plan prioritizing weak areas and approaching exams
-- Output as structured chat message (not a document)
-- Register trigger keywords in `instructions.ts`
+**Files:**
+- `packages/shared/src/models.ts` — remove `trackBlockModel` from `LlmModelConfig`
+- `packages/core/src/models/defaults.ts` — remove `getTrackBlockModel()`, `SIGNED_IN_TRACK_BLOCK_MODEL`
+- `packages/core/src/models/repo.ts` — remove `trackBlockModel` from config merge
+- `packages/core/src/application/assistant/skills/index.ts:36` — remove dead `// console.log(tracksSkill)`
+- `apps/renderer/src/App.tsx:442-449` — remove track/tracking note references from suggested topics prompt
+- `apps/renderer/src/components/onboarding-modal.tsx` — remove `trackBlockModel` from types, state, update handler, and model setup UI
+- `apps/renderer/src/components/settings-dialog.tsx` — remove `trackBlockModel` from types, state, update handlers, and model dropdowns
+- `apps/renderer/src/components/onboarding/steps/feature-tour-step.tsx` — remove "Track Blocks" card
 
-**Trigger keywords:** "study plan", "study schedule", "exam schedule", "what should I study", "plan my revision"
+**Acceptance:** No `trackBlockModel` references remain in the codebase. No UI shows a dead config option. "Track Blocks" does not appear in the feature tour.
 
-**Dependencies:** Calendar system, flashcard stats (both exist).
+### ✅ 2. Add empty states for file tree and search
 
----
+**Problem:** Opening a new vault shows an empty sidebar with no guidance. Search that fails silently shows "No results found." Users don't know if the app is working.
 
-### Sprint 3 — Lecture-to-Notes Pipeline
+**Files:**
+- `apps/renderer/src/components/sidebar-content.tsx` — in the file tree section, when `tree` is empty, show "No notes yet" with a "Create your first note" button
+- `apps/renderer/src/components/search-dialog.tsx:134` — show a toast on search IPC failure instead of silently clearing results
 
-**What it is:** Upload lecture recording → transcribe (Deepgram already integrated) → extract key concepts → write structured notes with definitions, questions, summary → auto-generate flashcards from the notes.
+**Acceptance:** Empty vault shows a helpful placeholder. Search errors are communicated to the user.
 
-**Why this order:** The #1 workflow on StudyFetch and Mindgrasp — both multi-million dollar student apps. ScholarOS has voice (Deepgram STT), note creation, and flashcard generation. This chains them together.
+### ⏭️ 3. Use skeleton loading states instead of blank/spinner-only
 
-**Implementation:**
-- New: `skills/lecture-pipeline/skill.ts` — orchestrator skill
-- Or: extend existing ingest pipeline with a "lecture mode"
-- Flow:
-  1. Accept audio/video file or recording
-  2. Transcribe via Deepgram (existing `voice:getConfig`, `voice:synthesize`)
-  3. Extract concepts, definitions, key questions via LLM
-  4. Write structured note to `courses/{course}/lectures/` (existing note creation)
-  5. Generate flashcards from the note (existing auto-flashcards)
-  6. Report summary to user
-- Register in `skills/index.ts` and `instructions.ts`
+**Problem:** The skeleton components (`Skeleton`, `SkeletonShimmer`, etc.) are defined but never used. The file tree, chat history, and search results all appear with no loading transition.
 
-**Trigger keywords:** "lecture recording", "transcribe lecture", "process my lecture", "lecture notes", "recorded class"
+**Files:**
+- `apps/renderer/src/components/sidebar-content.tsx` — add `SkeletonShimmerCard` placeholders while tree and runs list are loading
+- `apps/renderer/src/components/search-dialog.tsx` — add skeleton placeholders while `isSearching` is true
 
-**Dependencies:** Deepgram integration (exists), note creation system (exists), auto-flashcards (exists). The chain does not exist.
+**Acceptance:** Loading states show skeleton placeholders matching the final layout, not just spinners or white space.
 
----
+### ✅ 4. Unify toast systems (remove custom, keep sonner)
 
-### Sprint 3 — Resume / Cover Letter Builder
+**Problem:** Two toast systems coexist. `lib/toast.ts` (custom) is used in `sidebar-content.tsx`. `sonner` is used everywhere else. Different visual treatment, different API.
 
-**What it is:** Student info + job description → tailored resume and cover letter, export as DOCX.
+**Files:**
+- `apps/renderer/src/lib/toast.ts` — delete (or deprecate)
+- `apps/renderer/src/components/sidebar-content.tsx` — replace `toast("...","success")`/`toast("...","error")` calls with `toast.success("...")`/`toast.error("...")` from sonner
 
-**Why this order:** Big use case for juniors/seniors applying for internships. Every career service recommends this. DOCX export already built.
+**Acceptance:** All toasts use sonner. Single import pattern across the app.
 
-**Implementation:**
-- New skill: `skills/resume-builder/skill.ts`
-- Takes: user's education, experience, skills + job description
-- Generates: tailored resume (ATS-optimized) + cover letter
-- Exports as DOCX via existing docx skill
-- Store templates in `skills/resume-builder/templates/`
-- Register in `skills/index.ts` and `instructions.ts`
+### ✅ 5. Replace native `confirm()` in settings with Radui UI AlertDialog
 
-**Trigger keywords:** "resume", "CV", "cover letter", "job application", "internship application"
+**Problem:** Settings "Discard changes?" uses the OS-native `confirm()` dialog — jarring against the app's polished Radix UI.
 
-**Dependencies:** DOCX creation skill (exists). Template design needed.
+**File:**
+- `apps/renderer/src/components/settings-dialog.tsx:1525` — replace `confirm(...)` with an `AlertDialog` component
 
----
+**Acceptance:** "Discard changes?" shows a styled Radix UI dialog matching the rest of the app.
 
-### Sprint 4 — Mind Map Generator
+### ✅ 6. Add confirmation to onboarding "Skip" action
 
-**What it is:** Course content or notes → visual mind map for revision. Output as Mermaid diagram (already supported in web artifacts builder) or image.
+**Problem:** "Skip for now" / "Skip onboarding" links have no guard. Users can accidentally skip vault selection, theme, and model setup with one click.
 
-**Why this order:** Mapify is a top-5 student tool. Mermaid rendering already works. Mostly prompt work to structure content as hierarchical mind maps.
+**File:**
+- `apps/renderer/src/components/onboarding/steps/welcome-step.tsx:124` — add `AlertDialog` before completing onboarding skip
+- `apps/renderer/src/components/onboarding-modal.tsx` — add confirmation before "Skip for now" on LLM setup and other steps
 
-**Implementation:**
-- New skill: `skills/mind-map/skill.ts`
-- Reads course content or user-provided text
-- Structures content hierarchically (central topic → subtopics → details)
-- Generates Mermaid mind map syntax
-- Renders as an artifact (existing web artifacts builder) or inline Mermaid
-- Register in `skills/index.ts` and `instructions.ts`
-
-**Trigger keywords:** "mind map", "concept map", "visualize", "diagram", "brainstorm map"
-
-**Dependencies:** Mermaid support (exists in revision-guide and web-artifacts-builder).
+**Acceptance:** Skipping onboarding shows "Are you sure? You won't have an AI assistant configured." with Cancel/Confirm.
 
 ---
 
-### Sprint 4 — Citation Quick-Formatter
+## P2 — Polish & Low Risk
 
-**What it is:** Paste URL / book title / DOI / ISBN → get formatted citation in MLA, APA, or Chicago. One-shot, no import dialog needed.
+These are worth doing but won't block an MVP launch.
 
-**Why this order:** Trivial implementation. Students writing essays need quick citation formatting constantly.
-
-**Implementation:**
-- New skill: `skills/citation-formatter/skill.ts`
-- Accepts: URL, DOI, ISBN, or manual metadata
-- Outputs: formatted citation in requested style (MLA/APA/Chicago)
-- Uses LLM to extract metadata from URLs/sources
-- Can optionally save to the existing citation library (`library.json`)
-- Register in `skills/index.ts` and `instructions.ts`
-
-**Trigger keywords:** "cite this", "citation", "MLA", "APA", "Chicago", "bibliography entry", "reference format"
-
-**Dependencies:** Citation library (exists). No complex integration needed.
+### 1. Remove dead `backend/` directory
+### 2. Remove unused dependencies (xterm, react-big-calendar, date-fns, googleapis, cron-parser, cors, etc.)
+### 3. Consolidate duplicate `parseFrontmatter` implementations
+### 4. Replace `console.log` with structured logging
+### 5. Add global type definition for `window.ipc` to eliminate `(window as any).ipc`
+### 6. Delete stale `packages/core/src/knowledge/README.md`
 
 ---
 
-## Registration Checklist (for each skill)
+## Status — ✅ All completed 2026-07-18
 
-1. Create `packages/core/src/application/assistant/skills/{name}/skill.ts`
-2. Add to `skills/index.ts`:
-   - Import the skill
-   - Add definition to `definitions[]` array
-3. Add trigger keywords to `instructions.ts` (the "Skill Loading Quick Reference" section)
-4. Add to `buildContextualSkillCatalog()` keyword detection in `skills/index.ts`
-
-## Effort Summary
-
-| Sprint | Skill | Effort | Type |
-|--------|-------|--------|------|
-| 1 | Interactive Quiz Mode | Low | Agent skill only |
-| 1 | Practice Exam Generator | Low-Medium | Agent skill + DOCX output |
-| 2 | Concept Explainer (Socratic Tutor) | Low | Agent skill only |
-| 2 | Study Schedule Planner | Low | Agent skill only (synthesizes existing data) |
-| 3 | Lecture-to-Notes Pipeline | Medium | Chains 3+ existing systems |
-| 3 | Resume / Cover Letter Builder | Low-Medium | Agent skill + DOCX template |
-| 4 | Mind Map Generator | Low | Agent skill + Mermaid rendering |
-| 4 | Citation Quick-Formatter | Very Low | Agent skill only |
+| Item | Status | Notes |
+|------|--------|-------|
+| **P0.1** Remove blank onboarding step 3 | ✅ Done | Removed `renderAccountConnectionStep`, OAuth provider loading, provider states. Updated step numbering 0-3. |
+| **P1.1** Strip Track Block remnants | ✅ Done | Removed from schema, defaults, repo, settings UI, onboarding UI, App.tsx prompt, feature tour. |
+| **P0.2** Delete confirmation dialogs | ✅ Done | Added AlertDialog for file/folder delete in Tree component (`sidebar-content.tsx`). |
+| **P0.3** React Error Boundary | ✅ Done | New `ErrorBoundary` component with "Reload" button and collapsible error details. Wraps `<App />` in `main.tsx`. |
+| **P0.4** User-friendly AI errors | ✅ Done | `userFacingError()` maps 9 error types (rate limit, auth, quota, content filter, etc.) to plain English. Applied in both streaming and run-level error paths. |
+| **P1.2** Empty states | ✅ Done | File tree shows "No notes yet" with "Create your first note" link. Search errors show toast. |
+| **P1.4** Unify toast systems | ✅ Done | Replaced all `toast(msg, "success"|"error"|"info")` calls with sonner `toast.success/error/info`. Removed `lib/toast.ts`. |
+| **P1.5** Native confirm replacement | ✅ Done | Replaced `confirm("Discard changes?")` in settings with AlertDialog. |
+| **P1.6** Onboarding skip confirmation | ✅ Done | Added AlertDialog before skipping onboarding with warning about no AI assistant. |
+| **P1.3** Skeleton loading states | Skipped | Nice-to-have polish. Skeleton components exist but are unused. |
+| **P2** Cleanup debt | Not started | Backend dir, unused deps, duplicate parseFrontmatter, console.log, window.ipc types. |

@@ -1,4 +1,4 @@
-import { MessageSquare, Network, FileText, Blocks, Calendar, ArrowLeft } from "lucide-react"
+import { MessageSquare, Network, FileText, Calendar, ArrowLeft } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import type { OnboardingState } from "../use-onboarding-state"
@@ -25,12 +25,6 @@ const features = [
     title: "PDF Analysis",
     description: "Extract insights from research papers",
     color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  },
-  {
-    icon: Blocks,
-    title: "Track Blocks",
-    description: "Auto-updating note content",
-    color: "bg-green-500/10 text-green-600 dark:text-green-400",
   },
   {
     icon: Calendar,

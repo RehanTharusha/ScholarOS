@@ -29,11 +29,6 @@ import {
   Trash2,
 } from "lucide-react";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -236,8 +231,8 @@ export function QuickAccessSidebar({
   onReorder,
   onValidateItem,
 }: QuickAccessSidebarProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -275,69 +270,65 @@ export function QuickAccessSidebar({
 
   return (
     <div className="border-b border-sidebar-border">
-      <Collapsible
-        open={!isCollapsed}
-        onOpenChange={(open) => setIsCollapsed(!open)}
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="flex items-center gap-1 w-full px-2 py-1 cursor-pointer hover:bg-sidebar-accent/50 select-none text-left"
       >
-        <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-sidebar-accent/50 select-none">
-            <ChevronRight
-              className={`size-3.5 text-sidebar-foreground/50 transition-transform ${
-                !isCollapsed ? "rotate-90" : ""
-              }`}
-            />
-            <span className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider">
-              Quick Access
-            </span>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
+        <ChevronRight
+          className={`size-3.5 text-sidebar-foreground/50 transition-transform ${
+            !isCollapsed ? "rotate-90" : ""
+          }`}
+        />
+        <span className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider">
+          Quick Access
+        </span>
+      </button>
+      {!isCollapsed && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={items.map((i) => i.id)}
+            strategy={verticalListSortingStrategy}
           >
-            <SortableContext
-              items={items.map((i) => i.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {items.map((item) => (
-                <QuickAccessItemRow
-                  key={item.id}
-                  item={item}
-                  expandedPaths={expandedPaths}
-                  onSelectFile={onSelectFile}
-                  onEnsureFolderExpanded={onEnsureFolderExpanded}
-                  onToggleFolder={onToggleFolder}
-                  onRemove={onRemove}
-                  onRename={onRename}
-                  onValidateItem={onValidateItem}
-                />
-              ))}
-            </SortableContext>
-            <DragOverlay>
-              {activeItem && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-sidebar-accent shadow-md text-sm text-sidebar-foreground">
-                  {activeItem.type === "course" || activeItem.type === "detected" ? (
-                    <span
-                      className="size-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: activeItem.color || "#3B82F6" }}
-                    />
-                  ) : activeItem.path.includes(".") && !activeItem.path.endsWith("/") ? (
-                    fileIcon(activeItem.path)
-                  ) : (
-                    <Folder className="size-3.5 text-sidebar-foreground/60" />
-                  )}
-                  <span className="truncate max-w-40 text-xs">
-                    {activeItem.customName || activeItem.name}
-                  </span>
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-        </CollapsibleContent>
-      </Collapsible>
+            {items.map((item) => (
+              <QuickAccessItemRow
+                key={item.id}
+                item={item}
+                expandedPaths={expandedPaths}
+                onSelectFile={onSelectFile}
+                onEnsureFolderExpanded={onEnsureFolderExpanded}
+                onToggleFolder={onToggleFolder}
+                onRemove={onRemove}
+                onRename={onRename}
+                onValidateItem={onValidateItem}
+              />
+            ))}
+          </SortableContext>
+          <DragOverlay>
+            {activeItem && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-sidebar-accent shadow-md text-sm text-sidebar-foreground">
+                {activeItem.type === "course" || activeItem.type === "detected" ? (
+                  <span
+                    className="size-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: activeItem.color || "#3B82F6" }}
+                  />
+                ) : activeItem.path.includes(".") && !activeItem.path.endsWith("/") ? (
+                  fileIcon(activeItem.path)
+                ) : (
+                  <Folder className="size-3.5 text-sidebar-foreground/60" />
+                )}
+                <span className="truncate max-w-40 text-xs">
+                  {activeItem.customName || activeItem.name}
+                </span>
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
     </div>
   );
 }
