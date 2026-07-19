@@ -225,7 +225,7 @@ export function ReviewSession({ onClose, course }: ReviewSessionProps) {
             <div className="rounded-2xl border border-border/60 p-4">
               <p className={cn(
                 "text-2xl font-bold tabular-nums",
-                accuracy >= 80 ? "text-emerald-600" : accuracy >= 60 ? "text-amber-600" : "text-red-600",
+                accuracy >= 80 ? "text-emerald-600" : accuracy >= 60 ? "text-amber-600 dark:text-amber-400" : "text-red-600",
               )}>
                 {accuracy}%
               </p>

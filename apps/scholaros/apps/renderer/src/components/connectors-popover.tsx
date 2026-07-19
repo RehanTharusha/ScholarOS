@@ -81,7 +81,7 @@ export function ConnectorsPopover({
             {state.isLoading ? (
               <span className="text-xs text-muted-foreground">Checking...</span>
             ) : needsReconnect ? (
-              <span className="text-xs text-amber-600">Needs reconnect</span>
+              <span className="text-xs text-amber-600 dark:text-amber-400">Needs reconnect</span>
             ) : (
               <span className="text-xs text-muted-foreground truncate">
                 {description}
@@ -168,7 +168,7 @@ export function ConnectorsPopover({
             <h4 className="font-semibold text-sm flex items-center gap-1.5">
               {isUnconnectedMode ? "Connect Accounts" : "Connected accounts"}
               {!isUnconnectedMode && c.hasProviderError && (
-                <AlertTriangle className="size-3 text-amber-500/80 animate-pulse" />
+                <AlertTriangle className="size-3 text-amber-500/80 dark:text-amber-400/80 animate-pulse" />
               )}
             </h4>
             <p className="text-xs text-muted-foreground mt-1">

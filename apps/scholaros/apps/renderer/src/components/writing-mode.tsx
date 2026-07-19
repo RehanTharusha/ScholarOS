@@ -276,7 +276,7 @@ export function WritingMode({
   const progressColor = useMemo(() => {
     if (wordCount > wordTarget) return "bg-destructive";
     if (progressRatio >= 0.8) return "bg-emerald-500";
-    return "bg-amber-500";
+    return "bg-amber-500 dark:bg-amber-400";
   }, [wordCount, wordTarget, progressRatio]);
 
   // Collapse all / expand all

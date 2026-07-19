@@ -93,7 +93,7 @@ const StatusDot = ({ status }: { status: ItemStatus }) => (
     className={cn(
       "inline-block size-2 shrink-0 rounded-full",
       status === "completed" && "bg-green-600",
-      status === "running" && "bg-amber-500 animate-pulse",
+      status === "running" && "bg-amber-500 dark:bg-amber-400 animate-pulse",
       status === "error" && "bg-red-600",
       status === "pending" && "bg-muted-foreground/40",
     )}
@@ -128,7 +128,7 @@ const ToolGroupHeader = ({ label, items }: ToolGroupHeaderProps) => {
     status === "completed"
       ? "bg-green-600/10 text-green-600"
       : status === "running"
-        ? "bg-amber-500/10 text-amber-600"
+        ? "bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400"
         : "bg-red-600/10 text-red-600";
 
   const icon =
@@ -146,7 +146,7 @@ const ToolGroupHeader = ({ label, items }: ToolGroupHeaderProps) => {
     status === "completed" ? (
       <CheckIcon />
     ) : status === "running" ? (
-      <span className="inline-block size-2 rounded-full bg-amber-500 animate-pulse" />
+      <span className="inline-block size-2 rounded-full bg-amber-500 dark:bg-amber-400 animate-pulse" />
     ) : (
       <XCircleIcon className="size-3.5" />
     );
@@ -155,7 +155,7 @@ const ToolGroupHeader = ({ label, items }: ToolGroupHeaderProps) => {
     status === "completed"
       ? "bg-green-600/10 text-green-600 border-green-600/20"
       : status === "running"
-        ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+        ? "bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 border-amber-500/20 dark:border-amber-400/20"
         : "bg-red-600/10 text-red-600 border-red-600/20";
 
   const progress = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -223,7 +223,7 @@ const ToolGroupHeader = ({ label, items }: ToolGroupHeaderProps) => {
           className={cn(
             "h-full rounded-full transition-all duration-400 ease-out",
             status === "completed" && "bg-green-600",
-            status === "running" && "bg-amber-500",
+            status === "running" && "bg-amber-500 dark:bg-amber-400",
             status === "error" && "bg-red-600",
           )}
           style={{ width: `${progress}%` }}

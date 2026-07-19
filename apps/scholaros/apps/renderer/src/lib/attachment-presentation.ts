@@ -89,7 +89,7 @@ export function getAttachmentToneClass(typeLabel: string): string {
     case '7Z':
     case 'TAR':
     case 'GZ':
-      return 'bg-amber-500 text-white'
+      return 'bg-amber-500 dark:bg-amber-400 text-white'
     case 'MP3':
     case 'WAV':
     case 'M4A':

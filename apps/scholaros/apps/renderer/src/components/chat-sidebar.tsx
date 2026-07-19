@@ -142,7 +142,7 @@ function BillingErrorCTA({ label }: { label: string }) {
   return (
     <button
       onClick={() => window.open(`${appUrl}?intent=upgrade`)}
-      className="mt-1 rounded-md bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-500/30"
+      className="mt-1 rounded-md bg-amber-500/20 dark:bg-amber-400/15 px-3 py-1.5 text-xs font-medium text-amber-100 dark:text-amber-200 transition-colors hover:bg-amber-500/30 dark:hover:bg-amber-400/25"
     >
       {label}
     </button>
@@ -582,12 +582,12 @@ export function ChatSidebar({
       if (billingError) {
         return (
           <Message key={item.id} from="assistant" data-message-id={item.id}>
-            <MessageContent className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <MessageContent className="rounded-lg border border-amber-500/30 dark:border-amber-400/20 bg-amber-500/10 dark:bg-amber-400/10 px-4 py-3">
               <div className="space-y-2">
-                <p className="text-sm font-medium text-amber-200">
+                <p className="text-sm font-medium text-amber-200 dark:text-amber-300">
                   {billingError.title}
                 </p>
-                <p className="text-xs text-amber-300/80">
+                <p className="text-xs text-amber-300/80 dark:text-amber-400/70">
                   {billingError.subtitle}
                 </p>
                 <BillingErrorCTA label={billingError.cta} />

@@ -16,7 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
   queued: "text-muted-foreground",
   parsing: "text-blue-500",
   classifying: "text-violet-500",
-  writing: "text-amber-500",
+  writing: "text-amber-500 dark:text-amber-400",
   done: "text-emerald-500",
   error: "text-destructive",
 };

@@ -159,7 +159,7 @@ export function IngestApproveConcepts({
 
   if (approveData.concepts.length === 0) {
     return (
-      <AcademicCard className="border-amber-500/20">
+      <AcademicCard className="border-amber-500/20 dark:border-amber-400/15">
         <AcademicSectionTitle eyebrow="Review" title="No concepts detected" />
         <p className="mt-2 text-sm text-muted-foreground">
           The source files were processed but no concepts were extracted.
@@ -188,7 +188,7 @@ export function IngestApproveConcepts({
   const hasContradictions = approveData.contradictions.length > 0;
 
   return (
-    <AcademicCard className="border-amber-500/20">
+    <AcademicCard className="border-amber-500/20 dark:border-amber-400/15">
       <div className="flex items-start justify-between gap-4">
         <div>
           <AcademicSectionTitle eyebrow="Review" title="Approve concepts to create" />
@@ -291,7 +291,7 @@ export function IngestApproveConcepts({
             {approveData.contradictions.map((c) => (
               <div
                 key={c.id}
-                className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3"
+                className="rounded-xl border border-amber-500/20 dark:border-amber-400/15 bg-amber-500/5 dark:bg-amber-400/5 px-4 py-3"
               >
                 <div className="space-y-1 text-xs">
                   <p className="font-medium text-foreground">

@@ -41,7 +41,7 @@ export function ConnectedAccountsSettings({
             {state.isLoading ? (
               <span className="text-xs text-muted-foreground">Checking...</span>
             ) : needsReconnect ? (
-              <span className="text-xs text-amber-600">Needs reconnect</span>
+              <span className="text-xs text-amber-600 dark:text-amber-400">Needs reconnect</span>
             ) : state.isConnected ? (
               <span className="text-xs text-emerald-600">Connected</span>
             ) : (
