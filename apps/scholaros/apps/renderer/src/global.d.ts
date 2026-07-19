@@ -5,7 +5,13 @@ type IPCChannels = ipc.IPCChannels;
 
 declare global {
   interface Window {
-    ipc?: {
+    /**
+     * The IPC bridge exposed by the preload script. The preload always
+     * installs this synchronously at boot, so it is non-null at runtime.
+     * Treat it as required at the type level to avoid `?.invoke(...)`
+     * everywhere in the renderer.
+     */
+    ipc: {
       /**
        * Invoke a channel that expects a response (request/response pattern)
        * Only channels with non-null responses can be invoked
@@ -14,7 +20,7 @@ declare global {
         channel: K,
         args: IPCChannels[K]['req']
       ): Promise<IPCChannels[K]['res']>;
-      
+
       /**
        * Send a message to a channel without expecting a response (fire-and-forget)
        * Only channels with null responses can be sent
@@ -23,7 +29,7 @@ declare global {
         channel: K,
         args: IPCChannels[K]['req']
       ): void;
-      
+
       /**
        * Listen to a send channel event
        * Returns a cleanup function to remove the listener

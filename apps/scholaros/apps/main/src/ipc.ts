@@ -197,6 +197,35 @@ type InvokeHandlers = {
  * 2. Handler signatures match channel definitions
  * 3. Request/response payloads are validated at runtime
  */
+/**
+ * In-memory ring buffer of recent slow IPC operations. Dev-only.
+ * Used by the Debug panel in settings to surface what is taking
+ * time. Not a real telemetry pipeline - never sent off-device.
+ */
+export interface IpcTimingEntry {
+  channel: string;
+  durationMs: number;
+  ok: boolean;
+  ts: number;
+  error?: string;
+}
+const TIMING_BUFFER_MAX = 200;
+const SLOW_THRESHOLD_MS = 100;
+const slowIpcBuffer: IpcTimingEntry[] = [];
+
+export function getSlowIpcEntries(): readonly IpcTimingEntry[] {
+  return slowIpcBuffer;
+}
+
+function recordIpcTiming(entry: IpcTimingEntry) {
+  if (entry.durationMs < SLOW_THRESHOLD_MS && entry.ok) return;
+  slowIpcBuffer.push(entry);
+  if (slowIpcBuffer.length > TIMING_BUFFER_MAX) {
+    slowIpcBuffer.splice(0, slowIpcBuffer.length - TIMING_BUFFER_MAX);
+  }
+}
+
+
 export function registerIpcHandlers(handlers: InvokeHandlers) {
   // Register each handler with runtime validation
   for (const [channel, handler] of Object.entries(handlers) as [
@@ -204,14 +233,36 @@ export function registerIpcHandlers(handlers: InvokeHandlers) {
     InvokeHandler<InvokeChannels>,
   ][]) {
     ipcMain.handle(channel, async (event, rawArgs) => {
-      // Validate request payload
-      const args = ipc.validateRequest(channel, rawArgs);
+      const start = Date.now();
+      try {
+        // Validate request payload
+        const args = ipc.validateRequest(channel, rawArgs);
 
-      // Call handler
-      const result = await handler(event, args);
+        // Call handler
+        const result = await handler(event, args);
 
-      // Validate response payload
-      return ipc.validateResponse(channel, result);
+        // Validate response payload
+        const validated = ipc.validateResponse(channel, result);
+
+        recordIpcTiming({
+          channel,
+          durationMs: Date.now() - start,
+          ok: true,
+          ts: start,
+        });
+
+        return validated;
+      } catch (err) {
+        recordIpcTiming({
+          channel,
+          durationMs: Date.now() - start,
+          ok: false,
+          ts: start,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        console.error(`[IPC] ${channel} failed:`, err);
+        throw err;
+      }
     });
   }
 }

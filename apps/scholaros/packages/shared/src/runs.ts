@@ -88,6 +88,20 @@ export const RunStoppedEvent = BaseRunEvent.extend({
     reason: z.enum(["user-requested", "force-stopped"]).optional(),
 });
 
+/**
+ * Synthetic event inserted by FSRunsRepo when a run's NDJSON log is
+ * compacted to keep it from growing without bound. The renderer can
+ * show a small "this run was compacted" hint or simply ignore it; the
+ * important part is that the schema knows about it so the log file
+ * reads cleanly on the next fetch (otherwise `ReadRunEvent` would
+ * reject the marker line and skip it).
+ */
+export const CompactionMarkerEvent = BaseRunEvent.extend({
+    type: z.literal("_compaction_marker"),
+    dropped: z.number().int().nonnegative(),
+});
+
+
 export const RunEvent = z.union([
     RunProcessingStartEvent,
     RunProcessingEndEvent,
@@ -103,6 +117,7 @@ export const RunEvent = z.union([
     ToolPermissionResponseEvent,
     RunErrorEvent,
     RunStoppedEvent,
+    CompactionMarkerEvent,
 ]);
 
 export const ToolPermissionAuthorizePayload = ToolPermissionResponseEvent.pick({

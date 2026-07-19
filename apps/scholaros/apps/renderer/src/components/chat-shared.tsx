@@ -1,11 +1,14 @@
 /**
- * Shared constants and small components used by every conversation renderer
- * (App.tsx main-pane chat AND chat-sidebar.tsx). Kept in one module so the
- * two rendering paths cannot drift.
+ * Shared chat helpers (streamdownComponents, SmoothStreamingMessage,
+ * userMessageRemarkPlugins, matchBillingError, BillingErrorCTA).
  *
- * NOTE: heavy conversation rendering logic still lives in App.tsx and
- * chat-sidebar.tsx as `renderConversationItem` — extracting that into a
- * shared component is tracked as a follow-up (see Plan 05).
+ * `StreamingMessage` is a self-subscribing variant of
+ * `SmoothStreamingMessage` that reads its text from the external
+ * streaming store via `useAssistantStream` so it re-renders
+ * independently of any prop changes. This is the key piece that
+ * breaks the App-wide re-render cascade on chat tokens: only the
+ * streaming message component re-renders when a new token arrives,
+ * not the conversation list, not the input, not the file tree.
  */
 import { useEffect, useState } from "react";
 import { defaultRemarkPlugins } from "streamdown";
@@ -13,6 +16,7 @@ import remarkBreaks from "remark-breaks";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
 import { useSmoothedText } from "@/hooks/useSmoothedText";
+import { useAssistantStream } from "@/contexts/chat-streaming-context";
 
 /** Custom streamdown components used for every markdown message. */
 export const streamdownComponents = { pre: MarkdownPreOverride };
@@ -43,6 +47,29 @@ export function SmoothStreamingMessage({
   return (
     <MessageResponse components={components}>{smoothText}</MessageResponse>
   );
+}
+
+/**
+ * Self-subscribing streaming message. Reads its text from the chat
+ * streaming store via `useAssistantStream` and only re-renders when
+ * the streaming text actually changes. Use this in any place that
+ * previously received `currentAssistantMessage` as a prop, so the
+ * component no longer participates in the parent re-render cascade.
+ *
+ * The optional `transform` prop is for stripping voice tags etc.
+ * (matches the previous inline `.replace(/<\/?voice>/g, "")`).
+ */
+export function StreamingMessage({
+  transform,
+  components = streamdownComponents,
+}: {
+  transform?: (text: string) => string;
+  components?: typeof streamdownComponents;
+}) {
+  const raw = useAssistantStream();
+  const text = transform ? transform(raw) : raw;
+  if (!text) return null;
+  return <SmoothStreamingMessage text={text} components={components} />;
 }
 
 /* ─── Billing error helpers ─────────────────────────────────────────────── */

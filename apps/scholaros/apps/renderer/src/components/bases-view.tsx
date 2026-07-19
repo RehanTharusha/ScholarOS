@@ -50,6 +50,8 @@ import {
   extractAllFrontmatterValues,
 } from "@/lib/frontmatter";
 import { useDebounce } from "@/hooks/use-debounce";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Table2 } from "lucide-react";
 
 interface TreeNode {
   path: string;

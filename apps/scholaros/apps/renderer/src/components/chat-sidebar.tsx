@@ -43,9 +43,6 @@ import {
   type FileMention,
 } from "@/components/ai-elements/prompt-input";
 import { FileCardProvider } from "@/contexts/file-card-context";
-import { MarkdownPreOverride } from "@/components/ai-elements/markdown-code-override";
-import { defaultRemarkPlugins } from "streamdown";
-import remarkBreaks from "remark-breaks";
 import { TabBar, type ChatTab } from "@/components/tab-bar";
 import {
   ChatResearchProgress,
@@ -58,11 +55,11 @@ import {
 } from "@/components/chat-input-with-mentions";
 import { ChatMessageAttachments } from "@/components/chat-message-attachments";
 import { wikiLabel } from "@/lib/wiki-links";
-import { useSmoothedText } from "@/hooks/useSmoothedText";
 import {
   streamdownComponents,
   userMessageRemarkPlugins,
   SmoothStreamingMessage,
+  StreamingMessage,
   matchBillingError,
   BillingErrorCTA,
 } from "@/components/chat-shared";
@@ -844,20 +841,13 @@ export function ChatSidebar({
                                 </Message>
                               )}
 
-                              {!tabState.currentToolDraftActive &&
-                                tabState.currentAssistantMessage && (
-                                  <Message from="assistant">
-                                    <MessageContent>
-                                      <SmoothStreamingMessage
-                                        text={tabState.currentAssistantMessage.replace(
-                                          /<\/?voice>/g,
-                                          "",
-                                        )}
-                                        components={streamdownComponents}
-                                      />
-                                    </MessageContent>
-                                  </Message>
-                                )}
+                              {tabState.currentToolDraftActive === false && (
+                                <StreamingMessage
+                                  transform={(t) =>
+                                    t.replace(/<\/?voice>/g, "")
+                                  }
+                                />
+                              )}
 
                               {isActive &&
                                 isProcessing &&

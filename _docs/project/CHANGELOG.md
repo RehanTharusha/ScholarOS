@@ -16,6 +16,13 @@ All notable features and capabilities of ScholarOS.
 - **Image optimization** — uploaded images >500KB are downscaled (max 1920px) and re-encoded as webp at 0.85 quality before being saved to `.assets/`, reducing editor state and markdown bloat
 - **LRU cache primitive** — `lib/lru-map.ts` plus `useLRUMap` React hook; ready for the editor-content bounded cache (Plan 01 §4)
 - **Perf monitor** — dev-only `useRenderCount` / `useMountCount` / `useStableDuration` helpers; drop into any component to count re-renders during profiling
+- **Streaming tokens route through external store** — new `lib/chat-streaming-store.ts` + `contexts/chat-streaming-context.tsx` use `useSyncExternalStore` so the `StreamingMessage` component re-renders on tokens independently of the App tree. The conversation list, file tree, header, and editor no longer participate in the token re-render cascade
+- **IPC timing instrumentation** — `registerIpcHandlers` in `apps/main/src/ipc.ts` now records duration and error status for every handler call. Slow (>100ms) or failed calls are stored in a 200-entry ring buffer exposed via `getSlowIpcEntries()` for the future Debug panel
+- **Crash resilience in main process** — `process.on('uncaughtException')`, `unhandledRejection`, and `warning'` handlers in `apps/main/src/main.ts` log and continue instead of killing the app. A dialog surfaces uncaught exceptions to the user
+- **`window.ipc` is now non-optional in the global type** — 81 "possibly undefined" TS errors eliminated in one shot
+- **`CompactionMarkerEvent` added to `RunEvent` Zod union** — NDJSON logs with the `_compaction_marker` line now read cleanly
+- **Status bar component** — new `components/ui/status-bar.tsx` with a `StatusBarProvider` and `useStatusBar` hook. Components can `push({id, kind, text, busy, ttlMs, progress})` to surface status in a persistent bottom strip
+
 - **Shared chat helpers** — `streamdownComponents`, `userMessageRemarkPlugins`, `SmoothStreamingMessage`, `matchBillingError`, `BillingErrorCTA` moved to a single `components/chat-shared.tsx` module. Both the main-pane chat (App.tsx) and the right-side chat (chat-sidebar.tsx) now import from it; the two rendering paths can no longer drift
 
 ## v0.1.5 (2026-06-05)

@@ -69,6 +69,52 @@ if (process.stderr) {
     }
     console.error("Stderr error:", err);
   });
+
+/**
+ * Process-level crash handlers. Without these, a single uncaught
+ * exception or unhandled promise rejection in the main process takes
+ * the entire app down — losing unsaved work, breaking long-running
+ * agents, and producing a frustrating experience.
+ *
+ * Strategy: log the error with full context, surface it to the user via
+ * a dialog (only for uncaughtException, since rejections are usually
+ * already-handled async errors), but do NOT exit. The next IPC roundtrip
+ * from the renderer that touches a broken subsystem will surface the
+ * actual error in a more useful place.
+ */
+process.on("uncaughtException", (err, origin) => {
+  console.error(
+    `[Main] UNCAUGHT EXCEPTION (${origin}). Continuing.\n${err.stack ?? err}`,
+  );
+  try {
+    // Show a dialog only if the app is initialized; otherwise it crashes.
+    if (app.isReady()) {
+      dialog.showErrorBox(
+        "ScholarOS hit an unexpected error",
+        `${err.message}\n\nThe error has been logged. You can keep working, but some features may be affected.`,
+      );
+    }
+  } catch {
+    // ignore - dialog may not be available
+  }
+});
+
+process.on("unhandledRejection", (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error(
+    `[Main] UNHANDLED PROMISE REJECTION. Continuing.\n${err.stack ?? err.message ?? err}`,
+  );
+  // Intentionally not showing a dialog here. Unhandled rejections are often
+  // benign (e.g., a fire-and-forget IPC that the renderer no longer cares
+  // about). Logging is enough; surfacing them as a modal would be noisy.
+});
+
+process.on("warning", (warning) => {
+  // Deprecation warnings, unhandled experimental flags, etc. Log to help
+  // diagnose issues without crashing the app.
+  console.warn(`[Main] Node warning: ${warning.name}: ${warning.message}`);
+});
+
 }
 
 // Clean up old ScholarOS cache/config on Squirrel install/update
