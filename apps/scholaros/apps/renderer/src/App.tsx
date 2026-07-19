@@ -6435,8 +6435,8 @@ function App() {
                       navigateToFile(path);
                     }}
                   >
-                    <div className="flex min-h-0 flex-1 flex-col">
-                      <div className="relative min-h-0 flex-1">
+                    <div className={cn("flex min-h-0 flex-1 flex-col", !hasConversation && "justify-center")}>
+                      <div className={cn("relative", hasConversation && "min-h-0 flex-1")}>
                         {chatTabs.map((tab) => {
                           const isActive = tab.id === activeChatTabId;
                           const tabState = getChatTabStateForRender(tab.id);
@@ -6447,7 +6447,7 @@ function App() {
                           const tabConversationContentClassName =
                             tabHasConversation
                               ? "mx-auto w-full max-w-4xl pb-28"
-                              : "mx-auto w-full max-w-4xl min-h-full items-center justify-center pb-0";
+                              : "mx-auto w-full max-w-4xl pb-0";
                           return (
                             <div
                               key={tab.id}
@@ -6467,13 +6467,13 @@ function App() {
                                 anchorRequestKey={
                                   chatViewportAnchorByTab[tab.id]?.requestKey
                                 }
-                                className="relative flex-1"
+                                className={tabHasConversation ? "relative flex-1" : "relative flex-none"}
                               >
                                 <ConversationContent
                                   className={tabConversationContentClassName}
                                 >
                                   {!tabHasConversation ? (
-                                    <Greeting />
+                                    <div className="h-auto"><Greeting /></div>
                                   ) : (
                                     <>
                                       {(() => {
@@ -6726,9 +6726,11 @@ function App() {
                         usage={modelUsage ?? undefined}
                         modelId={currentModelId ?? undefined}
                       >
-                      <div className="sticky bottom-0 z-10 bg-background pb-12 pt-0 shadow-lg">
-                        <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-t from-background to-transparent" />
-                        <div className="mx-auto w-full max-w-4xl px-4">
+                      <div className={cn(hasConversation ? "sticky bottom-0 z-10 bg-background pb-12 pt-0 shadow-lg" : "pb-4")}>
+                        {hasConversation && (
+                          <div className="pointer-events-none absolute inset-x-0 -top-6 h-6 bg-linear-to-t from-background to-transparent" />
+                        )}
+                        <div className="mx-auto w-full max-w-4xl px-4 pt-6">
                           {!hasConversation && (
                             <Suggestions
                               onSelect={setPresetMessage}

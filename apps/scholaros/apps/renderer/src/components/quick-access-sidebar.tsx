@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef, useLayoutEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -231,7 +231,31 @@ export function QuickAccessSidebar({
   onReorder,
   onValidateItem,
 }: QuickAccessSidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("scholaros-quick-access-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("scholaros-quick-access-collapsed", String(isCollapsed));
+    } catch {
+      // ignore
+    }
+  }, [isCollapsed]);
+
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (contentRef.current) {
+      setContentHeight(contentRef.current.scrollHeight);
+    }
+  }, [items]);
+
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -283,52 +307,60 @@ export function QuickAccessSidebar({
           Quick Access
         </span>
       </button>
-      {!isCollapsed && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={items.map((i) => i.id)}
-            strategy={verticalListSortingStrategy}
+      <div
+        className="overflow-hidden transition-all duration-150 ease-[cubic-bezier(0.2,0.9,0.2,1)]"
+        style={{
+          maxHeight: isCollapsed ? "0px" : contentHeight !== null ? `${contentHeight}px` : undefined,
+          opacity: isCollapsed ? 0 : 1,
+        }}
+      >
+        <div ref={contentRef}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
           >
-            {items.map((item) => (
-              <QuickAccessItemRow
-                key={item.id}
-                item={item}
-                expandedPaths={expandedPaths}
-                onSelectFile={onSelectFile}
-                onEnsureFolderExpanded={onEnsureFolderExpanded}
-                onToggleFolder={onToggleFolder}
-                onRemove={onRemove}
-                onRename={onRename}
-                onValidateItem={onValidateItem}
-              />
-            ))}
-          </SortableContext>
-          <DragOverlay>
-            {activeItem && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-sidebar-accent shadow-md text-sm text-sidebar-foreground">
-                {activeItem.type === "course" || activeItem.type === "detected" ? (
-                  <span
-                    className="size-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: activeItem.color || "#3B82F6" }}
-                  />
-                ) : activeItem.path.includes(".") && !activeItem.path.endsWith("/") ? (
-                  fileIcon(activeItem.path)
-                ) : (
-                  <Folder className="size-3.5 text-sidebar-foreground/60" />
-                )}
-                <span className="truncate max-w-40 text-xs">
-                  {activeItem.customName || activeItem.name}
-                </span>
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
-      )}
+            <SortableContext
+              items={items.map((i) => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {items.map((item) => (
+                <QuickAccessItemRow
+                  key={item.id}
+                  item={item}
+                  expandedPaths={expandedPaths}
+                  onSelectFile={onSelectFile}
+                  onEnsureFolderExpanded={onEnsureFolderExpanded}
+                  onToggleFolder={onToggleFolder}
+                  onRemove={onRemove}
+                  onRename={onRename}
+                  onValidateItem={onValidateItem}
+                />
+              ))}
+            </SortableContext>
+            <DragOverlay>
+              {activeItem && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-sidebar-accent shadow-md text-sm text-sidebar-foreground">
+                  {activeItem.type === "course" || activeItem.type === "detected" ? (
+                    <span
+                      className="size-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: activeItem.color || "#3B82F6" }}
+                    />
+                  ) : activeItem.path.includes(".") && !activeItem.path.endsWith("/") ? (
+                    fileIcon(activeItem.path)
+                  ) : (
+                    <Folder className="size-3.5 text-sidebar-foreground/60" />
+                  )}
+                  <span className="truncate max-w-40 text-xs">
+                    {activeItem.customName || activeItem.name}
+                  </span>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        </div>
+      </div>
     </div>
   );
 }
