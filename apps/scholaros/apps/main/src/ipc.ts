@@ -25,6 +25,26 @@ const mammoth = (mammothModule as any).default || mammothModule;
 
 const execAsync = promisify(exec);
 
+/**
+ * Discriminated-union result type for IPC handlers. Handlers can
+ * return `ok(data)` or `err(code, message)` instead of throwing, so
+ * the renderer can branch on `result.ok` rather than wrapping every
+ * call in a try/catch.
+ *
+ * Throwing is still allowed (and still wrapped by the
+ * registerIpcHandlers timing/error wrapper for logging). This is
+ * an opt-in for handlers that want explicit success/failure paths.
+ */
+export type IpcResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: string; message: string } };
+
+export const ok = <T>(data: T): IpcResult<T> => ({ ok: true, data });
+export const err = (code: string, message: string): IpcResult<never> => ({
+  ok: false,
+  error: { code, message },
+});
+
 import { RunEvent } from "@scholaros/shared/dist/runs.js";
 import { ServiceEvent } from "@scholaros/shared/dist/service-events.js";
 import container from "@scholaros/core/dist/di/container.js";

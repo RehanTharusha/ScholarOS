@@ -52,7 +52,9 @@ import {
   DEFAULT_BASE_CONFIG,
 } from "@/components/bases-view";
 import { useDebounce } from "./hooks/use-debounce";
+import { useEditorContentStore } from "./hooks/use-editor-content-store";
 import { SidebarContentPanel } from "@/components/sidebar-content";
+import { applyTreePatch as applyTreePatchOp } from "@/lib/tree-patch";
 import { SuggestedTopicsView } from "@/components/suggested-topics-view";
 import { ArtifactsView } from "@/components/artifacts-view";
 import { CanvasesView } from "@/components/canvases-view";
@@ -710,11 +712,32 @@ function App() {
   const [fileContent, setFileContent] = useState<string>("");
   const [editorContent, setEditorContent] = useState<string>("");
   const editorContentRef = useRef<string>("");
-  const [editorContentByPath, setEditorContentByPath] = useState<
-    Record<string, string>
-  >({});
-  const editorContentByPathRef = useRef<Map<string, string>>(new Map());
+  // Per-file editor content store (single source of truth, was previously
+  // duplicated as editorContentByPath (state) + editorContentByPathRef
+  // (ref)). See hooks/use-editor-content-store.ts for the API.
+  const editorStore = useEditorContentStore();
   const [tree, setTree] = useState<TreeNode[]>([]);
+  // Map<path, TreeNode> kept in sync with `tree` for O(1) lookups and
+  // incremental updates from workspace:didChange events.
+  const treeMapRef = useRef<Map<string, TreeNode>>(new Map());
+
+  /**
+   * Replace the rendered tree and re-sync the lookup map. Callers
+   * should use this instead of setTree directly so the map never
+   * drifts out of sync with the rendered tree.
+   */
+  const setTreeAndMap = useCallback((next: TreeNode[]) => {
+    const map = new Map<string, TreeNode>();
+    const walk = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        map.set(n.path, n);
+        if (n.children) walk(n.children);
+      }
+    };
+    walk(next);
+    treeMapRef.current = map;
+    setTree(next);
+  }, []);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [recentWikiFiles, setRecentWikiFiles] = useState<string[]>([]);
   const [isGraphOpen, setIsGraphOpen] = useState(false);
@@ -1493,7 +1516,27 @@ function App() {
       const needsTreeReload =
         event.type !== "changed";
       if (needsTreeReload) {
-        loadDirectory().then(setTree);
+        // Try the incremental patcher first for single events. It
+        // mutates the tree map in place without touching the disk
+        // and avoids the cost of a full recursive readdir. Fall back
+        // to loadDirectory() only for events the patcher cannot handle
+        // (moves, bulkChanged) where we may be missing per-file stat data.
+        let patched = false;
+        if (event.type === "created" || event.type === "deleted") {
+          const stat = async (p: string) => {
+            try { return await window.ipc.invoke("workspace:stat", { path: p }); }
+            catch { return null; }
+          };
+          patched = applyTreePatchOp(treeMapRef.current, event, stat);
+        }
+        if (patched) {
+          const fresh = Array.from(treeMapRef.current.values())
+            .filter((n) => !n.path.includes("/"))
+            .map((n) => ({ ...n }));
+          setTreeAndMap(sortNodes(fresh));
+        } else {
+          loadDirectory().then(setTreeAndMap);
+        }
       }
 
       const changedPath = event.type === "changed" ? event.path : null;
@@ -6232,7 +6275,7 @@ function App() {
                             versionHistoryPath === tab.path;
                           const tabContent = isViewingHistory
                             ? viewingHistoricalVersion.content
-                            : (editorContentByPath[tab.path] ??
+                            : (editorStore.get(tab.path) ??
                               (isActive && editorPathRef.current === tab.path
                                 ? editorContent
                                 : ""));
@@ -6241,7 +6284,9 @@ function App() {
                               key={tab.id}
                               className={cn(
                                 "min-h-0 flex-1 flex-col overflow-hidden",
-                                isActive ? "flex" : "hidden",
+                                isActive
+                                  ? "flex"
+                                  : "flex [content-visibility:auto] [contain-intrinsic-size:1px_800px]",
                               )}
                               data-file-tab-panel={tab.id}
                               aria-hidden={!isActive}

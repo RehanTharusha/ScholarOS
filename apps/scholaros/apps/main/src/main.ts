@@ -49,6 +49,43 @@ import pkg from "../package.json" with { type: "json" };
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+/**
+ * Memory pressure sampler. Samples process.memoryUsage() every
+ * 30s and warns (or pushes a `main:mempressure` IPC event) if RSS
+ * exceeds 1.5GB. The main process can leak memory in long-running
+ * sessions â€” a 24h session can easily reach 2-3GB if not watched.
+ *
+ * The thresholds are conservative; tune in production.
+ */
+const MEM_PRESSURE_WARN_MB = 1500;
+const MEM_PRESSURE_CRITICAL_MB = 2200;
+const MEM_SAMPLE_INTERVAL_MS = 30_000;
+
+let lastMemWarnMB = 0;
+const memSampler = setInterval(() => {
+  const rssMB = Math.round(process.memoryUsage().rss / 1024 / 1024);
+  if (rssMB >= MEM_PRESSURE_CRITICAL_MB) {
+    console.warn(
+      `[Main] CRITICAL memory pressure: ${rssMB}MB RSS. ` +
+        `Consider restarting the app.`,
+    );
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && win.webContents) {
+        win.webContents.send("main:mempressure", { level: "critical", rssMB });
+      }
+    }
+  } else if (rssMB >= MEM_PRESSURE_WARN_MB && rssMB - lastMemWarnMB >= 100) {
+    lastMemWarnMB = rssMB;
+    console.warn(`[Main] memory pressure: ${rssMB}MB RSS`);
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && win.webContents) {
+        win.webContents.send("main:mempressure", { level: "warn", rssMB });
+      }
+    }
+  }
+}, MEM_SAMPLE_INTERVAL_MS);
+memSampler.unref?.();
+
 // Handle EPIPE errors that can occur when stdout/stderr pipes are closed
 // (e.g., when running under concurrently with broken pipes)
 // This must be done very early to catch any errors from initialization code
