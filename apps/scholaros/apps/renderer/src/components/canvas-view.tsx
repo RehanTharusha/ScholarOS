@@ -615,6 +615,19 @@ export function CanvasView({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (editingNodeId) return;
+      // Defer to native undo / delete when the user is typing in
+      // a text input or contentEditable (sidebar search, rename,
+      // etc). Without this guard every Delete / Ctrl+Z in any input
+      // would be hijacked by the canvas.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA")
+      ) {
+        return;
+      }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (contextMenu) {
           closeContextMenuRef.current();

@@ -1331,24 +1331,20 @@ function App() {
     runIdRef.current = runId;
   }, [runId]);
 
-  const setEditorCacheForPath = useCallback((path: string, content: string) => {
-    editorContentByPathRef.current.set(path, content);
-    setEditorContentByPath((prev) => {
-      if (prev[path] === content) return prev;
-      return { ...prev, [path]: content };
-    });
-  }, []);
+  const setEditorCacheForPath = useCallback(
+    (path: string, content: string) => {
+      editorStore.set(path, content);
+    },
+    [editorStore],
+  );
 
-  const removeEditorCacheForPath = useCallback((path: string) => {
-    editorContentByPathRef.current.delete(path);
-    untitledRenameReadyPathsRef.current.delete(path);
-    setEditorContentByPath((prev) => {
-      if (!(path in prev)) return prev;
-      const next = { ...prev };
-      delete next[path];
-      return next;
-    });
-  }, []);
+  const removeEditorCacheForPath = useCallback(
+    (path: string) => {
+      editorStore.delete(path);
+      untitledRenameReadyPathsRef.current.delete(path);
+    },
+    [editorStore],
+  );
 
   const markRecentLocalMarkdownWrite = useCallback((path: string) => {
     if (!path.endsWith(".md")) return;
@@ -1458,7 +1454,7 @@ function App() {
       editorContentRef.current = "";
       initialContentRef.current = "";
       editorPathRef.current = null;
-      editorContentByPathRef.current.clear();
+      editorStore.clear();
       initialContentByPathRef.current.clear();
       frontmatterByPathRef.current.clear();
     },
@@ -1697,7 +1693,7 @@ function App() {
       return;
     }
     if (selectedPath.endsWith(".md")) {
-      const cachedContent = editorContentByPathRef.current.get(selectedPath);
+      const cachedContent = editorStore.get(selectedPath);
       const hasBaseline = initialContentByPathRef.current.has(selectedPath);
       // Only trust cache after we've loaded/saved this file at least once.
       // This avoids a first-open race where an early empty editor update can poison the cache.
@@ -1915,7 +1911,7 @@ function App() {
                 frontmatterByPathRef.current.set(targetPath, fmEntry ?? null);
                 initialContentByPathRef.current.delete(pathAtStart);
                 const cachedContent =
-                  editorContentByPathRef.current.get(pathAtStart);
+                  editorStore.get(pathAtStart);
                 if (cachedContent !== undefined) {
                   const rewrittenCachedContent =
                     rewriteWikiLinksForRenamedFileInMarkdown(
@@ -1923,23 +1919,23 @@ function App() {
                       pathAtStart,
                       targetPath,
                     );
-                  editorContentByPathRef.current.delete(pathAtStart);
-                  editorContentByPathRef.current.set(
+                  editorStore.delete(pathAtStart);
+                  editorStore.set(
                     targetPath,
                     rewrittenCachedContent,
                   );
-                  setEditorContentByPath((prev) => {
-                    const oldContent = prev[pathAtStart];
-                    if (oldContent === undefined) return prev;
-                    const next = { ...prev };
-                    delete next[pathAtStart];
-                    next[targetPath] = rewriteWikiLinksForRenamedFileInMarkdown(
-                      oldContent,
-                      pathAtStart,
-                      targetPath,
-                    );
-                    return next;
-                  });
+                  editorStore.delete(pathAtStart); {
+
+
+
+
+
+
+
+
+
+
+}
                 }
                 if (selectedPathRef.current === pathAtStart) {
                   const bodyForEditor = splitFrontmatter(contentToSave).body;
@@ -5171,18 +5167,18 @@ function App() {
               rewriteForRename(baseline),
             );
           }
-          const cachedContent = editorContentByPathRef.current.get(oldPath);
+          const cachedContent = editorStore.get(oldPath);
           if (cachedContent !== undefined) {
             const rewrittenCachedContent = rewriteForRename(cachedContent);
-            editorContentByPathRef.current.delete(oldPath);
-            editorContentByPathRef.current.set(newPath, rewrittenCachedContent);
-            setEditorContentByPath((prev) => {
-              if (!(oldPath in prev)) return prev;
-              const next = { ...prev };
-              delete next[oldPath];
-              next[newPath] = rewriteForRename(cachedContent);
-              return next;
-            });
+            editorStore.delete(oldPath);
+            editorStore.set(newPath, rewrittenCachedContent);
+            editorStore.delete(oldPath); {
+
+
+
+
+
+}
           }
           if (selectedPath === oldPath) {
             const rewrittenEditorContent = rewriteForRename(
@@ -5328,8 +5324,8 @@ function App() {
           editorPathRef.current = notePath;
           initialContentRef.current = body;
           initialContentByPathRef.current.set(notePath, body);
-          setEditorContentByPath((prev) => ({ ...prev, [notePath]: body }));
-          editorContentByPathRef.current.set(notePath, body);
+           editorStore.set(notePath, body);
+          editorStore.set(notePath, body);
           // Bump editor session to force TipTap to pick up the new content
           setEditorSessionByTabId((prev) => ({
             ...prev,

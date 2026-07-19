@@ -74,17 +74,20 @@ export function TabBar<T>({
             >
               <span className="truncate flex-1 text-left">{title}</span>
               {(allowSingleTabClose || tabs.length > 1) && (
-                <span
-                  role="button"
-                  className="shrink-0 flex items-center justify-center rounded-sm p-0.5 opacity-0 group-hover/tab:opacity-60 hover:opacity-100! hover:bg-foreground/10 transition-all"
+                <button
+                  type="button"
+                  title="Close tab"
+                  aria-label="Close tab"
+                  className="shrink-0 flex items-center justify-center rounded-sm p-0.5 opacity-0 group-hover/tab:opacity-60 hover:opacity-100! hover:bg-foreground/10 transition-all cursor-pointer"
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
+                    e.preventDefault();
                     onCloseTab(tabId);
                   }}
-                  aria-label="Close tab"
                 >
                   <X className="size-3" />
-                </span>
+                </button>
               )}
             </button>
             {/* Right edge divider after last tab to close off the section */}
