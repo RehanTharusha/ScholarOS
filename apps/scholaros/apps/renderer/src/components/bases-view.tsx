@@ -872,11 +872,12 @@ export function BasesView({
             ))}
             {pageNotes.length === 0 && (
               <tr>
-                <td
-                  colSpan={visibleColumns.length}
-                  className="px-4 py-8 text-center text-muted-foreground"
-                >
-                  No notes found
+                <td colSpan={visibleColumns.length} className="p-0">
+                  <EmptyState
+                    icon={<Table2 className="size-5" />}
+                    title="No matching notes"
+                    description="Try clearing your filters or create a new note to see it here."
+                  />
                 </td>
               </tr>
             )}

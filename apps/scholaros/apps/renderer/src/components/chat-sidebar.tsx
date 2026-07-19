@@ -60,6 +60,13 @@ import { ChatMessageAttachments } from "@/components/chat-message-attachments";
 import { wikiLabel } from "@/lib/wiki-links";
 import { useSmoothedText } from "@/hooks/useSmoothedText";
 import {
+  streamdownComponents,
+  userMessageRemarkPlugins,
+  SmoothStreamingMessage,
+  matchBillingError,
+  BillingErrorCTA,
+} from "@/components/chat-shared";
+import {
   type ChatViewportAnchorState,
   type ChatTabViewState,
   type ConversationItem,
@@ -74,80 +81,6 @@ import {
   parseAttachedFiles,
 } from "@/lib/chat-conversation";
 
-const streamdownComponents = { pre: MarkdownPreOverride };
-
-function SmoothStreamingMessage({
-  text,
-  components,
-}: {
-  text: string;
-  components: typeof streamdownComponents;
-}) {
-  const smoothText = useSmoothedText(text);
-  return (
-    <MessageResponse components={components}>{smoothText}</MessageResponse>
-  );
-}
-
-// Render user messages with markdown so bullets, bold, links, etc. survive the
-// round-trip from the input textarea. `remarkBreaks` turns single newlines
-// into <br> so typed line breaks are preserved without requiring blank lines.
-const userMessageRemarkPlugins = [
-  ...Object.values(defaultRemarkPlugins),
-  remarkBreaks,
-];
-
-/* ─── Billing error helpers ─── */
-
-const BILLING_ERROR_PATTERNS = [
-  {
-    pattern: /upgrade required/i,
-    title: "A subscription is required",
-    subtitle: "Get started with a plan to access AI features in ScholarOS.",
-    cta: "Subscribe",
-  },
-  {
-    pattern: /not enough credits/i,
-    title: "You've run out of credits",
-    subtitle:
-      "Upgrade your plan for more credits, or wait for your billing cycle to reset.",
-    cta: "Upgrade plan",
-  },
-  {
-    pattern: /subscription not active/i,
-    title: "Your subscription is inactive",
-    subtitle: "Reactivate your subscription to continue using AI features.",
-    cta: "Reactivate",
-  },
-] as const;
-
-function matchBillingError(message: string) {
-  return (
-    BILLING_ERROR_PATTERNS.find(({ pattern }) => pattern.test(message)) ?? null
-  );
-}
-
-function BillingErrorCTA({ label }: { label: string }) {
-  const [appUrl, setAppUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    window.ipc
-      .invoke("account:getAccount", null)
-      .then((account) => setAppUrl(account.config?.appUrl ?? null))
-      .catch(() => {});
-  }, []);
-
-  if (!appUrl) return null;
-
-  return (
-    <button
-      onClick={() => window.open(`${appUrl}?intent=upgrade`)}
-      className="mt-1 rounded-md bg-amber-500/20 dark:bg-amber-400/15 px-3 py-1.5 text-xs font-medium text-amber-100 dark:text-amber-200 transition-colors hover:bg-amber-500/30 dark:hover:bg-amber-400/25"
-    >
-      {label}
-    </button>
-  );
-}
 
 const MIN_WIDTH = 360;
 const MAX_WIDTH = 1600;

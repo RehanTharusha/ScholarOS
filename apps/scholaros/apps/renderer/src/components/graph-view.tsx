@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, Network } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/ui/empty-state'
 
 export type GraphNode = {
   id: string
@@ -790,8 +791,12 @@ export function GraphView({
       ) : null}
 
       {!error && nodes.length === 0 ? (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-          No notes found.
+        <div className="absolute inset-0 z-10 flex items-center justify-center">
+          <EmptyState
+            icon={<Network className="size-5" />}
+            title="No connections yet"
+            description="Create notes with [[wiki-links]] to see them appear as a graph."
+          />
         </div>
       ) : null}
 

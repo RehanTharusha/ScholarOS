@@ -4,6 +4,20 @@ All notable features and capabilities of ScholarOS.
 
 ---
 
+
+## Unreleased
+
+### Performance & Efficiency
+
+- **Code-split heavy views** — `BasesView`, `ArtifactsView`, `CalendarView`, `CanvasesView` are now lazy-loaded; previously they were pulled into the initial renderer bundle
+- **LoadingCard component** — new calm, structural loading skeleton (`page` / `card` / `list` variants) used by every lazy-chunk fallback. Replaces the previous `animate-pulse rounded-lg bg-muted/50` placeholder
+- **EmptyState component** — standardized empty-state UI per the design doc (icon + title + description + optional action), with proper `EmptyState` instances in graph, bases, and artifacts views
+- **NDJSON run-log compaction** — long-running agent runs no longer grow without bound; logs over 10MB are compacted in-place to keep the first 500 and last 2000 events with a `_compaction_marker` line
+- **Image optimization** — uploaded images >500KB are downscaled (max 1920px) and re-encoded as webp at 0.85 quality before being saved to `.assets/`, reducing editor state and markdown bloat
+- **LRU cache primitive** — `lib/lru-map.ts` plus `useLRUMap` React hook; ready for the editor-content bounded cache (Plan 01 §4)
+- **Perf monitor** — dev-only `useRenderCount` / `useMountCount` / `useStableDuration` helpers; drop into any component to count re-renders during profiling
+- **Shared chat helpers** — `streamdownComponents`, `userMessageRemarkPlugins`, `SmoothStreamingMessage`, `matchBillingError`, `BillingErrorCTA` moved to a single `components/chat-shared.tsx` module. Both the main-pane chat (App.tsx) and the right-side chat (chat-sidebar.tsx) now import from it; the two rendering paths can no longer drift
+
 ## v0.1.5 (2026-06-05)
 
 ### New Features

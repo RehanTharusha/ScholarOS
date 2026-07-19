@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Search, FileText, File as FileIcon } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingCard } from "@/components/ui/loading-card";
 
 interface ArtifactEntry {
   name: string;
@@ -187,34 +189,23 @@ export function ArtifactsView({
 
           {/* Grid */}
           {loading ? (
-            <div className="flex items-center justify-center py-24 text-muted-foreground/60 text-sm">
-              Loading artifacts...
+            <div className="py-12">
+              <LoadingCard rows={4} label="Loading artifacts" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              {searchQuery ? (
-                <>
-                  <p className="text-muted-foreground/60 text-sm mb-1">
-                    No artifacts match "{searchQuery}"
-                  </p>
-                  <p className="text-muted-foreground/40 text-xs">
-                    Try a different search term
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="size-12 rounded-2xl border border-dashed border-border flex items-center justify-center mb-4">
-                    <FileText className="size-6 text-muted-foreground/30" />
-                  </div>
-                  <p className="text-muted-foreground/60 text-sm mb-1">
-                    No artifacts yet
-                  </p>
-                  <p className="text-muted-foreground/40 text-xs">
-                    Create a revision guide or other document to see it here
-                  </p>
-                </>
-              )}
-            </div>
+            searchQuery ? (
+              <EmptyState
+                icon={<Search className="size-5" />}
+                title={`No artifacts match "${searchQuery}"`}
+                description="Try a different search term."
+              />
+            ) : (
+              <EmptyState
+                icon={<FileText className="size-5" />}
+                title="No artifacts yet"
+                description="Generated documents and exports will appear here."
+              />
+            )
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {filtered.map((artifact) => (

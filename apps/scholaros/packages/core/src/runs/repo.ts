@@ -31,6 +31,16 @@ const LegacyStartEvent = StartEvent.extend({
 });
 const ReadRunEvent = RunEvent.or(LegacyStartEvent);
 
+/**
+ * Log compaction: when a run's NDJSON log file exceeds {@link SOFT_LIMIT_BYTES}
+ * (10MB) it is rewritten to keep only the first {@link KEEP_HEAD} events
+ * (which include the start event) and the last {@link KEEP_TAIL} events
+ * (recent context). Middle events are dropped and replaced with a
+ * `_compaction_marker` line so consumers know the log was truncated.
+ */
+const KEEP_HEAD = 500;
+const KEEP_TAIL = 2000;
+
 export type CreateRunRepoOptions = Required<z.infer<typeof CreateRunOptions>>;
 
 export interface IRunsRepo {
@@ -193,11 +203,41 @@ export class FSRunsRepo implements IRunsRepo {
     runId: string,
     events: z.infer<typeof RunEvent>[],
   ): Promise<void> {
-    await fsp.mkdir(getScholarOSPath("runs"), { recursive: true });
+    const runsDir = getScholarOSPath("runs");
+    await fsp.mkdir(runsDir, { recursive: true });
+    const filePath = path.join(runsDir, `${runId}.jsonl`);
     await fsp.appendFile(
-      path.join(getScholarOSPath("runs"), `${runId}.jsonl`),
+      filePath,
       events.map((event) => JSON.stringify(event)).join("\n") + "\n",
     );
+
+    // Compact oversized logs so a long-running agent session does not
+    // grow without bound and eat memory + disk. We trim back to
+    // KEEP_HEAD + KEEP_TAIL events, preserving the start event (line 0)
+    // and recent context. Best-effort: any failure is logged but never
+    // fails the append.
+    try {
+      const stat = await fsp.stat(filePath);
+      const SOFT_LIMIT_BYTES = 10 * 1024 * 1024; // 10 MB
+      if (stat.size <= SOFT_LIMIT_BYTES) return;
+
+      const raw = await fsp.readFile(filePath, "utf8");
+      const lines = raw.split("\n").filter((l) => l.length > 0);
+      if (lines.length <= KEEP_HEAD + KEEP_TAIL) return;
+
+      const head = lines.slice(0, KEEP_HEAD);
+      const tail = lines.slice(lines.length - KEEP_TAIL);
+      const dropped = lines.length - KEEP_HEAD - KEEP_TAIL;
+      const marker = JSON.stringify({
+        type: "_compaction_marker",
+        dropped,
+        ts: new Date().toISOString(),
+      });
+      const compacted = [...head, marker, ...tail].join("\n") + "\n";
+      await fsp.writeFile(filePath, compacted);
+    } catch (err) {
+      console.warn("runs repo: log compaction failed", err);
+    }
   }
 
   async create(options: CreateRunRepoOptions): Promise<z.infer<typeof Run>> {
