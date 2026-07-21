@@ -34,6 +34,7 @@ import {
   Trash2,
   Inbox,
   LayoutGrid,
+  MessageSquare,
 } from "lucide-react";
 
 import {
@@ -1809,6 +1810,19 @@ function TasksSection({
               ))}
             </SidebarMenu>
           </>
+        )}
+        {runs.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 pt-12 text-center">
+            <MessageSquare className="size-8 text-muted-foreground/40" />
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                No chats yet
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground/60">
+                Start a new chat to begin
+              </p>
+            </div>
+          </div>
         )}
       </SidebarGroupContent>
 
