@@ -468,33 +468,7 @@ const normalizeUsage = (
 };
 
 // Sidebar folder ordering — listed folders appear in this order, unlisted ones follow alphabetically
-const FOLDER_ORDER = ["People", "Organizations", "Projects", "Topics"];
-
-/**
- * Per-folder base view config: which columns to show and default sort.
- * Folders not listed here fall back to DEFAULT_BASE_CONFIG.
- */
-const FOLDER_BASE_CONFIGS: Record<
-  string,
-  { visibleColumns: string[]; sort: { field: string; dir: "asc" | "desc" } }
-> = {
-  People: {
-    visibleColumns: ["name", "relationship", "organization", "mtimeMs"],
-    sort: { field: "name", dir: "asc" },
-  },
-  Organizations: {
-    visibleColumns: ["name", "relationship", "mtimeMs"],
-    sort: { field: "name", dir: "asc" },
-  },
-  Projects: {
-    visibleColumns: ["name", "status", "topic", "mtimeMs"],
-    sort: { field: "name", dir: "asc" },
-  },
-  Topics: {
-    visibleColumns: ["name", "mtimeMs"],
-    sort: { field: "name", dir: "asc" },
-  },
-};
+const FOLDER_ORDER = ["Courses", "Papers", "Research", "Concepts", "Resources"];
 
 // Sort nodes (dirs first, ordered folders by FOLDER_ORDER, then alphabetically)
 function sortNodes(nodes: TreeNode[]): TreeNode[] {
@@ -1429,7 +1403,7 @@ function App() {
       console.debug("[Renderer] loadDirectory: requesting root readdir");
       const rootEntries = await window.ipc.invoke("workspace:readdir", {
         path: "",
-        opts: { recursive: true, includeHidden: false, includeStats: false },
+        opts: { recursive: true, includeHidden: false, includeStats: true },
       });
       const visibleRootEntries = rootEntries.filter(
         (entry) => !isHiddenSidebarRootEntry(entry),
@@ -4926,17 +4900,13 @@ function App() {
     }
     if (parts.length === 1 && isKnowledgeRelPath(parts[0] + "/")) {
       const folderName = parts[0];
-      const folderCfg = FOLDER_BASE_CONFIGS[folderName];
       setBaseConfigByPath((prev) => ({
         ...prev,
         [BASES_DEFAULT_TAB_PATH]: {
           ...DEFAULT_BASE_CONFIG,
           name: folderName,
+          visibleColumns: ["name", "ext", "folder", "size", "mtimeMs"],
           filters: [{ category: "folder", value: folderName }],
-          ...(folderCfg && {
-            visibleColumns: folderCfg.visibleColumns,
-            sort: folderCfg.sort,
-          }),
         },
       }));
       if (

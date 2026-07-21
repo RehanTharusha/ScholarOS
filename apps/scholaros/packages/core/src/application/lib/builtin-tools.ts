@@ -1940,7 +1940,7 @@ export const BuiltinTools: z.infer<typeof BuiltinToolsSchema> = {
         .string()
         .optional()
         .describe(
-          "Knowledge file path for open-note, e.g. People/John.md",
+          "Knowledge file path for open-note, e.g. Courses/Biology 101/Lecture Notes.md",
         ),
       // open-view
       view: z

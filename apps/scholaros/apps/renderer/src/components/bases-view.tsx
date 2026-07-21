@@ -6,29 +6,19 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Check,
-  ListFilter,
-  Filter,
   Search,
   Save,
   Copy,
   Pencil,
   Trash2,
+  FileText,
+  FileIcon,
+  Image,
+  Music,
+  Video,
+  BookOpen,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandInput,
-  CommandList,
-  CommandItem,
-  CommandEmpty,
-  CommandGroup,
-} from "@/components/ui/command";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -61,12 +51,55 @@ interface TreeNode {
   stat?: { size: number; mtimeMs: number };
 }
 
-type NoteEntry = {
+const AUDIO_EXTS = new Set([".wav", ".mp3", ".m4a", ".ogg", ".flac", ".aac"]);
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico"]);
+const VIDEO_EXTS = new Set([".mp4", ".mov", ".avi", ".mkv", ".webm"]);
+const DOC_EXTS = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".rtf", ".csv"]);
+const CODE_EXTS = new Set([".js", ".ts", ".py", ".java", ".cpp", ".rs", ".go", ".rb", ".css", ".json", ".xml"]);
+
+type FileCategory = "md" | "pdf" | "html" | "code" | "image" | "audio" | "video" | "document" | "other";
+
+function getFileCategory(ext: string): FileCategory {
+  if (ext === ".md") return "md";
+  if (ext === ".pdf") return "pdf";
+  if (ext === ".html" || ext === ".htm") return "html";
+  if (CODE_EXTS.has(ext)) return "code";
+  if (IMAGE_EXTS.has(ext)) return "image";
+  if (AUDIO_EXTS.has(ext)) return "audio";
+  if (VIDEO_EXTS.has(ext)) return "video";
+  if (DOC_EXTS.has(ext)) return "document";
+  return "other";
+}
+
+function getFileIcon(cat: FileCategory) {
+  switch (cat) {
+    case "md": return BookOpen;
+    case "pdf": return FileText;
+    case "html": return FileText;
+    case "code": return FileIcon;
+    case "image": return Image;
+    case "audio": return Music;
+    case "video": return Video;
+    case "document": return FileText;
+    case "other": return FileIcon;
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+type FileEntry = {
   path: string;
   name: string;
+  ext: string;
   folder: string;
   rootFolder: string;
   fields: Record<string, string | string[]>;
+  size: number;
   mtimeMs: number;
 };
 
@@ -82,15 +115,8 @@ export type BaseConfig = {
 };
 
 export const DEFAULT_BASE_CONFIG: BaseConfig = {
-  name: "All Notes",
-  visibleColumns: [
-    "name",
-    "folder",
-    "relationship",
-    "topic",
-    "status",
-    "mtimeMs",
-  ],
+  name: "All Files",
+  visibleColumns: ["name", "ext", "folder", "size", "mtimeMs"],
   columnWidths: {},
   sort: { field: "mtimeMs", dir: "desc" },
   filters: [],
@@ -99,19 +125,23 @@ export const DEFAULT_BASE_CONFIG: BaseConfig = {
 const PAGE_SIZE = 25;
 
 /** Built-in columns that don't come from frontmatter */
-const BUILTIN_COLUMNS = ["name", "folder", "mtimeMs"] as const;
+const BUILTIN_COLUMNS = ["name", "ext", "folder", "size", "mtimeMs"] as const;
 type BuiltinColumn = (typeof BUILTIN_COLUMNS)[number];
 
 const BUILTIN_LABELS: Record<BuiltinColumn, string> = {
   name: "Name",
+  ext: "Type",
   folder: "Folder",
+  size: "Size",
   mtimeMs: "Last Modified",
 };
 
 /** Default pixel widths for columns */
 const DEFAULT_WIDTHS: Record<string, number> = {
-  name: 200,
-  folder: 140,
+  name: 240,
+  ext: 70,
+  folder: 160,
+  size: 90,
   mtimeMs: 140,
 };
 const DEFAULT_FRONTMATTER_WIDTH = 150;
@@ -146,14 +176,16 @@ type BasesViewProps = {
 
 function collectFiles(
   nodes: TreeNode[],
-): { path: string; name: string; mtimeMs: number }[] {
+): { path: string; name: string; ext: string; mtimeMs: number; size: number }[] {
   return nodes.flatMap((n) =>
-    n.kind === "file" && n.name.endsWith(".md")
+    n.kind === "file"
       ? [
           {
             path: n.path,
-            name: n.name.replace(/\.md$/i, ""),
+            name: n.name.replace(/\.[^.]+$/, ""),
+            ext: (n.name.match(/\.[^.]+$/) || [""])[0].toLowerCase(),
             mtimeMs: n.stat?.mtimeMs ?? 0,
+            size: n.stat?.size ?? 0,
           },
         ]
       : n.children
@@ -191,10 +223,12 @@ function hasFilter(filters: ActiveFilter[], f: ActiveFilter): boolean {
   return filters.some((x) => filtersEqual(x, f));
 }
 
-/** Get the string values for a column from a note */
-function getColumnValues(note: NoteEntry, column: string): string[] {
+/** Get the string values for a column from a file entry */
+function getColumnValues(note: FileEntry, column: string): string[] {
   if (column === "name") return [note.name];
+  if (column === "ext") return [note.ext];
   if (column === "folder") return [note.folder];
+  if (column === "size") return [];
   if (column === "mtimeMs") return [];
   const v = note.fields[column];
   if (!v) return [];
@@ -202,18 +236,17 @@ function getColumnValues(note: NoteEntry, column: string): string[] {
 }
 
 /** Get a single sortable string for a column */
-function getSortValue(note: NoteEntry, column: string): string | number {
+function getSortValue(note: FileEntry, column: string): string | number {
   if (column === "name") return note.name;
+  if (column === "ext") return note.ext;
   if (column === "folder") return note.folder;
+  if (column === "size") return note.size;
   if (column === "mtimeMs") return note.mtimeMs;
   const v = note.fields[column];
   if (!v) return "";
-  if (column === "last_update" || column === "first_met") {
-    const s = Array.isArray(v) ? (v[0] ?? "") : v;
-    const ms = Date.parse(s);
-    return isNaN(ms) ? 0 : ms;
-  }
-  return Array.isArray(v) ? (v[0] ?? "") : v;
+  const s = Array.isArray(v) ? (v[0] ?? "") : v;
+  const ms = Date.parse(s);
+  return isNaN(ms) ? s : ms;
 }
 
 export function BasesView({
@@ -227,19 +260,21 @@ export function BasesView({
   onExternalSearchConsumed,
   actions,
 }: BasesViewProps) {
-  // Build notes instantly from tree
-  const notes = useMemo<NoteEntry[]>(() => {
+  // Build file entries instantly from tree
+  const files = useMemo<FileEntry[]>(() => {
     return collectFiles(tree).map((f) => ({
       path: f.path,
       name: f.name,
+      ext: f.ext,
       folder: getFolderPath(f.path),
       rootFolder: getRootFolder(f.path),
       fields: {},
+      size: f.size,
       mtimeMs: f.mtimeMs,
     }));
   }, [tree]);
 
-  // Frontmatter fields loaded async, keyed by path
+  // Frontmatter fields loaded async, keyed by path (MD files only)
   const [fieldsByPath, setFieldsByPath] = useState<
     Map<string, Record<string, string | string[]>>
   >(new Map());
@@ -249,25 +284,25 @@ export function BasesView({
   useEffect(() => {
     const gen = ++loadGenRef.current;
     let cancelled = false;
-    const paths = notes.map((n) => n.path);
+    const mdFiles = files.filter((f) => f.ext === ".md");
 
     async function load() {
       const BATCH = 30;
-      for (let i = 0; i < paths.length; i += BATCH) {
+      for (let i = 0; i < mdFiles.length; i += BATCH) {
         if (cancelled) return;
-        const batch = paths.slice(i, i + BATCH);
+        const batch = mdFiles.slice(i, i + BATCH);
         const results = await Promise.all(
-          batch.map(async (p) => {
+          batch.map(async (f) => {
             try {
               const result = await window.ipc.invoke("workspace:readFile", {
-                path: p,
+                path: f.path,
                 encoding: "utf8",
               });
               const { raw } = splitFrontmatter(result.data);
-              return { path: p, fields: extractAllFrontmatterValues(raw) };
+              return { path: f.path, fields: extractAllFrontmatterValues(raw) };
             } catch {
               return {
-                path: p,
+                path: f.path,
                 fields: {} as Record<string, string | string[]>,
               };
             }
@@ -286,48 +321,59 @@ export function BasesView({
     return () => {
       cancelled = true;
     };
-  }, [notes]);
+  }, [files]);
 
-  // Merge tree-derived notes with async-loaded fields
-  const enrichedNotes = useMemo<NoteEntry[]>(() => {
-    if (fieldsByPath.size === 0) return notes;
-    return notes.map((n) => {
+  // Merge tree-derived files with async-loaded fields
+  const enrichedFiles = useMemo<FileEntry[]>(() => {
+    if (fieldsByPath.size === 0) return files;
+    return files.map((n) => {
       const f = fieldsByPath.get(n.path);
       return f ? { ...n, fields: f } : n;
     });
-  }, [notes, fieldsByPath]);
+  }, [files, fieldsByPath]);
 
-  // Collect all unique frontmatter property keys across all notes
-  const allPropertyKeys = useMemo<string[]>(() => {
-    const keys = new Set<string>();
-    for (const fields of fieldsByPath.values()) {
-      for (const k of Object.keys(fields)) keys.add(k);
+  const [activeTypeFilter, setActiveTypeFilter] = useState<FileCategory | "all">("md");
+
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const file of enrichedFiles) {
+      const cat = getFileCategory(file.ext);
+      counts[cat] = (counts[cat] ?? 0) + 1;
     }
-    return Array.from(keys).sort();
-  }, [fieldsByPath]);
+    return counts;
+  }, [enrichedFiles]);
 
-  // Filterable categories: "folder" + all frontmatter keys
-  const filterCategories = useMemo<string[]>(() => {
-    return ["folder", ...allPropertyKeys];
-  }, [allPropertyKeys]);
+  const rootFolders = useMemo(() => {
+    const set = new Set<string>();
+    for (const file of enrichedFiles) {
+      if (file.rootFolder) set.add(file.rootFolder);
+    }
+    return Array.from(set).sort();
+  }, [enrichedFiles]);
 
-  // All unique values per category, across all enriched notes
-  const valuesByCategory = useMemo<Record<string, string[]>>(() => {
-    const result: Record<string, Set<string>> = {};
-    for (const cat of filterCategories) result[cat] = new Set();
-    for (const note of enrichedNotes) {
-      for (const cat of filterCategories) {
-        for (const v of getColumnValues(note, cat)) {
-          if (v) result[cat]?.add(v);
-        }
+  const FILTER_CATEGORIES: { key: FileCategory | "all"; label: string }[] = useMemo(() => {
+    const cats: { key: FileCategory | "all"; label: string }[] = [{ key: "all", label: "All" }];
+    const order: [FileCategory, string][] = [
+      ["md", "MD"],
+      ["pdf", "PDF"],
+      ["html", "HTML"],
+      ["code", "Code"],
+      ["image", "Image"],
+      ["document", "Document"],
+      ["audio", "Audio"],
+      ["video", "Video"],
+    ];
+    for (const [cat, label] of order) {
+      if ((typeCounts[cat] ?? 0) > 0) {
+        cats.push({ key: cat, label });
       }
     }
-    const out: Record<string, string[]> = {};
-    for (const [cat, set] of Object.entries(result)) {
-      out[cat] = Array.from(set).sort((a, b) => a.localeCompare(b));
+    const otherCount = typeCounts["other"] ?? 0;
+    if (otherCount > 0) {
+      cats.push({ key: "other", label: "Other" });
     }
-    return out;
-  }, [filterCategories, enrichedNotes]);
+    return cats;
+  }, [typeCounts]);
 
   const visibleColumns = config.visibleColumns;
   const columnWidths = config.columnWidths;
@@ -338,7 +384,6 @@ export function BasesView({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const saveInputRef = useRef<HTMLInputElement>(null);
-  const [filterCategory, setFilterCategory] = useState<string | null>(null);
 
   const handleSaveClick = useCallback(() => {
     if (isDefaultBase) {
@@ -411,14 +456,12 @@ export function BasesView({
   );
 
   // Search
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Apply external search from app-navigation tool
   useEffect(() => {
     if (externalSearch !== undefined) {
       setSearchQuery(externalSearch);
-      setSearchOpen(true);
       onExternalSearchConsumed?.();
     }
   }, [externalSearch, onExternalSearchConsumed]);
@@ -453,32 +496,21 @@ export function BasesView({
     };
   }, [debouncedSearch]);
 
-  const toggleSearch = useCallback(() => {
-    setSearchOpen((prev) => {
-      if (prev) {
-        setSearchQuery("");
-        setSearchMatchPaths(null);
-      }
-      return !prev;
-    });
-  }, []);
-
-  // Focus input when search opens
-  useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus();
-  }, [searchOpen]);
-
   // Reset page when filters or search change
   useEffect(() => {
     setPage(0);
   }, [filters, searchMatchPaths]);
 
-  // Filter (search + badge filters)
-  const filteredNotes = useMemo(() => {
-    let result = enrichedNotes;
+  // Filter (search + type pill + badge filters)
+  const filteredFiles = useMemo(() => {
+    let result = enrichedFiles;
+    // Apply type pill filter
+    if (activeTypeFilter !== "all") {
+      result = result.filter((file) => getFileCategory(file.ext) === activeTypeFilter);
+    }
     // Apply search filter
     if (searchMatchPaths) {
-      result = result.filter((note) => searchMatchPaths.has(note.path));
+      result = result.filter((file) => searchMatchPaths.has(file.path));
     }
     // Apply badge filters
     if (filters.length > 0) {
@@ -488,32 +520,32 @@ export function BasesView({
         vals.push(f.value);
         byCategory.set(f.category, vals);
       }
-      result = result.filter((note) => {
+      result = result.filter((file) => {
         for (const [category, requiredValues] of byCategory) {
           if (category === "folder") {
             const folderMatches = requiredValues.some((value) => {
               const normalizedValue = value.replace(/\/+$/, "");
               return (
-                note.folder === normalizedValue ||
-                note.folder.startsWith(`${normalizedValue}/`) ||
-                note.path.startsWith(`${normalizedValue}/`)
+                file.folder === normalizedValue ||
+                file.folder.startsWith(`${normalizedValue}/`) ||
+                file.path.startsWith(`${normalizedValue}/`)
               );
             });
             if (!folderMatches) return false;
             continue;
           }
-          const noteValues = getColumnValues(note, category);
-          if (!requiredValues.some((v) => noteValues.includes(v))) return false;
+          const fileValues = getColumnValues(file, category);
+          if (!requiredValues.some((v) => fileValues.includes(v))) return false;
         }
         return true;
       });
     }
     return result;
-  }, [enrichedNotes, filters, searchMatchPaths]);
+  }, [enrichedFiles, activeTypeFilter, filters, searchMatchPaths]);
 
   // Sort
-  const sortedNotes = useMemo(() => {
-    return [...filteredNotes].sort((a, b) => {
+  const sortedFiles = useMemo(() => {
+    return [...filteredFiles].sort((a, b) => {
       const va = getSortValue(a, sortField);
       const vb = getSortValue(b, sortField);
       let cmp: number;
@@ -524,15 +556,15 @@ export function BasesView({
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filteredNotes, sortField, sortDir]);
+  }, [filteredFiles, sortField, sortDir]);
 
   // Paginate
-  const totalPages = Math.max(1, Math.ceil(sortedNotes.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sortedFiles.length / PAGE_SIZE));
   const clampedPage = Math.min(page, totalPages - 1);
-  const pageNotes = useMemo(
+  const pageFiles = useMemo(
     () =>
-      sortedNotes.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE),
-    [sortedNotes, clampedPage],
+      sortedFiles.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE),
+    [sortedFiles, clampedPage],
   );
 
   const toggleFilter = useCallback(
@@ -569,17 +601,6 @@ export function BasesView({
     [onConfigChange],
   );
 
-  const toggleColumn = useCallback(
-    (key: string) => {
-      const c = configRef.current;
-      const next = c.visibleColumns.includes(key)
-        ? c.visibleColumns.filter((col) => col !== key)
-        : [...c.visibleColumns, key];
-      onConfigChange({ ...c, visibleColumns: next });
-    },
-    [onConfigChange],
-  );
-
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return null;
     return sortDir === "asc" ? (
@@ -589,190 +610,27 @@ export function BasesView({
     );
   };
 
+  const SORT_OPTIONS: { field: string; label: string; defaultDir: SortDir }[] = [
+    { field: "name", label: "Name", defaultDir: "asc" },
+    { field: "mtimeMs", label: "Modified", defaultDir: "desc" },
+    { field: "ext", label: "Type", defaultDir: "asc" },
+    { field: "size", label: "Size", defaultDir: "desc" },
+  ];
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="shrink-0 border-b border-border px-4 py-2 flex items-center gap-3">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-              <ListFilter className="size-3.5" />
-              Properties
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-56 p-0">
-            <Command>
-              <CommandInput placeholder="Search properties..." />
-              <CommandList>
-                <CommandEmpty>No properties found.</CommandEmpty>
-                <CommandGroup heading="Built-in">
-                  {BUILTIN_COLUMNS.map((col) => (
-                    <CommandItem key={col} onSelect={() => toggleColumn(col)}>
-                      <Check
-                        className={cn(
-                          "size-3.5 mr-2",
-                          visibleColumns.includes(col)
-                            ? "opacity-100"
-                            : "opacity-0",
-                        )}
-                      />
-                      {BUILTIN_LABELS[col]}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-                <CommandGroup heading="Frontmatter">
-                  {allPropertyKeys.map((key) => (
-                    <CommandItem key={key} onSelect={() => toggleColumn(key)}>
-                      <Check
-                        className={cn(
-                          "size-3.5 mr-2",
-                          visibleColumns.includes(key)
-                            ? "opacity-100"
-                            : "opacity-0",
-                        )}
-                      />
-                      {toTitleCase(key)}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-
-        <Popover
-          onOpenChange={(open) => {
-            if (!open) setFilterCategory(null);
-          }}
-        >
-          <PopoverTrigger asChild>
-            <button
-              className={cn(
-                "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground",
-                filters.length > 0 && "text-foreground",
-              )}
-            >
-              <Filter className="size-3.5" />
-              Filter
-              {filters.length > 0 && (
-                <span className="rounded-full bg-primary text-primary-foreground px-1.5 text-[10px] font-medium leading-tight">
-                  {filters.length}
-                </span>
-              )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className={cn("p-0", filterCategory ? "w-[420px]" : "w-[200px]")}
-          >
-            <div className="flex h-[300px]">
-              {/* Left: categories */}
-              <div
-                className={cn(
-                  "overflow-auto",
-                  filterCategory
-                    ? "w-[160px] border-r border-border"
-                    : "flex-1",
-                )}
-              >
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                    Attributes
-                  </span>
-                  {filters.length > 0 && (
-                    <button
-                      onClick={clearFilters}
-                      className="text-[10px] text-muted-foreground hover:text-foreground"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-                {filterCategories.map((cat) => {
-                  const activeCount = filters.filter(
-                    (f) => f.category === cat,
-                  ).length;
-                  const isSelected = filterCategory === cat;
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => setFilterCategory(cat)}
-                      className={cn(
-                        "w-full flex items-center gap-1.5 px-2 py-1.5 text-xs text-left hover:bg-accent transition-colors",
-                        isSelected && "bg-accent text-foreground",
-                        !isSelected && "text-muted-foreground",
-                      )}
-                    >
-                      <span className="flex-1 truncate">
-                        {toTitleCase(cat)}
-                      </span>
-                      {activeCount > 0 && (
-                        <span className="rounded-full bg-primary text-primary-foreground px-1.5 text-[10px] font-medium leading-tight shrink-0">
-                          {activeCount}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Right: values for selected category */}
-              {filterCategory && (
-                <div className="flex-1 min-w-0 flex flex-col">
-                  <Command className="flex-1 flex flex-col">
-                    <CommandInput
-                      placeholder={`Search ${toTitleCase(filterCategory).toLowerCase()}...`}
-                    />
-                    <CommandList className="flex-1 overflow-auto max-h-none">
-                      <CommandEmpty>No values found.</CommandEmpty>
-                      <CommandGroup>
-                        {(valuesByCategory[filterCategory] ?? []).map((val) => {
-                          const active = hasFilter(filters, {
-                            category: filterCategory,
-                            value: val,
-                          });
-                          return (
-                            <CommandItem
-                              key={val}
-                              onSelect={() => toggleFilter(filterCategory, val)}
-                            >
-                              <Check
-                                className={cn(
-                                  "size-3.5 mr-2 shrink-0",
-                                  active ? "opacity-100" : "opacity-0",
-                                )}
-                              />
-                              <span className="truncate">{val}</span>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </div>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <button
-          onClick={toggleSearch}
-          className={cn(
-            "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground shrink-0",
-            searchOpen && "text-foreground",
-          )}
-        >
-          <Search className="size-3.5" />
-          Search
-        </button>
-
-        {searchOpen && (
+      <div className="shrink-0 border-b border-border px-4 py-2 space-y-2">
+        {/* Row 1: Search + Save */}
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Search className="size-3.5 shrink-0 text-muted-foreground" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search notes..."
+              placeholder="Search files..."
               className="flex-1 min-w-0 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
             />
             {searchQuery && (
@@ -780,32 +638,117 @@ export function BasesView({
                 {searchMatchPaths ? `${searchMatchPaths.size} matches` : "..."}
               </span>
             )}
-            <button
-              onClick={toggleSearch}
-              className="text-muted-foreground hover:text-foreground shrink-0"
-            >
-              <X className="size-3" />
-            </button>
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(""); setSearchMatchPaths(null); }}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={handleSaveClick}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <Save className="size-3.5" />
+            {isDefaultBase ? "Save As" : "Save"}
+          </button>
+        </div>
+
+        {/* Row 2: Type pills */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {FILTER_CATEGORIES.map(({ key, label }) => {
+            const count = key === "all"
+              ? Object.values(typeCounts).reduce((a, b) => a + b, 0)
+              : (typeCounts[key] ?? 0);
+            const isActive = activeTypeFilter === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveTypeFilter(key)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-primary/20 hover:text-foreground",
+                )}
+              >
+                {label}
+                <span className={cn(
+                  "text-[10px]",
+                  isActive ? "text-primary-foreground/70" : "text-muted-foreground",
+                )}>
+                  ({count})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 3: Sort pills */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">
+            Sort:
+          </span>
+          {SORT_OPTIONS.map((opt) => {
+            const isActive = sortField === opt.field;
+            return (
+              <button
+                key={opt.field}
+                onClick={() => handleSort(opt.field)}
+                className={cn(
+                  "inline-flex items-center gap-0.5 rounded-md px-2 py-0.5 text-[11px] transition-colors",
+                  isActive
+                    ? "bg-accent text-accent-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                )}
+              >
+                {opt.label}
+                {isActive && (
+                  sortDir === "asc"
+                    ? <ArrowUp className="size-3" />
+                    : <ArrowDown className="size-3" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 4: Folder pills */}
+        {rootFolders.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">
+              Folders:
+            </span>
+            {rootFolders.map((folder) => {
+              const isActive = hasFilter(filters, { category: "folder", value: folder });
+              return (
+                <button
+                  key={folder}
+                  onClick={() => toggleFilter("folder", folder)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-foreground font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                  )}
+                >
+                  {folder}
+                  <span className="text-[10px] text-muted-foreground">
+                    ({enrichedFiles.filter((f) => f.rootFolder === folder).length})
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        <div className="flex-1" />
-
-        <button
-          onClick={handleSaveClick}
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground shrink-0"
-        >
-          <Save className="size-3.5" />
-          {isDefaultBase ? "Save As" : "Save"}
-        </button>
-      </div>
-
-      {/* Filter bar */}
-      {filters.length > 0 && (
-        <div className="shrink-0 border-b border-border px-4 py-2">
+        {/* Row 5: Active filters bar */}
+        {filters.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground shrink-0">
-              {sortedNotes.length} of {enrichedNotes.length} notes
+            <span className="text-[10px] text-muted-foreground">
+              {sortedFiles.length} of {enrichedFiles.length} files
             </span>
             {filters.map((f) => (
               <button
@@ -822,13 +765,13 @@ export function BasesView({
             ))}
             <button
               onClick={clearFilters}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-[11px] text-muted-foreground hover:text-foreground"
             >
               Clear all
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
@@ -861,10 +804,10 @@ export function BasesView({
             </tr>
           </thead>
           <tbody>
-            {pageNotes.map((note) => (
-              <NoteRow
-                key={note.path}
-                note={note}
+            {pageFiles.map((file) => (
+              <FileRow
+                key={file.path}
+                file={file}
                 visibleColumns={visibleColumns}
                 filters={filters}
                 toggleFilter={toggleFilter}
@@ -872,13 +815,13 @@ export function BasesView({
                 actions={actions}
               />
             ))}
-            {pageNotes.length === 0 && (
+            {pageFiles.length === 0 && (
               <tr>
                 <td colSpan={visibleColumns.length} className="p-0">
                   <EmptyState
                     icon={<Table2 className="size-5" />}
-                    title="No matching notes"
-                    description="Try clearing your filters or create a new note to see it here."
+                    title="No matching files"
+                    description="Try clearing your filters or add files to your vault."
                   />
                 </td>
               </tr>
@@ -890,9 +833,9 @@ export function BasesView({
       {/* Pagination */}
       <div className="shrink-0 border-t border-border px-4 py-2 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {sortedNotes.length === 0
-            ? "0 notes"
-            : `${clampedPage * PAGE_SIZE + 1}\u2013${Math.min((clampedPage + 1) * PAGE_SIZE, sortedNotes.length)} of ${sortedNotes.length}`}
+          {sortedFiles.length === 0
+            ? "0 files"
+            : `${clampedPage * PAGE_SIZE + 1}\u2013${Math.min((clampedPage + 1) * PAGE_SIZE, sortedFiles.length)} of ${sortedFiles.length}`}
         </span>
         {totalPages > 1 && (
           <div className="flex items-center gap-1">
@@ -934,7 +877,7 @@ export function BasesView({
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSaveConfirm();
             }}
-            placeholder="e.g. Contacts, Projects..."
+            placeholder="e.g. Active Papers, CS Lectures..."
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
             autoFocus
           />
@@ -961,55 +904,60 @@ export function BasesView({
 
 /** Renders a single table cell based on the column type */
 function CellRenderer({
-  note,
+  file,
   column,
   filters,
   toggleFilter,
 }: {
-  note: NoteEntry;
+  file: FileEntry;
   column: string;
   filters: ActiveFilter[];
   toggleFilter: (category: string, value: string) => void;
 }) {
   if (column === "name") {
-    return <span className="font-medium truncate block">{note.name}</span>;
+    const cat = getFileCategory(file.ext);
+    const Icon = getFileIcon(cat);
+    return (
+      <span className="font-medium truncate block flex items-center gap-2">
+        <Icon className="size-4 shrink-0 text-muted-foreground" />
+        {file.name}
+      </span>
+    );
+  }
+  if (column === "ext") {
+    const cat = getFileCategory(file.ext);
+    const Icon = getFileIcon(cat);
+    return (
+      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+        <Icon className="size-3.5" />
+        <span className="text-xs font-mono">{file.ext.replace(/^\./, "").toUpperCase()}</span>
+      </span>
+    );
   }
   if (column === "folder") {
     return (
       <span className="text-muted-foreground truncate block">
-        {note.folder}
+        {file.folder}
+      </span>
+    );
+  }
+  if (column === "size") {
+    return (
+      <span className="text-muted-foreground whitespace-nowrap truncate block text-xs font-mono">
+        {formatFileSize(file.size)}
       </span>
     );
   }
   if (column === "mtimeMs") {
     return (
       <span className="text-muted-foreground whitespace-nowrap truncate block">
-        {formatDate(note.mtimeMs)}
-      </span>
-    );
-  }
-
-  // Date-like frontmatter columns — render like Last Modified
-  if (column === "last_update" || column === "first_met") {
-    const value = note.fields[column];
-    if (!value || Array.isArray(value)) return null;
-    const ms = Date.parse(value);
-    if (!isNaN(ms)) {
-      return (
-        <span className="text-muted-foreground whitespace-nowrap truncate block">
-          {formatDate(ms)}
-        </span>
-      );
-    }
-    return (
-      <span className="text-muted-foreground whitespace-nowrap truncate block">
-        {value}
+        {formatDate(file.mtimeMs)}
       </span>
     );
   }
 
   // Frontmatter column
-  const value = note.fields[column];
+  const value = file.fields[column];
   if (!value) return null;
 
   if (Array.isArray(value)) {
@@ -1039,15 +987,15 @@ function CellRenderer({
   );
 }
 
-function NoteRow({
-  note,
+function FileRow({
+  file,
   visibleColumns,
   filters,
   toggleFilter,
   onSelectNote,
   actions,
 }: {
-  note: NoteEntry;
+  file: FileEntry;
   visibleColumns: string[];
   filters: ActiveFilter[];
   toggleFilter: (category: string, value: string) => void;
@@ -1063,7 +1011,7 @@ function NoteRow({
     if (isRenaming) inputRef.current?.focus();
   }, [isRenaming]);
 
-  const baseName = note.name;
+  const baseName = file.name;
   const handleRenameSubmit = useCallback(async () => {
     if (isSubmittingRef.current) return;
     const trimmed = newName.trim();
@@ -1073,26 +1021,26 @@ function NoteRow({
     }
     isSubmittingRef.current = true;
     try {
-      await actions?.rename(note.path, trimmed, false);
+      await actions?.rename(file.path, trimmed, false);
     } catch {
       // ignore
     }
     setIsRenaming(false);
     isSubmittingRef.current = false;
-  }, [newName, baseName, actions, note.path]);
+  }, [newName, baseName, actions, file.path]);
 
   const handleCopyPath = useCallback(() => {
-    actions?.copyPath(note.path);
-  }, [actions, note.path]);
+    actions?.copyPath(file.path);
+  }, [actions, file.path]);
 
   const handleDelete = useCallback(() => {
-    void actions?.remove(note.path);
-  }, [actions, note.path]);
+    void actions?.remove(file.path);
+  }, [actions, file.path]);
 
   const row = (
     <tr
       className="border-b border-border/50 hover:bg-accent/50 cursor-pointer transition-colors"
-      onClick={() => onSelectNote(note.path)}
+      onClick={() => onSelectNote(file.path)}
     >
       {visibleColumns.map((col) => (
         <td key={col} className="px-4 py-2 overflow-hidden">
@@ -1112,7 +1060,7 @@ function NoteRow({
             />
           ) : (
             <CellRenderer
-              note={note}
+              file={file}
               column={col}
               filters={filters}
               toggleFilter={toggleFilter}

@@ -8,14 +8,14 @@ You have access to the **app-navigation** tool which lets you control the Schola
 ### open-note
 Open a specific knowledge file in the editor pane.
 
-**When to use:** When the user asks to see, open, or view a specific note (e.g., "open John's note", "show me the Acme project page").
+**When to use:** When the user asks to see, open, or view a specific file (e.g., "open my Biology notes", "show me the lecture on photosynthesis").
 
 **Parameters:**
-- ` + "`path`" + `: Full workspace-relative path (e.g., ` + "`People/John Smith.md`" + `)
+- ` + "`path`" + `: Full workspace-relative path (e.g., ` + "`Courses/Biology 101/Lecture Notes.md`" + `)
 
 **Tips:**
 - Use ` + "`workspace-grep`" + ` first to find the exact path if you're unsure of the filename.
-- Always pass the full workspace-relative path (e.g., ` + "`People/John.md`" + `), not just the filename.
+- Always pass the full workspace-relative path (e.g., ` + "`Courses/Biology 101/Lecture Notes.md`" + `), not just the filename.
 
 ### open-view
 Switch the UI to the graph or bases view.
@@ -28,7 +28,7 @@ Switch the UI to the graph or bases view.
 ### update-base-view
 Change filters, columns, sort order, or search in the bases (table) view.
 
-**When to use:** When the user asks to find, filter, sort, or search notes. Examples: "show me all active customers", "filter by topic=hiring", "sort by name", "search for pricing".
+**When to use:** When the user asks to find, filter, sort, or search files. Examples: "show me Biology 101 notes", "filter by folder=Courses", "sort by name", "search for machine learning".
 
 **Parameters:**
 - ` + "`filters`" + `: Object with ` + "`set`" + `, ` + "`add`" + `, ` + "`remove`" + `, or ` + "`clear`" + ` — each takes an array of ` + "`{ category, value }`" + ` pairs.
@@ -43,7 +43,7 @@ Change filters, columns, sort order, or search in the bases (table) view.
 **Tips:**
 - If unsure what categories/values are available, call ` + "`get-base-state`" + ` first.
 - For "show me X", prefer ` + "`filters.set`" + ` to start fresh rather than ` + "`filters.add`" + `.
-- Categories come from frontmatter keys (e.g., relationship, status, topic, type).
+- Categories come from frontmatter keys and built-in fields like ` + "`folder`" + `, ` + "`ext`" + ` (file type), ` + "`size`" + `, and ` + "`mtimeMs`" + `. You can also filter by file type using the type pills (MD, PDF, HTML, etc.).
 - **CRITICAL: Do NOT pass ` + "`columns`" + ` unless the user explicitly asks to show/hide specific columns.** Omit the ` + "`columns`" + ` parameter entirely when only filtering, sorting, or searching. Passing ` + "`columns`" + ` will override the user's current column layout and can make the view appear empty.
 
 ### get-base-state
@@ -64,18 +64,20 @@ Save the current view configuration as a named base.
 
 ## Workflow Example
 
-1. User: "Show me all people who are customers"
+1. User: "Show me Biology 101 lecture notes"
 2. First, check what properties are available:
    ` + "`app-navigation({ action: \"get-base-state\" })`" + `
 3. Apply filters based on the available properties:
-   ` + "`app-navigation({ action: \"update-base-view\", filters: { set: [{ category: \"relationship\", value: \"customer\" }] } })`" + `
-4. If the user wants to save it:
-   ` + "`app-navigation({ action: \"create-base\", name: \"Customers\" })`" + `
+   ` + "`app-navigation({ action: \"update-base-view\", filters: { set: [{ category: \"folder\", value: \"Courses\" }] } })`" + `
+4. If the user wants to narrow to PDFs only, use type filter:
+   ` + "`app-navigation({ action: \"update-base-view\", filters: { set: [{ category: \"folder\", value: \"Courses\" }] } })`" + `
+   Then the user can click the PDF pill to filter by file type.
 
 ## Important Notes
 - The ` + "`update-base-view`" + ` action will automatically navigate to the bases view if the user isn't already there.
 - ` + "`open-note`" + ` validates that the file exists before navigating.
-- Filter categories and values come from frontmatter in knowledge files.
+- Filter categories and values come from frontmatter in markdown files and built-in fields (folder, ext, size, mtimeMs).
+- File type filtering (MD, PDF, HTML, Code, Image, etc.) is done via the type pills in the UI — use ` + "`filters`" + ` with frontmatter or folder values only.
 - **Never send ` + "`columns`" + ` or ` + "`sort`" + ` with ` + "`update-base-view`" + ` unless the user specifically asks to change them.** Only pass the parameters you intend to change — omitted parameters are left untouched.
 
 ### open-dashboard
