@@ -188,7 +188,6 @@ function Sidebar({
         data-slot="sidebar-gap"
         className={cn(
           "relative w-(--sidebar-width) bg-transparent overflow-hidden",
-          "in-data-[resizing=false]:transition-[width] in-data-[resizing=false]:duration-[180ms] in-data-[resizing=false]:ease-[cubic-bezier(0.4,0,0.2,1)]",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -200,7 +199,6 @@ function Sidebar({
         data-slot="sidebar-container"
         className={cn(
           "fixed inset-y-0 z-10 flex h-svh w-(--sidebar-width) overflow-hidden",
-          "in-data-[resizing=false]:transition-[left,right,width] in-data-[resizing=false]:duration-[180ms] in-data-[resizing=false]:ease-[cubic-bezier(0.4,0,0.2,1)]",
           side === "left"
             ? "left-(--sidebar-offset) group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-offset)-var(--sidebar-width))]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -217,8 +215,6 @@ function Sidebar({
           data-slot="sidebar-inner"
           className={cn(
             "bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm",
-            "in-data-[resizing=false]:transition-[opacity,transform] in-data-[resizing=false]:duration-[180ms] in-data-[resizing=false]:ease-[cubic-bezier(0.4,0,0.2,1)]",
-            "group-data-[collapsible=offcanvas]:opacity-0 group-data-[collapsible=offcanvas]:translate-x-[-8px]",
             "group-data-[collapsible=icon]:transition-[padding] group-data-[collapsible=icon]:duration-200",
           )}
         >

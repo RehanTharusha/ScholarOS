@@ -502,20 +502,11 @@
   display: grid;
   gap: 0;
   overflow: hidden;
-  transition:
-    max-height 140ms cubic-bezier(0.2, 0.9, 0.2, 1),
-    opacity 110ms ease-out,
-    transform 140ms cubic-bezier(0.2, 0.9, 0.2, 1);
 }
 
 /* ==============================================
    Focus/zen mode transitions
    ============================================== */
-
-/* Smooth transition for sidebar collapse/expand */
-[data-slot="sidebar"] {
-  transition: width 180ms cubic-bezier(0.4, 0, 0.2, 1), opacity 180ms cubic-bezier(0.4, 0, 0.2, 1);
-}
 
 /* Smooth transition for sidebar inset (main content) */
 [data-slot="sidebar-inset"] {
@@ -530,76 +521,18 @@
 .sidebar-quick-actions[data-state="open"] {
   max-height: 320px;
   opacity: 1;
-  transform: translateY(0);
   pointer-events: auto;
 }
 
 .sidebar-quick-actions[data-state="closed"] {
   max-height: 0;
   opacity: 0;
-  transform: translateY(-6px);
   pointer-events: none;
-}
-
-.sidebar-quick-action {
-  transition:
-    opacity 120ms ease-out,
-    transform 140ms cubic-bezier(0.2, 0.9, 0.2, 1);
-  transition-delay: 0ms;
-  will-change: transform, opacity;
-}
-
-.sidebar-quick-actions[data-state="open"] .sidebar-quick-action {
-  opacity: 1;
-  transform: translateY(0);
-  transition-delay: var(--stagger, 0ms);
-}
-
-.sidebar-quick-actions[data-state="closed"] .sidebar-quick-action {
-  opacity: 0;
-  transform: translateY(-6px);
-  transition-delay: 0ms;
 }
 
 /* Sidebar folders: fast, snappy collapse/expand */
 .sidebar-folder-collapsible [data-slot="collapsible-content"] {
   overflow: hidden;
-}
-
-.sidebar-folder-collapsible
-  [data-slot="collapsible-content"][data-state="open"] {
-  animation: sidebar-collapsible-down 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-
-.sidebar-folder-collapsible
-  [data-slot="collapsible-content"][data-state="closed"] {
-  animation: sidebar-collapsible-up 120ms cubic-bezier(0.2, 0.9, 0.2, 1);
-}
-
-@keyframes sidebar-collapsible-down {
-  from {
-    height: 0;
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    height: var(--radix-collapsible-content-height);
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes sidebar-collapsible-up {
-  from {
-    height: var(--radix-collapsible-content-height);
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    height: 0;
-    opacity: 0;
-    transform: translateY(-4px);
-  }
 }
 
 /* Overlays: warm transparent instead of black */
