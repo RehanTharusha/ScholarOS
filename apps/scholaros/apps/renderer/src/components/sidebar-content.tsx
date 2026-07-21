@@ -1318,9 +1318,9 @@ function KnowledgeSection({
                     </button>
                   </div>
                 ) : (
-                  tree.map((item, index) => (
+                  tree.map((item) => (
                     <Tree
-                      key={index}
+                      key={item.path}
                       item={item}
                       selectedPath={selectedPath}
                       expandedPaths={expandedPaths}
@@ -1358,7 +1358,7 @@ function KnowledgeSection({
 const FOLDER_DISPLAY_NAMES: Record<string, string> = {};
 
 // Tree component for file browser
-function Tree({
+const Tree = React.memo(function Tree({
   item,
   selectedPath,
   expandedPaths,
@@ -1610,9 +1610,9 @@ function Tree({
               )}
               <CollapsibleContent>
                 <SidebarMenuSub>
-                  {(item.children ?? []).map((subItem, index) => (
+                  {(item.children ?? []).map((subItem) => (
                     <Tree
-                      key={index}
+                      key={subItem.path}
                       item={subItem}
                       selectedPath={selectedPath}
                       expandedPaths={expandedPaths}
@@ -1688,9 +1688,9 @@ function Tree({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <SidebarMenuSub>
-                {(item.children ?? []).map((subItem, index) => (
+                {(item.children ?? []).map((subItem) => (
                   <Tree
-                    key={index}
+                    key={subItem.path}
                     item={subItem}
                     selectedPath={selectedPath}
                     expandedPaths={expandedPaths}
@@ -1709,7 +1709,12 @@ function Tree({
     </ContextMenu>
     </>
   );
-}
+}, (prev, next) => {
+  return prev.item.path === next.item.path
+    && prev.item.kind === next.item.kind
+    && prev.selectedPath === next.selectedPath
+    && prev.expandedPaths.has(prev.item.path) === next.expandedPaths.has(next.item.path);
+});
 
 // Knowledge section
 

@@ -59,7 +59,6 @@ import {
   streamdownComponents,
   userMessageRemarkPlugins,
   SmoothStreamingMessage,
-  StreamingMessage,
   matchBillingError,
   BillingErrorCTA,
 } from "@/components/chat-shared";
@@ -841,11 +840,10 @@ export function ChatSidebar({
                                 </Message>
                               )}
 
-                              {tabState.currentToolDraftActive === false && (
-                                <StreamingMessage
-                                  transform={(t) =>
-                                    t.replace(/<\/?voice>/g, "")
-                                  }
+                              {tabState.currentToolDraftActive === false && tabState.currentAssistantMessage && (
+                                <SmoothStreamingMessage
+                                  text={tabState.currentAssistantMessage.replace(/<\/?voice>/g, "")}
+                                  components={streamdownComponents}
                                 />
                               )}
 

@@ -90,19 +90,23 @@ export function useQuickAccess() {
   );
 
   const persist = useCallback(async (next: QuickAccessItem[]) => {
-    const ipc = getIpc();
-    if (!ipc) return;
-    await ipc.invoke("workspace:mkdir", {
-      path: ".scholar",
-      recursive: true,
-    });
-    await ipc.invoke("workspace:writeFile", {
-      path: QUICK_ACCESS_PATH,
-      data: JSON.stringify({
-        items: next,
-        dismissed: Array.from(dismissedRef.current),
-      }, null, 2),
-    });
+    try {
+      const ipc = getIpc();
+      if (!ipc) return;
+      await ipc.invoke("workspace:mkdir", {
+        path: ".scholar",
+        recursive: true,
+      });
+      await ipc.invoke("workspace:writeFile", {
+        path: QUICK_ACCESS_PATH,
+        data: JSON.stringify({
+          items: next,
+          dismissed: Array.from(dismissedRef.current),
+        }, null, 2),
+      });
+    } catch (err) {
+      console.error("Failed to persist quick access items:", err);
+    }
   }, []);
 
   const loadItems = useCallback(async () => {

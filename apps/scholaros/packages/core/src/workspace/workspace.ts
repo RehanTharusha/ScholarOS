@@ -370,7 +370,20 @@ export async function writeFile(
       const tempPath =
         filePath + ".tmp." + Date.now() + Math.random().toString(36).slice(2);
       await fs.writeFile(tempPath, buffer);
-      await fs.rename(tempPath, filePath);
+      try {
+        await fs.rename(tempPath, filePath);
+      } catch (err: unknown) {
+        // Clean up orphan .tmp file if rename fails (e.g., EPERM on FAT32/exFAT)
+        try { await fs.unlink(tempPath); } catch { /* ignore cleanup error */ }
+        if ((err as NodeJS.ErrnoException)?.code === "EPERM") {
+          console.warn(
+            `[Workspace] Atomic rename failed for "${relPath}", falling back to direct write (${(err as NodeJS.ErrnoException).code})`,
+          );
+          await fs.writeFile(filePath, buffer);
+        } else {
+          throw err;
+        }
+      }
     } else {
       await fs.writeFile(filePath, buffer);
     }

@@ -1066,6 +1066,7 @@ function App() {
   chatTabsRef.current = chatTabs;
   const navigateToFileRef = useRef<(path: string) => void>(() => {});
   const loadDirectoryRef = useRef<() => Promise<any>>(async () => {});
+  const cachedExpandedRef = useRef<Set<string> | null>(null);
   const setChatDraftForTab = useCallback((tabId: string, text: string) => {
     if (text) {
       chatDraftsRef.current.set(tabId, text);
@@ -1484,9 +1485,15 @@ function App() {
   }, [loadDirectory, hasVault]);
 
   // Refresh workspace state when vault changes
+  // Skip initial emission since Load initial tree effect already handled it
+  const initialVaultRef = useRef(true);
   useEffect(() => {
     const cleanup = window.ipc.on("vault:changed", async (event) => {
       console.debug("[Renderer] vault:changed received ->", event.path);
+      if (initialVaultRef.current) {
+        initialVaultRef.current = false;
+        return;
+      }
       if (!event.path) {
         setHasVault(false);
         resetWorkspaceState("");
@@ -5119,8 +5126,19 @@ function App() {
       openCanvas: () => {
         void navigateToView({ type: "canvases" });
       },
-      expandAll: () => setExpandedPaths(new Set(collectDirPaths(tree))),
-      collapseAll: () => setExpandedPaths(new Set()),
+      expandAll: () => {
+        if (cachedExpandedRef.current && cachedExpandedRef.current.size > 0) {
+          setExpandedPaths(new Set(cachedExpandedRef.current));
+        } else {
+          const all = collectDirPaths(tree);
+          cachedExpandedRef.current = new Set(all);
+          setExpandedPaths(new Set(all));
+        }
+      },
+      collapseAll: () => {
+        cachedExpandedRef.current = new Set(expandedPaths);
+        setExpandedPaths(new Set());
+      },
       rename: async (oldPath: string, newName: string, isDir: boolean) => {
         try {
           const parts = oldPath.split("/");

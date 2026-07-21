@@ -25,7 +25,11 @@ export async function createWorkspaceWatcher(
 
   const watcher = chokidar.watch(WorkDir, {
     ignoreInitial: true,
-    ignored: [getScholarOSDir(), `${getScholarOSDir()}/**`],
+    ignored: [
+      getScholarOSDir(),
+      `${getScholarOSDir()}/**`,
+      /\.tmp\.\d+[a-z0-9]+$/, // ignore temp files from atomic writes
+    ],
     awaitWriteFinish: {
       stabilityThreshold: 150,
       pollInterval: 50,

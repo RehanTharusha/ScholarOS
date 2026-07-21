@@ -102,21 +102,24 @@ function QuickAccessItemRow({
   const displayName = item.customName || item.name;
   const isCourse = item.type === "course" || item.type === "detected";
   const isFile = item.path.includes(".") && !item.path.endsWith("/");
-  const isExpanded = expandedPaths?.has(item.path) ?? false;
+
+  const expandedPathsRef = useRef(expandedPaths);
+  expandedPathsRef.current = expandedPaths;
 
   const handleClick = useCallback(async () => {
     if (onValidateItem) {
       const valid = await onValidateItem(item);
       if (!valid) return;
     }
+    const currentExpanded = expandedPathsRef.current?.has(item.path) ?? false;
     if (isFile) {
       onSelectFile(item.path, "file");
-    } else if (isExpanded && onToggleFolder) {
+    } else if (currentExpanded && onToggleFolder) {
       onToggleFolder(item.path);
     } else {
       onEnsureFolderExpanded(item.path);
     }
-  }, [isFile, isExpanded, item.path, onEnsureFolderExpanded, onSelectFile, onToggleFolder, onValidateItem, item]);
+  }, [isFile, item.path, onEnsureFolderExpanded, onSelectFile, onToggleFolder, onValidateItem, item]);
 
   const handleRenameSubmit = useCallback(async () => {
     const trimmed = renameValue.trim();

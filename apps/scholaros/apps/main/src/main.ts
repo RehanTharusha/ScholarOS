@@ -260,13 +260,17 @@ function createWindow() {
   configureSessionPermissions(session.fromPartition(BROWSER_PARTITION));
 
   // Set Content Security Policy to mitigate XSS and data injection
+  // 'unsafe-eval' is needed for Vite HMR in development but removed in production
+  const scriptSrc = app.isPackaged
+    ? "'self' 'unsafe-inline' https://cdn.jsdelivr.net"
+    : "'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net";
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         "Content-Security-Policy": [
           "default-src 'self'; " +
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; " +
+          `script-src ${scriptSrc}; ` +
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
           "img-src 'self' data: blob:; " +
           "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
@@ -312,9 +316,9 @@ function createWindow() {
       win.webContents.openDevTools({ mode: "detach" });
       win.webContents.on(
         "console-message",
-        (_event, level, message, line, sourceId) => {
+        (event) => {
           console.log(
-            `[Renderer][console:${level}] ${message} (${sourceId}:${line})`,
+            `[Renderer][console:${event.level}] ${event.message} (${event.sourceId}:${event.lineNumber})`,
           );
         },
       );

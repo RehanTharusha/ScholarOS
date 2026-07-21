@@ -74,8 +74,9 @@ export function TabBar<T>({
             >
               <span className="truncate flex-1 text-left">{title}</span>
               {(allowSingleTabClose || tabs.length > 1) && (
-                <button
-                  type="button"
+                <span
+                  role="button"
+                  tabIndex={0}
                   title="Close tab"
                   aria-label="Close tab"
                   className="shrink-0 flex items-center justify-center rounded-sm p-0.5 opacity-0 group-hover/tab:opacity-60 hover:opacity-100! hover:bg-foreground/10 transition-all cursor-pointer"
@@ -85,9 +86,16 @@ export function TabBar<T>({
                     e.preventDefault();
                     onCloseTab(tabId);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onCloseTab(tabId);
+                    }
+                  }}
                 >
                   <X className="size-3" />
-                </button>
+                </span>
               )}
             </button>
             {/* Right edge divider after last tab to close off the section */}
